@@ -25,7 +25,10 @@ cpSync(dist, www, { recursive: true });
 // The site's other pages are reachable only from the marketing nav, which
 // the shell does not show. Shipping them would put a privacy page and a
 // how-to article inside the app binary for no one to open.
-for (const page of ["burn-subtitles-into-video.html", "privacy.html", "sitemap.xml", "robots.txt", "llms.txt", "og-image.png"]) {
+// privacy.html stays. The footer links to it, both stores require a
+// reachable privacy policy, and deleting it left that link 404ing inside
+// the app -- which is exactly the sort of thing a reviewer clicks.
+for (const page of ["burn-subtitles-into-video.html", "sitemap.xml", "robots.txt", "llms.txt", "og-image.png"]) {
   rmSync(join(www, page), { force: true });
 }
 
@@ -36,7 +39,10 @@ let html = readFileSync(index, "utf8");
 // shell has no address bar to explain where you are. The sections are
 // named, so they are removed by name rather than by a shape-matching
 // regex that silently matches nothing when the markup moves.
-const MARKETING = ["how", "privacy", "pricing", "faq"];
+// "downloads" is not only marketing here. It links to GitHub releases for
+// the desktop app and the extension, and a store app that points users at
+// installers outside the store is a rejection on both platforms.
+const MARKETING = ["how", "downloads", "privacy", "pricing", "faq"];
 let dropped = 0;
 for (const id of MARKETING) {
   const open = html.indexOf(`<section id="${id}"`);
@@ -116,6 +122,18 @@ if (missed.length) {
   process.exit(1);
 }
 
+// The footer's link to GitHub *releases* goes too, for the same reason as
+// the downloads section: it offers installers from outside the store. The
+// link to the source stays -- the AGPL wants the source offered, and an
+// open-source app linking its repository is ordinary.
+const releasesLink = /<a href="https:\/\/github\.com\/[^"]*\/releases"[^>]*>[\s\S]*?<\/a>\s*/g;
+if (!releasesLink.test(html)) {
+  console.error("stage: no releases link found in the footer -- has it moved?");
+  process.exit(1);
+}
+releasesLink.lastIndex = 0;
+html = html.replace(releasesLink, "");
+
 // Structured data is search-engine markup for a web page. Inside an app
 // binary it is dead weight that also describes the wrong product -- it
 // names an operating system of "Any browser with WebAssembly".
@@ -133,6 +151,14 @@ const stray = html.match(/.{0,50}(browser|your machine|Drop a video).{0,50}/gi) 
 if (stray.length) {
   console.error(`stage: ${stray.length} phrase(s) that do not belong in an app survive:`);
   for (const m of stray.slice(0, 6)) console.error(`  ...${m.replace(/\s+/g, " ")}...`);
+  process.exit(1);
+}
+
+// Every same-origin page this links to has to still be in the payload.
+const linked = [...html.matchAll(/href="\/([A-Za-z0-9._-]+\.html)"/g)].map((m) => m[1]);
+const gone = linked.filter((f) => !existsSync(join(www, f)));
+if (gone.length) {
+  console.error(`stage: the page links to files this build removed: ${gone.join(", ")}`);
   process.exit(1);
 }
 

@@ -534,6 +534,23 @@
   footer a:hover { color: var(--text-strong); }
   footer .spacer { margin-left: auto; }
 
+  /* Downloads.
+     The four cards carry different amounts of prose, so the button in each
+     is pushed to the bottom rather than left to follow its paragraph --
+     four buttons on four different baselines read as four unrelated boxes
+     rather than one set of choices. */
+  #downloads .site-card { display: flex; flex-direction: column; }
+  /* A flex column stretches its children, and .site-tag is an
+     inline-block pill that then spans the whole card. */
+  #downloads .site-card .site-tag { align-self: flex-start; }
+  #downloads .site-card p:last-child { margin-top: auto; padding-top: var(--space-4); }
+  #downloads .site-card .site-btn { width: 100%; }
+  #downloads .reassure {
+    margin-top: var(--space-5);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+  }
+
   .sr-only {
     position: absolute;
     width: 1px; height: 1px;
@@ -576,6 +593,7 @@
       <a class="hide-sm" href="#how">How it works</a>
       <a class="hide-sm" href="#privacy">Privacy</a>
       <a class="hide-sm" href="#pricing">Pricing</a>
+      <a class="hide-sm" href="#downloads">Downloads</a>
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
       <a href="#app">Open the app</a>
@@ -699,6 +717,78 @@
         </p>
       </div>
     </div>
+  </div>
+</section>
+
+<!--
+  Everything except the web app.
+  
+  The page is the web app, so this section is about the three places the
+  same engine also runs. Every claim here is one a reader can check in a
+  minute, and each one carries what it actually needs to work: the desktop
+  app wants an ffmpeg with libass, and the extension is not in any store
+  yet. Saying so costs a few downloads and saves everyone the ones that
+  would have failed.
+-->
+<section id="downloads">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>The same engine, in three other places.</h2>
+      <p>
+        The page above needs nothing installed. These do, and in return they
+        do things a page cannot &mdash; subtitle a video already playing in a
+        tab, or burn a two-hour file without a browser in the way. All of it
+        is the same Rust engine, so the output is identical.
+      </p>
+    </div>
+    <div class="grid grid-4">
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Browser extension</h3>
+        <p>
+          Subtitles over whatever is playing in the tab, generated as it
+          plays. Chrome, Edge and Firefox. Not in the stores yet &mdash; the
+          build is a <code>.zip</code> you load yourself.
+        </p>
+        <p><a class="site-btn site-btn-secondary" href="https://github.com/open-subs/opensubs/releases">Get the extension</a></p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Desktop app</h3>
+        <p>
+          macOS, Windows and Linux, for long files and batches. It drives
+          <code>ffmpeg</code> to burn, so it needs one built with the
+          <code>ass</code> filter &mdash; <code>brew install ffmpeg-full</code>
+          on macOS. The builds are unsigned.
+        </p>
+        <p><a class="site-btn site-btn-secondary" href="https://github.com/open-subs/opensubs/releases">Download</a></p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Command line</h3>
+        <p>
+          One command per file, for scripting and for CI. Same engine, same
+          presets, same output. Build it from source; it has the same
+          <code>ffmpeg</code> requirement as the desktop app.
+        </p>
+        <p><a class="site-btn site-btn-secondary" href="https://github.com/open-subs/opensubs">Read the source</a></p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">AGPL-3.0</span>
+        <h3>All of it, open</h3>
+        <p>
+          The engine, the web app, the extension, the desktop app and the
+          command line are one repository. Read what runs on your machine
+          rather than take this page's word for it.
+        </p>
+        <p><a class="site-btn site-btn-secondary" href="https://github.com/open-subs/opensubs">View on GitHub</a></p>
+      </div>
+    </div>
+    <p class="reassure">
+      Current builds are release candidates. They are complete and tested;
+      the version number says they have not been through a stable release
+      yet.
+    </p>
   </div>
 </section>
 
@@ -869,8 +959,9 @@
   <div class="wrap">
     <span>&copy; 2026 OpenSubs</span>
     <a href="/privacy.html">Privacy</a>
+    <a href="https://github.com/open-subs/opensubs/releases">Downloads</a>
     <span class="spacer"></span>
-    <span>Open source, AGPL-3.0</span>
+    <a href="https://github.com/open-subs/opensubs">Source, AGPL-3.0</a>
   </div>
 </footer>
     </div>
