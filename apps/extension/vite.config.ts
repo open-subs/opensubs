@@ -45,6 +45,16 @@ export default defineConfig({
   // manifest into the package -- manifest.firefox.json inside the Chrome
   // build -- which is the kind of stray file a store review asks about.
   plugins: [singleOrtCopy()],
+  resolve: {
+    // Same reason as the `paths` block in tsconfig.json: the engine lives
+    // in ../web/src/lib and its bare imports would otherwise be resolved
+    // against apps/web/node_modules. This package carries its own copies
+    // and must build from them alone.
+    alias: {
+      mediabunny: resolve(__dirname, "node_modules/mediabunny"),
+      "@huggingface/transformers": resolve(__dirname, "node_modules/@huggingface/transformers"),
+    },
+  },
   publicDir: false,
   build: {
     outDir: "dist",

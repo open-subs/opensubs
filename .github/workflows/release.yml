@@ -29,6 +29,10 @@ jobs:
         with:
           name: extension
           path: apps/extension/packages/*.zip
+          # A job that uploads nothing must fail here rather than warn.
+          # Otherwise it goes green, the release step finds no files, and
+          # the only signal is a tag with an empty release hanging off it.
+          if-no-files-found: error
 
   desktop:
     name: desktop (${{ matrix.os }})
@@ -55,12 +59,21 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
+          # The workspace root, not apps/desktop/src-tauri. Cargo puts a
+          # workspace member's output in the *workspace's* target dir, so
+          # tauri bundles land here:
+          #   target/release/bundle/{dmg,appimage,deb,rpm,msi,nsis}/
+          # The first cut of this file guessed the crate-local path, all
+          # three platforms built cleanly, and every one of them uploaded
+          # nothing at all.
           path: |
-            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
-            apps/desktop/src-tauri/target/release/bundle/**/*.deb
-            apps/desktop/src-tauri/target/release/bundle/**/*.msi
-            apps/desktop/src-tauri/target/release/bundle/**/*.exe
+            target/release/bundle/**/*.dmg
+            target/release/bundle/**/*.AppImage
+            target/release/bundle/**/*.deb
+            target/release/bundle/**/*.rpm
+            target/release/bundle/**/*.msi
+            target/release/bundle/**/*.exe
+          if-no-files-found: error
 
   publish:
     name: attach to the release

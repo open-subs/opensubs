@@ -21,7 +21,16 @@
     "types": [
       "chrome",
       "vite/client"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "mediabunny": [
+        "./node_modules/mediabunny"
+      ],
+      "@huggingface/transformers": [
+        "./node_modules/@huggingface/transformers"
+      ]
+    }
   },
   "include": [
     "src/**/*.ts",

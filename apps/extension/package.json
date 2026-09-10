@@ -7,7 +7,7 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "sync:ort": "node scripts/sync-ort.mjs",
-    "prebuild": "npm run sync:ort && npm run icons",
+    "prebuild": "npm run sync:ort",
     "build": "vite build && node scripts/copy-static.mjs chrome",
     "build:firefox": "vite build --outDir dist-firefox && node scripts/copy-static.mjs firefox",
     "build:all": "npm run build && npm run build:firefox",
