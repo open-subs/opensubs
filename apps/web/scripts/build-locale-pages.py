@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+"""Write one real page per language into dist/<locale>/.
+
+Run after `vite build`, over `dist/`. Reads the four static pages the
+site is made of, translates their copy from `scripts/site-i18n/`, and
+writes a full document per locale with its own <html lang>, <title>,
+description, structured data and canonical, plus an hreflang ring so a
+search engine knows the eight are the same page.
+
+## Why not translate in the browser
+
+Because the static HTML exists precisely so the copy is readable without
+running anything (APP-48), and swapping it with JavaScript hands a
+crawler the English page and a reader the German one. It would also
+leave one URL claiming to be eight languages, which is not something
+hreflang can express and not something a search engine can serve: the
+German result has to have a German URL to send people to.
+
+## What is deliberately not translated
+
+- **The wordmark.** `translate="no"` in the markup.
+- **Preset identifiers** -- `<code data-v>Neon</code>`. That string is
+  what you pick in the app; renaming it on the page sends a reader
+  looking for a style that is not in the list.
+- **Numbers, and anything else marked `data-v`.**
+- **Proper nouns inside a sentence** -- Whisper, libass, ffmpeg, AGPL-3.0
+  -- which stay English because the translations keep them.
+
+Anything with no entry in a catalogue falls back to English, so a gap is
+survivable; `--check` is what makes it loud.
+"""
+
+import io
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import site_i18n as S  # noqa: E402
+
+WEB = os.path.dirname(HERE)
+DIST = os.path.join(WEB, "dist")
+CATALOGUES = os.path.join(HERE, "site-i18n")
+
+ORIGIN = "https://opensubs.app"
+
+# The eight, and the path each page answers on. `en` lives at the root:
+# it is the canonical site, and moving it to /en/ would break every link
+# anyone has already saved.
+LOCALES = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"]
+
+# path, and the sitemap hints that used to live in public/sitemap.xml --
+# which this script now writes, because a hand-kept sitemap and thirty-two
+# generated pages cannot stay in agreement.
+PAGES = {
+    "index.html": ("", "2026-09-10", "weekly", "1.0"),
+    "burn-subtitles-into-video.html": ("burn-subtitles-into-video", "2026-09-09", "monthly", "0.8"),
+    "styles.html": ("styles", "2026-09-10", "monthly", "0.8"),
+    "privacy.html": ("privacy.html", "2026-08-29", "yearly", "0.3"),
+}
+
+# og:locale wants a POSIX-ish tag, not BCP 47.
+OG_LOCALE = {
+    "en": "en_US", "zh-Hans": "zh_CN", "zh-Hant": "zh_TW", "ja": "ja_JP",
+    "ko": "ko_KR", "de": "de_DE", "es": "es_ES", "pt": "pt_BR",
+}
+
+
+def url_for(locale, page):
+    path = PAGES[page][0]
+    if locale == "en":
+        return f"{ORIGIN}/{path}"
+    if not path:
+        # The locale's home page is /ja, not /ja/ -- and it is written to
+        # ja.html rather than ja/index.html. Production resolves a clean
+        # URL with `try_files $uri $uri.html $uri/` and separately 301s any
+        # trailing slash away, so /ja/ would bounce to /ja and /ja would
+        # then have to be found through the directory index. One file the
+        # `$uri.html` rule finds directly is the same page with none of
+        # that, and it matches how /styles already works.
+        return f"{ORIGIN}/{locale}"
+    return f"{ORIGIN}/{locale}/{path}"
+
+
+def load_catalogue(locale):
+    if locale == "en":
+        return {}
+    path = os.path.join(CATALOGUES, f"{locale}.json")
+    with io.open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+# --- rewriting one page -------------------------------------------------
+
+# Values that are legitimately the same string as their English source:
+# proper nouns, licence identifiers, and loanwords several of these
+# languages have taken whole. Listed rather than allowed by a looser
+# check, so a genuine copy-paste still stands out.
+IDENTICAL = {
+    "OpenSubs", "AGPL-3.0", "CJK", "Paris, 1968", "Instagram Reels",
+    "YouTube Shorts", "Twitch", "twitch", "TikTok", "tiktok", "Podcast",
+    "podcast", "Reels", "reels", "Gaming", "gaming", "Fitness", "fitness",
+    "Interview", "Meme", "meme", "Trailer", "Tutorial", "tutorial",
+    "Streaming", "streaming", "Screencast", "screencast", "Hook", "hook",
+    "Broadcast", "Gym", "viral", "minimal", "Downloads", "Video",
+    "Talking Head", "Business", "Credits", "Clips", "clips", "Film",
+    "Gaming Neon Cyan", "cinema", "trailer",
+    "<span>Paris, 1968</span>", "<span>\u5b57\u5e55\u306f\u81ea\u52d5\u3067\u4f5c\u308c\u307e\u3059</span>",
+}
+
+ASSET_HREF = re.compile(r"\.(png|ico|svg|txt|xml|json|wasm|webmanifest|jpg|webp)$")
+
+
+def localise_link(href, locale):
+    """Point an in-site link at this locale's copy of the same page.
+
+    Only `<a href>` goes through here. A stylesheet or an icon has one
+    copy at the root and must keep pointing at it -- prefixing those
+    would give every locale its own 404 for the favicon.
+    """
+    if locale == "en" or not href.startswith("/") or href.startswith("//"):
+        return href
+    path, sep, fragment = href.partition("#")
+    if ASSET_HREF.search(path.split("?")[0]):
+        # ...except privacy.html, which is a page that happens to end in
+        # .html rather than an asset.
+        if not path.endswith(".html"):
+            return href
+    if path == "/":
+        path = ""
+    return f"/{locale}{path}{sep}{fragment}"
+
+
+def hreflang_ring(page):
+    """The alternates block: every locale, plus x-default.
+
+    x-default is English, because that is what a reader whose language
+    we do not ship should land on -- not whichever locale happens to
+    sort first.
+    """
+    lines = [
+        f'<link rel="alternate" hreflang="{code}" href="{url_for(code, page)}" />'
+        for code in LOCALES
+    ]
+    lines.append(f'<link rel="alternate" hreflang="x-default" href="{url_for("en", page)}" />')
+    return "\n".join(lines)
+
+
+def refuse_inline_scripts(tree, page):
+    """The site's CSP is `script-src 'self'`.
+
+    An inline <script> is therefore dropped by the browser without an
+    error anyone will see -- the page renders, the control does nothing.
+    That shipped once, on /styles' language picker. Checked here because
+    this is the one pass that parses every page on every build.
+    """
+    for node in tree.root.walk():
+        if node.tag != "script":
+            continue
+        if node.attrs.get("src") or node.attrs.get("type") == "application/ld+json":
+            continue
+        raise SystemExit(
+            f"{page}: an inline <script> would be dropped by the CSP "
+            f"(script-src 'self'). Put it in a module the page already loads.")
+
+
+def translate_page(raw, page, locale, catalogue, stats):
+    tree = S.Tree(raw)
+    refuse_inline_scripts(tree, page)
+    edits = []
+
+    def look_up(text):
+        key = S.collapse(text)
+        hit = catalogue.get(key)
+        stats["seen"].add(key)
+        if hit is None:
+            stats["missing"].setdefault(locale, set()).add(key)
+            return None
+        return hit
+
+    # 1. Blocks of copy.
+    for node in S.copy_blocks(tree):
+        key, values = S.keyed(tree, node)
+        hit = look_up(key)
+        if hit is not None:
+            edits.append((node.inner_start, node.inner_end, S.unkey(hit, values)))
+
+    # 2. Attributes that hold copy, and the meta tags that carry the
+    #    page's own title and description into a search result.
+    for node, name in S.copy_attrs(tree):
+        span = S.attr_span(tree, node, name)
+        if span is None:
+            continue
+        start, end, value = span
+        hit = look_up(value)
+        if hit is not None:
+            edits.append((start, end, escape_attr(hit)))
+
+    # 3. Structured data. A German page whose FAQPage answers are in
+    #    English offers a search engine the English answer to show
+    #    beside a German result.
+    for node, data in S.ld_blocks(tree):
+        strings = []
+        S.ld_strings(data, strings)
+        for value in strings:
+            look_up(value)
+        translated = S.ld_translate(data, lambda v: catalogue.get(S.collapse(v), v))
+        translated = retarget_ld(translated, page, locale)
+        body = json.dumps(translated, ensure_ascii=False, indent=2)
+        edits.append((node.inner_start, node.inner_end, "\n" + body + "\n"))
+
+    # 5. The document's own identity: lang, canonical, og:url, og:locale.
+    html = next(n for n in tree.root.walk() if n.tag == "html")
+    span = S.attr_span(tree, html, "lang")
+    if span:
+        edits.append((span[0], span[1], locale))
+
+    for node in tree.root.walk():
+        if node.tag == "link" and node.attrs.get("rel") == "canonical":
+            span = S.attr_span(tree, node, "href")
+            edits.append((span[0], span[1], url_for(locale, page)))
+            # The ring goes in right after the canonical, where a reader
+            # of the source expects to find it.
+            close = raw.find(">", node.tag_start) + 1
+            edits.append((close, close, "\n" + hreflang_ring(page)))
+        if node.tag == "meta" and node.attrs.get("property") == "og:url":
+            span = S.attr_span(tree, node, "content")
+            edits.append((span[0], span[1], url_for(locale, page)))
+        if node.tag == "meta" and node.attrs.get("property") == "og:locale":
+            span = S.attr_span(tree, node, "content")
+            edits.append((span[0], span[1], OG_LOCALE[locale]))
+
+    # In-site links are moved *after* the splice rather than as more
+    # edits. A translated block carries its own <a href> along with it --
+    # the footer is one block containing four links -- so rewriting them
+    # in the source would collide with the rewrite of the block they sit
+    # inside. The translations keep every href verbatim, so one pass over
+    # the finished document reaches both.
+    return ANCHOR.sub(
+        lambda m: m.group(1) + localise_link(m.group(2), locale) + m.group(3),
+        S.splice(raw, edits),
+    )
+
+
+ANCHOR = re.compile(r"""(<a\b[^>]*?\shref=")([^"]*)(")""")
+
+
+def escape_attr(text):
+    return text.replace("&", "&amp;").replace('"', "&quot;").replace("&amp;#", "&#") \
+               .replace("&amp;amp;", "&amp;")
+
+
+def retarget_ld(data, page, locale):
+    """Point the structured data at this locale's URL, and say so."""
+    if isinstance(data, dict):
+        out = {}
+        for key, value in data.items():
+            if key == "url" and isinstance(value, str) and value.rstrip("/") in (
+                ORIGIN, url_for("en", page).rstrip("/")
+            ):
+                out[key] = url_for(locale, page)
+            else:
+                out[key] = retarget_ld(value, page, locale)
+        if out.get("@type") in ("SoftwareApplication", "FAQPage", "WebPage", "Article"):
+            out["inLanguage"] = locale
+        return out
+    if isinstance(data, list):
+        return [retarget_ld(v, page, locale) for v in data]
+    return data
+
+
+# --- sitemap ------------------------------------------------------------
+
+def sitemap():
+    """Every page in every language, each listing the whole ring.
+
+    Google reads the alternates from the sitemap as well as from the
+    page, and a set that disagrees with itself is worse than one that is
+    only in one place -- so both are generated from the same table.
+    """
+    out = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+           'xmlns:xhtml="http://www.w3.org/1999/xhtml">']
+    for page, (_, lastmod, changefreq, priority) in PAGES.items():
+        for locale in LOCALES:
+            out.append("  <url>")
+            out.append(f"    <loc>{url_for(locale, page)}</loc>")
+            out.append(f"    <lastmod>{lastmod}</lastmod>")
+            out.append(f"    <changefreq>{changefreq}</changefreq>")
+            out.append(f"    <priority>{priority}</priority>")
+            for other in LOCALES:
+                out.append(f'    <xhtml:link rel="alternate" hreflang="{other}" '
+                           f'href="{url_for(other, page)}" />')
+            out.append('    <xhtml:link rel="alternate" hreflang="x-default" '
+                       f'href="{url_for("en", page)}" />')
+            out.append("  </url>")
+    out.append("</urlset>")
+    return "\n".join(out) + "\n"
+
+
+def main():
+    check_only = "--check" in sys.argv
+    root = DIST if os.path.isdir(DIST) and not check_only else WEB
+    if check_only:
+        sources = {p: os.path.join(WEB, "public" if p == "privacy.html" else "", p)
+                   for p in PAGES}
+    else:
+        sources = {p: os.path.join(DIST, p) for p in PAGES}
+
+    stats = {"seen": set(), "missing": {}}
+    written = 0
+    for page, path in sources.items():
+        raw = io.open(path, encoding="utf-8").read()
+        for locale in LOCALES:
+            catalogue = load_catalogue(locale)
+            out = translate_page(raw, page, locale, catalogue, stats)
+            if check_only:
+                continue
+            if locale == "en":
+                target = os.path.join(DIST, page)
+            elif page == "index.html":
+                target = os.path.join(DIST, locale + ".html")
+            else:
+                os.makedirs(os.path.join(DIST, locale), exist_ok=True)
+                target = os.path.join(DIST, locale, page)
+            io.open(target, "w", encoding="utf-8").write(out)
+            written += 1
+
+    if not check_only:
+        io.open(os.path.join(DIST, "sitemap.xml"), "w", encoding="utf-8").write(sitemap())
+
+    keys = sorted(stats["seen"])
+    io.open(os.path.join(CATALOGUES, "keys.json"), "w", encoding="utf-8").write(
+        json.dumps(keys, ensure_ascii=False, indent=1) + "\n")
+
+    # `en` is the key set, so every key is "missing" from it by
+    # definition -- it is the source, not a translation.
+    gaps = 0
+    for locale in LOCALES[1:]:
+        miss = stats["missing"].get(locale, set())
+        if miss:
+            gaps += len(miss)
+            print(f"  {locale}: {len(miss)} untranslated")
+            for key in sorted(miss)[:6]:
+                print(f"      {key[:88]}")
+
+    # A value identical to its English source is usually a copy-paste that
+    # never got translated -- invisible at runtime, because the fallback
+    # produces exactly the same page. IDENTICAL lists the ones that are
+    # genuinely the same word in that language.
+    echoes = 0
+    for locale in LOCALES[1:]:
+        table = load_catalogue(locale)
+        same = [k for k, v in table.items() if k == v and k not in IDENTICAL]
+        if same:
+            echoes += len(same)
+            print(f"  {locale}: {len(same)} untouched")
+            for key in same[:6]:
+                print(f"      {key[:88]}")
+
+    print(f"{written} pages, {len(keys)} keys, {gaps} gaps, {echoes} untouched")
+    if (gaps or echoes) and "--strict" in sys.argv:
+        raise SystemExit("untranslated copy would ship; refusing")
+
+
+if __name__ == "__main__":
+    main()

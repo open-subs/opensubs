@@ -121,7 +121,7 @@ for name in ORDER:
         </div>
         <div class="style-meta">
           <h3 class="style-name">{scene}</h3>
-          <p class="style-preset">Preset <code>{name}</code> — {d['size_pct']}% height{', boxed' if boxed else f", {d['outline']}px outline"}</p>
+          <p class="style-preset">Preset <code data-v>{name}</code> — <span data-v>{d['size_pct']}</span>% height{', boxed' if boxed else f", <span data-v>{d['outline']}</span>px outline"}</p>
           <ul class="tags">{tag_html}</ul>
         </div>
       </article>""")
@@ -142,6 +142,33 @@ footer = src[src.index("<footer"):src.index("</footer>") + 9]
 header = (header.replace('href="#how"', 'href="/#how"')
                 .replace('href="#app"', 'href="/#app"')
                 .replace('href="#top"', 'href="/"'))
+
+# The language picker, written into the markup rather than mounted.
+#
+# Every other page mounts src/lib/LanguagePicker.svelte, which arrives
+# with main.ts. This page loads design tokens and nothing else -- pulling
+# main.ts in for one <select> would drag eight hundred kilobytes of tool
+# onto the one page whose job is to load fast and be crawled.
+#
+# The behaviour lives in src/styles-page.ts, which this page already
+# loads. Not in an inline <script>: the site's CSP is `script-src 'self'`,
+# so an inline one is dropped without a word.
+LOCALES = [("en", "English"), ("zh-Hans", "简体中文"),
+           ("zh-Hant", "繁體中文"), ("ja", "日本語"),
+           ("ko", "한국어"), ("de", "Deutsch"), ("es", "Español"),
+           ("pt", "Português")]
+# `translate="no"` on each option: an endonym is the same word in every
+# locale -- 日本語 is 日本語 on the German page -- and a picker that lists
+# "Japanese" in English is no use to the one person who needs it.
+options = "".join(
+    f'<option value="{code}" lang="{code}" translate="no">{name}</option>'
+    for code, name in LOCALES)
+PICKER = f"""<label class="lang">
+        <span class="lang-hidden">Language</span>
+        <select aria-label="Language">{options}</select>
+      </label>"""
+assert '<div id="language"></div>' in header, "the burn page lost its picker slot"
+header = header.replace('<div id="language"></div>', PICKER)
 
 TITLE = "Subtitle Styles \u2014 12 Free Caption Presets, Rendered Live | OpenSubs"
 DESC = ("Twelve subtitle styles you can burn into a video free: bold fitness captions, "

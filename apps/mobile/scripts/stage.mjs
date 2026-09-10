@@ -32,6 +32,38 @@ for (const page of ["burn-subtitles-into-video.html", "styles.html", "sitemap.xm
   rmSync(join(www, page), { force: true });
 }
 
+// The site ships one translated document per language under /<locale>/
+// (web/scripts/build-locale-pages.py). Those are for a crawler and for a
+// URL somebody can share; inside the binary they are a megabyte of HTML
+// with no way to reach it. The app translates itself at runtime from the
+// same catalogues, so nothing is lost by dropping them.
+const LOCALES = ["zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"];
+for (const locale of LOCALES) {
+  rmSync(join(www, locale), { recursive: true, force: true });
+  rmSync(join(www, `${locale}.html`), { force: true });
+}
+
+// ...and the alternates ring goes with them, from every page that is
+// left. The ring is what a language picker reads to decide whether
+// changing language means navigating to another document -- the Svelte
+// one in src/lib/i18n/index.svelte.ts, and the plain <select> on
+// privacy.html. Left in place, picking a language inside the app would
+// open opensubs.app/de -- leaving the app, on a phone, with no address
+// bar to come back from.
+const RING = /\s*<link rel="alternate" hreflang="[^"]*" href="[^"]*" \/>/g;
+let ringsFound = 0;
+for (const page of ["index.html", "privacy.html"]) {
+  const file = join(www, page);
+  const before = readFileSync(file, "utf8");
+  ringsFound += (before.match(/<link rel="alternate" hreflang=/g) ?? []).length;
+  writeFileSync(file, before.replace(RING, ""));
+}
+if (ringsFound === 0) {
+  console.error("stage: no hreflang ring in the built pages -- did the locale build run?");
+  console.error("stage: run `npm run build` in apps/web (not `vite build`).");
+  process.exit(1);
+}
+
 const index = join(www, "index.html");
 let html = readFileSync(index, "utf8");
 

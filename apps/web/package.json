@@ -10,7 +10,7 @@
     "predev": "npm run sync:ort",
     "prebuild": "npm run sync:ort",
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && python3 scripts/build-locale-pages.py --strict",
     "preview": "vite preview",
     "test": "node e2e/smoke.mjs",
     "test:cleanup": "node e2e/cleanup.mjs",
@@ -24,7 +24,8 @@
     "test:i18n": "node --experimental-strip-types e2e/i18n.mjs",
     "test:i18n-live": "node e2e/i18n-live.mjs",
     "test:vad": "node e2e/vad.mjs",
-    "test:labels": "node --experimental-strip-types e2e/labels.mjs"
+    "test:labels": "node --experimental-strip-types e2e/labels.mjs",
+    "test:site-i18n": "python3 scripts/build-locale-pages.py --check --strict"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
