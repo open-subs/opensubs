@@ -69,8 +69,7 @@ export const ASR_ENGINES: AsrEngineOption[] = [
     id: "openai",
     label: "OpenAI-compatible API",
     note:
-      "Any server with a Whisper transcription endpoint — OpenAI, Groq " +
-      "(very fast), or a local one. Sends the clip's audio to that service.",
+      "Any server with a Whisper transcription endpoint — OpenAI, Groq (very fast), or a local one. Sends the clip's audio to that service.",
     cost: "own-key",
     needsKey: true,
     keyPlaceholder: "sk-...",
@@ -82,8 +81,7 @@ export const ASR_ENGINES: AsrEngineOption[] = [
     id: "opensubs",
     label: "OpenSubs",
     note:
-      "Our own backend. A large hosted model with no key and no account " +
-      "elsewhere \u2014 paid in credits, priced before you run it.",
+      "Our own backend. A large hosted model with no key and no account elsewhere \u2014 paid in credits, priced before you run it.",
     cost: "paid",
     needsKey: false,
   },

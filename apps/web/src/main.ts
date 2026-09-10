@@ -1,6 +1,7 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
 import AccountBadge from "./AccountBadge.svelte";
+import LanguagePicker from "./lib/LanguagePicker.svelte";
 import "./app.css";
 
 const target = document.getElementById("app");
@@ -24,5 +25,16 @@ const app = mount(App, { target });
 // must not take the whole app down with it.
 const badge = document.getElementById("account");
 if (badge) mount(AccountBadge, { target: badge });
+
+// The language picker sits in the same navbar, for the same reason and
+// with the same caveat: optional, because the app is served without a
+// navbar during e2e runs.
+//
+// It has to be mounted separately rather than rendered inside App, since
+// the navbar is outside #app -- and it belongs in the navbar, because a
+// reader who cannot read the interface should not have to scroll through
+// it to find the one control that fixes that.
+const picker = document.getElementById("language");
+if (picker) mount(LanguagePicker, { target: picker });
 
 export default app;

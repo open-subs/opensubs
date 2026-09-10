@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "./lib/i18n/index.svelte";
   // The account controls, in the page's navbar.
   //
   // Mounted separately from `App` and into static HTML, so the marketing
@@ -24,7 +25,7 @@
 
 <div class="nav-account">
   {#if session.signedIn}
-    <span class="nav-balance" title="Credits, shared across your account">
+    <span class="nav-balance" title={t("Credits, shared across your account")}>
       <strong>{session.balance}</strong>
       {session.balance === 1 ? "credit" : "credits"}
     </span>
@@ -37,7 +38,7 @@
       aria-haspopup="menu"
       onclick={() => (open = !open)}
     >
-      Sign in
+      {t("Sign in")}
     </button>
     <!-- Kept in the DOM rather than created on open: the element sets up
          its SDK client on connect, and mounting it at the moment of the
