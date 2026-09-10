@@ -194,6 +194,43 @@
     .site-header nav .site-btn.hide-sm { display: none; }
   }
 
+  /* The language picker. Two of them, in fact: the home page and this one
+     mount the Svelte control from src/lib/LanguagePicker.svelte, while
+     /styles -- which deliberately loads tokens and no bundle -- gets a
+     plain <select> written into the markup. They are styled from here so
+     the two look the same and /styles stays free of app.css. */
+  .site-header .lang {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-header .lang select {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 1.6rem 0.3rem 0.5rem;
+    border: 1px solid var(--border-hairline, #dfe3e9);
+    border-radius: var(--radius-md, 8px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .site-header .lang select:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  }
+
+  .site-header .lang-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   /* --- buttons --- */
 
   .site-btn {
@@ -498,7 +535,7 @@
           <rect x="15" y="13" width="3" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
         </svg>
       </span>
-      <span class="brand-word"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
+      <span class="brand-word" translate="no"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
     </a>
     <nav>
       <a class="hide-sm" href="#how">How it works</a>
@@ -509,6 +546,7 @@
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
       <a href="/#app">Open the app</a>
+      <div id="language"></div>
       <div id="account"></div>
     </nav>
   </div>

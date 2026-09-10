@@ -182,6 +182,43 @@
     .site-header nav .site-btn.hide-sm { display: none; }
   }
 
+  /* The language picker. Two of them, in fact: the home page and this one
+     mount the Svelte control from src/lib/LanguagePicker.svelte, while
+     /styles -- which deliberately loads tokens and no bundle -- gets a
+     plain <select> written into the markup. They are styled from here so
+     the two look the same and /styles stays free of app.css. */
+  .site-header .lang {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-header .lang select {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 1.6rem 0.3rem 0.5rem;
+    border: 1px solid var(--border-hairline, #dfe3e9);
+    border-radius: var(--radius-md, 8px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .site-header .lang select:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  }
+
+  .site-header .lang-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   /* --- buttons --- */
 
   .site-btn {
@@ -487,7 +524,7 @@
           <rect x="15" y="13" width="3" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
         </svg>
       </span>
-      <span class="brand-word"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
+      <span class="brand-word" translate="no"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
     </a>
     <nav>
       <a class="hide-sm" href="/#how">How it works</a>
@@ -498,6 +535,10 @@
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
       <a href="/#app">Open the app</a>
+      <label class="lang">
+        <span class="lang-hidden">Language</span>
+        <select aria-label="Language"><option value="en" lang="en" translate="no">English</option><option value="zh-Hans" lang="zh-Hans" translate="no">简体中文</option><option value="zh-Hant" lang="zh-Hant" translate="no">繁體中文</option><option value="ja" lang="ja" translate="no">日本語</option><option value="ko" lang="ko" translate="no">한국어</option><option value="de" lang="de" translate="no">Deutsch</option><option value="es" lang="es" translate="no">Español</option><option value="pt" lang="pt" translate="no">Português</option></select>
+      </label>
       <div id="account"></div>
     </nav>
   </div>
@@ -541,7 +582,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Interview Clean White</h3>
-          <p class="style-preset">Preset <code>Clean</code> — 4.5% height, 2.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Clean</code> — <span data-v>4.5</span>% height, <span data-v>2.0</span>px outline</p>
           <ul class="tags"><li>interview</li><li>documentary</li><li>talking head</li><li>white subtitles</li></ul>
         </div>
       </article>
@@ -551,7 +592,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Fitness Bold White</h3>
-          <p class="style-preset">Preset <code>Bold</code> — 5.5% height, 4.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Bold</code> — <span data-v>5.5</span>% height, <span data-v>4.0</span>px outline</p>
           <ul class="tags"><li>fitness</li><li>gym</li><li>workout</li><li>bold subtitles</li></ul>
         </div>
       </article>
@@ -561,7 +602,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Corporate Clean Box</h3>
-          <p class="style-preset">Preset <code>Boxed</code> — 4.5% height, boxed</p>
+          <p class="style-preset">Preset <code data-v>Boxed</code> — <span data-v>4.5</span>% height, boxed</p>
           <ul class="tags"><li>corporate</li><li>explainer</li><li>training</li><li>boxed subtitles</li></ul>
         </div>
       </article>
@@ -571,7 +612,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Shorts Safe Area</h3>
-          <p class="style-preset">Preset <code>Shorts</code> — 6.5% height, 3.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Shorts</code> — <span data-v>6.5</span>% height, <span data-v>3.0</span>px outline</p>
           <ul class="tags"><li>youtube shorts</li><li>tiktok</li><li>reels</li><li>vertical video</li></ul>
         </div>
       </article>
@@ -581,7 +622,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Broadcast Caption Yellow</h3>
-          <p class="style-preset">Preset <code>Caption</code> — 4.5% height, 2.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Caption</code> — <span data-v>4.5</span>% height, <span data-v>2.0</span>px outline</p>
           <ul class="tags"><li>broadcast</li><li>news</li><li>accessibility</li><li>yellow subtitles</li></ul>
         </div>
       </article>
@@ -591,7 +632,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">CJK Clean 中日韓</h3>
-          <p class="style-preset">Preset <code>CJK</code> — 5.0% height, 2.0px outline</p>
+          <p class="style-preset">Preset <code data-v>CJK</code> — <span data-v>5.0</span>% height, <span data-v>2.0</span>px outline</p>
           <ul class="tags"><li>chinese subtitles</li><li>japanese subtitles</li><li>korean subtitles</li><li>cjk</li></ul>
         </div>
       </article>
@@ -601,7 +642,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Gaming Neon Cyan</h3>
-          <p class="style-preset">Preset <code>Neon</code> — 5.5% height, 3.5px outline</p>
+          <p class="style-preset">Preset <code data-v>Neon</code> — <span data-v>5.5</span>% height, <span data-v>3.5</span>px outline</p>
           <ul class="tags"><li>gaming</li><li>streaming</li><li>twitch</li><li>neon subtitles</li></ul>
         </div>
       </article>
@@ -611,7 +652,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Podcast Top Bar</h3>
-          <p class="style-preset">Preset <code>Podcast</code> — 4.5% height, boxed</p>
+          <p class="style-preset">Preset <code data-v>Podcast</code> — <span data-v>4.5</span>% height, boxed</p>
           <ul class="tags"><li>podcast</li><li>interview</li><li>top captions</li><li>clips</li></ul>
         </div>
       </article>
@@ -621,7 +662,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Cinema Letterbox Cream</h3>
-          <p class="style-preset">Preset <code>Cinema</code> — 4.0% height, 1.5px outline</p>
+          <p class="style-preset">Preset <code data-v>Cinema</code> — <span data-v>4.0</span>% height, <span data-v>1.5</span>px outline</p>
           <ul class="tags"><li>cinema</li><li>film</li><li>trailer</li><li>documentary</li></ul>
         </div>
       </article>
@@ -631,7 +672,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Punch Centre Impact</h3>
-          <p class="style-preset">Preset <code>Punch</code> — 8.5% height, 5.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Punch</code> — <span data-v>8.5</span>% height, <span data-v>5.0</span>px outline</p>
           <ul class="tags"><li>meme</li><li>viral</li><li>hook</li><li>centre captions</li></ul>
         </div>
       </article>
@@ -641,7 +682,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Minimal Dark on Light</h3>
-          <p class="style-preset">Preset <code>Minimal</code> — 4.0% height, 1.0px outline</p>
+          <p class="style-preset">Preset <code data-v>Minimal</code> — <span data-v>4.0</span>% height, <span data-v>1.0</span>px outline</p>
           <ul class="tags"><li>minimal</li><li>tutorial</li><li>screencast</li><li>light background</li></ul>
         </div>
       </article>
@@ -651,7 +692,7 @@
         </div>
         <div class="style-meta">
           <h3 class="style-name">Reel Box Bottom</h3>
-          <p class="style-preset">Preset <code>Reel Box</code> — 6.0% height, boxed</p>
+          <p class="style-preset">Preset <code data-v>Reel Box</code> — <span data-v>6.0</span>% height, boxed</p>
           <ul class="tags"><li>instagram reels</li><li>vertical video</li><li>social</li><li>boxed captions</li></ul>
         </div>
       </article>

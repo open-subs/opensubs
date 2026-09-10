@@ -11,10 +11,26 @@
   use to the only person who needs it.
 -->
 <script lang="ts">
-  import { LOCALES, getLocale, setLocale, t } from "./i18n/index.svelte";
+  import { LOCALES, alternateHref, getLocale, setLocale, t } from "./i18n/index.svelte";
 
   function onChange(event: Event) {
-    setLocale((event.currentTarget as HTMLSelectElement).value);
+    const next = (event.currentTarget as HTMLSelectElement).value;
+    setLocale(next);
+
+    // The site and the tool are one document -- the app sits in the hero
+    // of opensubs.app with the marketing copy below it -- and that copy
+    // is static HTML translated at build time, not by this component. So
+    // changing the language here has to move to the page that is already
+    // in that language, or the tool would speak Japanese inside an
+    // English page.
+    //
+    // Only where such a page exists: the picker also ships in the
+    // extension popup and the packaged mobile build, which have no
+    // alternates, and there the locale change above is the whole job.
+    const href = alternateHref(next);
+    if (href && href !== location.href.split("#")[0]) {
+      location.href = href + location.hash;
+    }
   }
 </script>
 

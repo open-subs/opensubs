@@ -68,11 +68,20 @@ const STORAGE_KEY = "opensubs.locale";
 let locale = $state(DEFAULT_LOCALE);
 
 /**
- * The stored choice, else what the browser asks for.
+ * The stored choice, else the page's own language, else the browser's.
  *
  * Called once from the app's own startup rather than at module scope: the
  * catalogues are also imported by the extension's engine host, which has
  * no `window`.
+ *
+ * The middle step is what keeps the app and the page in one language.
+ * The site ships a translated document per locale (scripts/build-locale-
+ * pages.py), so `/de/` arrives with `<html lang="de">` and German copy
+ * around the tool; without reading that, the tool inside it would come up
+ * in whatever the browser asked for and the page would be bilingual.
+ * `lang` is only consulted when it names a locale we ship, so the
+ * untranslated pages -- the extension popup, the packaged mobile build --
+ * fall through to the browser as before.
  */
 export function initLocale(): void {
   if (typeof window === "undefined") return;
@@ -83,8 +92,48 @@ export function initLocale(): void {
     // Private browsing, or storage disabled. The browser's own
     // preference is a good enough answer.
   }
-  const preferred = stored ? [stored] : [...(navigator.languages ?? [navigator.language])];
+  const page = pageLocale();
+  const preferred = [
+    // The URL wins over the stored choice, and deliberately. Someone who
+    // opens /ja/ has asked for the Japanese page by name -- from a
+    // search result, or a link somebody sent them -- and a preference
+    // left over from a previous visit must not put a German tool in the
+    // middle of a Japanese page.
+    ...(page ? [page] : []),
+    ...(stored ? [stored] : []),
+    ...(navigator.languages ?? [navigator.language]),
+  ];
   setLocale(resolveLocale(preferred), { persist: false });
+}
+
+/**
+ * The locale this *document* was built in, if it was built per locale.
+ *
+ * Keyed on the hreflang ring rather than on `<html lang>` alone: every
+ * page has a lang, including the extension popup and the packaged mobile
+ * build, and those have no translated sibling to be consistent with. The
+ * ring is only ever written by scripts/build-locale-pages.py, so its
+ * presence is exactly the question being asked.
+ */
+export function pageLocale(): string | null {
+  if (typeof document === "undefined") return null;
+  if (!document.querySelector('link[rel="alternate"][hreflang]')) return null;
+  const lang = document.documentElement.lang;
+  return lang in CATALOGUES ? lang : null;
+}
+
+/**
+ * Where this page lives in `code`, if it has been built in that language.
+ *
+ * Read off the page's own alternates, so the picker cannot invent a URL
+ * that was never generated.
+ */
+export function alternateHref(code: string): string | null {
+  if (typeof document === "undefined") return null;
+  const link = document.querySelector<HTMLLinkElement>(
+    `link[rel="alternate"][hreflang="${CSS.escape(code)}"]`,
+  );
+  return link ? link.href : null;
 }
 
 export function getLocale(): string {

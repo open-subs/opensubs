@@ -69,3 +69,4 @@ test-results/
 /apps/mobile/www/
 /apps/mobile/ios/App/App/public/
 /apps/mobile/android/app/src/main/assets/public/
+__pycache__/
