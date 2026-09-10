@@ -53,6 +53,19 @@ export default defineConfig({
     alias: {
       mediabunny: resolve(__dirname, "node_modules/mediabunny"),
       "@huggingface/transformers": resolve(__dirname, "node_modules/@huggingface/transformers"),
+      // vad.ts reaches for this one, and it broke the release build: the
+      // importer is ../web/src/lib/vad.ts, so resolution starts in
+      // apps/web/node_modules -- which exists on this machine and does not
+      // exist in the extension's CI job. Six assets shipped instead of
+      // eight and the tag still looked green.
+      //
+      // The value is the *file*, not the package directory: an alias is a
+      // prefix rewrite that bypasses the exports map, so aliasing the
+      // package would resolve "onnxruntime-web/webgpu" to a directory. It
+      // is also the file singleOrtCopy() above patches, which is what
+      // keeps the second 23 MB wasm copy out of the package.
+      "onnxruntime-web/webgpu": resolve(
+        __dirname, "node_modules/onnxruntime-web/dist/ort.webgpu.bundle.min.mjs"),
     },
   },
   publicDir: false,
