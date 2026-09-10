@@ -125,6 +125,64 @@ eq("an empty translation empties every cue", spread("   ", ["a", "b"]), ["", ""]
   );
 }
 
+
+// --- APP-53, second round: the punctuation snap ------------------------
+//
+// The first fix ended the missing translations, which thea confirmed --
+// 26 of 26 translated, none left in English. What did not take effect was
+// the third part, aligning the break to nearby punctuation. Five of 25
+// split points still cut a word, and in one the full stop opened the next
+// cue instead of closing the previous one:
+//
+//     …大脑并没 | 有改变，…       the comma is four units on
+//     …感受特 | 定情绪时，…       four units on
+//     …选择不同的情绪 | 。我们…    the full stop opened the next cue
+//
+// Every one is *ahead* of the break, and the search only looked behind.
+// These fix the distance rather than the sentence: a sentence chosen to
+// make the point is a sentence that proves nothing.
+
+/** Two sources whose lengths put the proportional break after `aChars`. */
+function splitAt(text, aChars) {
+  return spread(text, ["x".repeat(aChars), "y".repeat(text.length - aChars)]);
+}
+
+for (const distance of [1, 2, 3, 4]) {
+  const text = "甲乙丙丁" + "王".repeat(distance - 1) + "。" + "壬癸子丑寅卯";
+  const out = splitAt(text, 4);
+  ok(
+    `a full stop ${distance} unit(s) ahead pulls the break onto it`,
+    out[0].endsWith("。"),
+    `got 「${out[0]}」 | 「${out[1]}」`,
+  );
+}
+
+{
+  const out = splitAt("你可以选择不同的情绪。我们开始吧", 8);
+  ok("a full stop never opens the next cue", !out[1].startsWith("。"), `「${out[0]}」 | 「${out[1]}」`);
+  ok("and it closes the previous one", out[0].endsWith("。"), `「${out[0]}」 | 「${out[1]}」`);
+}
+
+{
+  // The comma is one unit ahead, the full stop three. Ending a subtitle
+  // mid-sentence to save two characters is the wrong trade, so the whole
+  // reach is searched for a sentence end before a comma is considered.
+  const out = splitAt("天气很好，今天。明天再说吧", 4);
+  ok("a full stop beats a nearer comma", out[0].endsWith("。"), `「${out[0]}」 | 「${out[1]}」`);
+}
+
+{
+  const out = splitAt("好的。甲乙丙丁戊己庚辛壬癸", 6);
+  ok("punctuation behind the break still works", /[。，]$/.test(out[0]), `「${out[0]}」 | 「${out[1]}」`);
+}
+
+{
+  const text = "甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳";
+  const out = splitAt(text, 8);
+  eq("with no punctuation in reach nothing is lost", out.join(""), text);
+  ok("and no cue is left empty", out.every((p) => p.length > 0), JSON.stringify(out));
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);

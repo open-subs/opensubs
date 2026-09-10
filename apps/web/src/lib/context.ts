@@ -89,9 +89,21 @@ export function contextGroups(cues: Timed[], texts: string[]): Group[] {
 /** Punctuation a subtitle can end on without looking cut off. */
 const BREAKS_WELL = /[，。、；：！？,.;:!?…]/;
 
-/** How far back from the proportional split point to look for one, as a
+/** ...and the subset that ends a whole sentence, which is better still. */
+const ENDS_A_SENTENCE = /[。！？.!?…]/;
+
+/** How far from the proportional split point to look for one, as a
  * fraction of the piece just taken. */
 const PUNCTUATION_REACH = 0.25;
+
+/**
+ * ...and never less than this many units.
+ *
+ * The measured misses were three and four characters away from the split
+ * on pieces short enough that a quarter of them was two. Four is the
+ * distance the reported cases actually needed.
+ */
+const MIN_REACH = 4;
 
 /** Scripts that do not put spaces between words. */
 const UNSPACED = /[\u3000-\u303f\u3040-\u9fff\uf900-\ufaff\uff00-\uffef\u0e00-\u0e7f]/;
@@ -209,22 +221,58 @@ export function spread(translated: string, sources: string[]): string[] {
       consumed = next;
       at += 1;
     }
-    // Prefer a punctuation boundary if one is close.
+    // Prefer a punctuation boundary if one is close, in either direction.
     //
     // Character-unit splitting is free to break anywhere, and left alone
     // it breaks 转眼之间 into 转眼之 / 间 -- legal, and unreadable. A comma
     // or full stop within a short reach of the proportional split point
     // is a much better place to end a subtitle, and moving to it costs at
     // most a few characters of drift against the audio.
-    const reach = Math.max(2, Math.round((consumed - (consumed - piece.length)) * PUNCTUATION_REACH));
-    for (let back = 1; back <= reach && at - back > started; back += 1) {
-      if (!BREAKS_WELL.test(units[at - back - 1] ?? "")) continue;
-      for (let n = 0; n < back; n += 1) {
+    //
+    // APP-53, second round. This searched *backwards* only, and every
+    // case that got through had its punctuation a few characters ahead:
+    //
+    //     …大脑并没 | 有改变，…      the comma is three characters on
+    //     …感受特 | 定情绪时，…      four characters on
+    //     …选择不同的情绪 | 。我们…   the full stop opened the next cue
+    //
+    // That last one is the clearest: a subtitle should end on its full
+    // stop, never begin with one. Reaching forward is what fixes it, so
+    // both directions are searched and the nearer boundary wins; a tie
+    // goes forward, because ending a line *on* its punctuation reads
+    // better than ending just before it.
+    const reach = Math.max(MIN_REACH, Math.round(piece.length * PUNCTUATION_REACH));
+
+    // A full stop is a better place to end a subtitle than a comma, so
+    // the whole reach is searched for one before a comma is considered at
+    // all. Without the two passes, a comma two characters away beats a
+    // full stop three away and the line ends mid-sentence -- which is how
+    // 的自然灾害之一。 became 的自然灾害之一。转眼之间， on the first try
+    // at searching forwards.
+    const find = (isBoundary: (u: string | undefined) => boolean) => {
+      for (let step = 1; step <= reach; step += 1) {
+        // Forward: take `step` more units, if they are there and are not
+        // owed to a later cue.
+        if (at + step - 1 < Math.min(limit, units.length) && isBoundary(units[at + step - 1])) {
+          return step;
+        }
+        // Backward: give `step` units back, keeping at least one.
+        if (at - step > started && isBoundary(units[at - step - 1])) return -step;
+      }
+      return 0;
+    };
+    const is = (re: RegExp) => (u: string | undefined) => !!u && re.test(u);
+    const move = find(is(ENDS_A_SENTENCE)) || find(is(BREAKS_WELL));
+    for (let n = 0; n < Math.abs(move); n += 1) {
+      if (move > 0) {
+        piece += units[at];
+        consumed += units[at].length;
+        at += 1;
+      } else {
         at -= 1;
         consumed -= units[at].length;
         piece = piece.slice(0, -units[at].length);
       }
-      break;
     }
     out.push(piece.trim());
   }
