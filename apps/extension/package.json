@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "mediabunny": "^1.55.3"
+    "mediabunny": "^1.55.3",
+    "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c"
   },
   "devDependencies": {
     "@types/chrome": "^0.2.9",

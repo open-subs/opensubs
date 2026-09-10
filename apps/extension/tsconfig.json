@@ -29,6 +29,9 @@
       ],
       "@huggingface/transformers": [
         "./node_modules/@huggingface/transformers"
+      ],
+      "onnxruntime-web/webgpu": [
+        "./node_modules/onnxruntime-web/types.d.ts"
       ]
     }
   },
