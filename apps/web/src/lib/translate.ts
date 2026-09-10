@@ -75,8 +75,7 @@ export const PROVIDERS: TranslationProvider[] = [
     id: "openai",
     label: "OpenAI-compatible",
     note:
-      "Any server speaking the OpenAI chat API — OpenAI, Groq, OpenRouter, " +
-      "DeepSeek, or Ollama and LM Studio running on this machine.",
+      "Any server speaking the OpenAI chat API — OpenAI, Groq, OpenRouter, DeepSeek, or Ollama and LM Studio running on this machine.",
     local: false,
     needsKey: true,
     keyPlaceholder: "sk-... (any value for a local server)",

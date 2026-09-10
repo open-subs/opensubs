@@ -49,6 +49,8 @@
   import { captureFrame, renderStyleThumbnails } from "./lib/stylePreview";
   import { burnInBrowser, burnSupport, type BurnSupport } from "./lib/burn";
   import { isChinese, toSimplified, wantsTraditional } from "./lib/script";
+  import { initLocale, t } from "./lib/i18n/index.svelte";
+  import LanguagePicker from "./lib/LanguagePicker.svelte";
   import { humanRemaining, progressLabel, secondsRemaining } from "./lib/eta";
   import {
     ASR_ENGINES,
@@ -606,6 +608,11 @@
   // --- lifecycle ---------------------------------------------------------
 
   onMount(async () => {
+    // Before anything renders: the stored choice, else what the browser
+    // asks for. Called here rather than at module scope because the
+    // catalogues are also imported by the extension's engine host, which
+    // has no `window` to read a preference from.
+    initLocale();
     try {
       await load();
       engineReady = true;
@@ -1401,12 +1408,12 @@
       note: "Our backend. No key, no account elsewhere.",
       unavailable: opensubsConfigured()
         ? undefined
-        : "Not in this build",
+        : t("Not in this build"),
       price: translationQuote
         ? priceLabel(translationQuote.credits)
         : translateTo
           ? undefined
-          : "Pick a language",
+          : t("Pick a language"),
     },
   ]);
 
@@ -1459,10 +1466,10 @@
       // rather than hidden so the choice is discoverable, and disabled
       // rather than pretending, because a paid button that cannot deliver
       // is worse than an absent one.
-      unavailable: opensubsAsrConfigured() ? undefined : "Not yet available",
+      unavailable: opensubsAsrConfigured() ? undefined : t("Not yet available"),
       price: transcriptionQuote
         ? priceLabel(transcriptionQuote.credits)
-        : "Load a video",
+        : t("Load a video"),
     },
   ]);
 
@@ -1530,7 +1537,7 @@
       translateProgress = "";
     } catch (e) {
       if (e instanceof NotSignedIn) {
-        translateError = "Sign in to translate on our backend.";
+        translateError = t("Sign in to translate on our backend.");
       } else if (e instanceof InsufficientCredits) {
         translateError = `This needs ${creditWord(e.need)} and you have ${e.have}. Add credits below.`;
       } else {
@@ -1598,10 +1605,10 @@
       ></div>
     </div>
     <span class="oa-mono progress-label">
-      {progressLabel(asrNote, asrPercent, asrRemaining)}
+      {progressLabel(t(asrNote), asrPercent, asrRemaining)}
     </span>
     <button type="button" class="btn btn-ghost btn-sm" onclick={cancelTranscribe}>
-      Cancel
+      {t("Cancel")}
     </button>
   </div>
 {/snippet}
@@ -1628,7 +1635,7 @@
   {#if asrEngineOption.needsKey}
     <div class="field-row">
       <label class="field field-wide">
-        <span class="field-label">API key</span>
+        <span class="field-label">{t("API key")}</span>
         <input
           class="input oa-mono"
           type="password"
@@ -1638,7 +1645,7 @@
         />
       </label>
       <label class="field field-wide">
-        <span class="field-label">Server</span>
+        <span class="field-label">{t("Server")}</span>
         <input
           class="input oa-mono"
           type="text"
@@ -1647,7 +1654,7 @@
         />
       </label>
       <label class="field field-wide">
-        <span class="field-label">Model</span>
+        <span class="field-label">{t("Model")}</span>
         <input
           class="input oa-mono"
           type="text"
@@ -1698,31 +1705,33 @@
       onclick={doTranscribe}
     >
       {#if asrEngine === "opensubs" && transcriptionQuote}
-        {again ? "Re-generate" : "Generate"} for {creditWord(transcriptionQuote.credits)}
+        {again
+          ? t("Re-generate for {price}", { price: creditWord(transcriptionQuote.credits) })
+          : t("Generate for {price}", { price: creditWord(transcriptionQuote.credits) })}
       {:else if again}
-        Re-generate
+        {t("Re-generate")}
       {:else}
-        Generate from the audio
+        {t("Generate from the audio")}
       {/if}
     </button>
     {#if asrEngine === "local"}
       <label class="field field-wide">
-        <span class="field-label">Model</span>
+        <span class="field-label">{t("Model")}</span>
         <select
           class="input"
           bind:value={asrModel}
           onchange={() => (modelChosenByUser = true)}
         >
           {#each ASR_MODELS as m (m.id)}
-            <option value={m.id}>{m.label} &middot; {m.size}</option>
+            <option value={m.id}>{t(m.label)} &middot; {m.size}</option>
           {/each}
         </select>
       </label>
     {/if}
     <label class="field field-wide">
-      <span class="field-label">Spoken language</span>
+      <span class="field-label">{t("Spoken language")}</span>
       <select class="input" bind:value={spokenLanguage} disabled={transcribing}>
-        <option value="auto">Detect it &mdash; any language</option>
+        <option value="auto">{t("Detect it — any language")}</option>
         {#each languages as l (l.code)}
           <option value={l.code}>{l.endonym} &middot; {l.name}</option>
         {/each}
@@ -1730,9 +1739,9 @@
     </label>
     {#if canNameSecond}
       <label class="field field-wide">
-        <span class="field-label">Second language</span>
+        <span class="field-label">{t("Second language")}</span>
         <select class="input" bind:value={secondLanguage} disabled={transcribing}>
-          <option value="none">None &mdash; only the one above</option>
+          <option value="none">{t("None — only the one above")}</option>
           {#each languages.filter((l) => l.code !== spokenLanguage) as l (l.code)}
             <option value={l.code}>{l.endonym} &middot; {l.name}</option>
           {/each}
@@ -1760,7 +1769,7 @@
       This route sends the whole clip away at once, so it can only be
       transcribed in <em>one</em> language &mdash; detection picks whichever
       is spoken most and puts every other speaker through it. For a video
-      that switches between two languages, use <strong>On this device</strong>,
+      that switches between two languages, use <strong>{t("On this device")}</strong>,
       which reads the language every four seconds and transcribes each
       stretch in the language it was actually spoken in.
     {/if}
@@ -1785,7 +1794,7 @@
       </span>
       {#if quote}
         <span class="credit-price" class:credit-short={!ok}>
-          Costs <strong>{priceLabel(quote.credits)}</strong>
+          {t("Costs")} <strong>{priceLabel(quote.credits)}</strong>
         </span>
       {:else}
         <span class="oa-caption">{empty}</span>
@@ -1797,7 +1806,7 @@
     {:else}
       <span class="credit-balance">
         {#if quote}
-          Costs <strong>{priceLabel(quote.credits)}</strong> &mdash;
+          {t("Costs")} <strong>{priceLabel(quote.credits)}</strong> &mdash;
         {/if}
         sign in to use it
       </span>
@@ -1847,10 +1856,10 @@
       </p>
       <div class="field-row">
         <button type="button" class="btn btn-secondary btn-sm" onclick={resumeWork}>
-          Restore subtitles
+          {t("Restore subtitles")}
         </button>
         <button type="button" class="btn btn-ghost btn-sm" onclick={discardWork}>
-          Discard
+          {t("Discard")}
         </button>
       </div>
     </section>
@@ -1863,13 +1872,13 @@
     </div>
   {:else if !engineReady}
     <div class="banner">
-      <p class="oa-caption">Loading the engine&hellip;</p>
+      <p class="oa-caption">{t("Loading the engine…")}</p>
     </div>
   {/if}
 
   <!-- 1. the video -->
   <section class="card">
-    <h2 class="section-title">Video</h2>
+    <h2 class="section-title">{t("Video")}</h2>
     {#if hasVideo}
       <div class="stage">
         <!-- svelte-ignore a11y_media_has_caption -->
@@ -1904,7 +1913,7 @@
             disabled={burning || transcribing}
             hidden
           />
-          Replace video
+          {t("Replace video")}
         </label>
       </div>
     {:else}
@@ -1949,8 +1958,8 @@
         -->
         <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
         <Icon name="film" size={22} />
-        <span>{touchOnly ? "Choose a video" : "Drop a video here, or choose one"}</span>
-        <span class="oa-caption">It stays on your device. No upload, no account.</span>
+        <span>{touchOnly ? t("Choose a video") : t("Drop a video here, or choose one")}</span>
+        <span class="oa-caption">{t("It stays on your device. No upload, no account.")}</span>
       </label>
     {/if}
     {#if videoError}
@@ -1960,7 +1969,7 @@
 
   <!-- 2. the subtitles -->
   <section class="card">
-    <h2 class="section-title">Subtitles</h2>
+    <h2 class="section-title">{t("Subtitles")}</h2>
     {#if hasCues}
       {#if !subtitleEncodingCertain}
         <!--
@@ -1972,14 +1981,14 @@
         -->
         <div class="encoding-row">
           <label class="field">
-            <span class="field-label">This file's text encoding</span>
+            <span class="field-label">{t("This file's text encoding")}</span>
             <select
               class="input"
               value={subtitleEncoding}
               onchange={(e) => rereadSubtitles((e.currentTarget as HTMLSelectElement).value)}
             >
               {#each SUBTITLE_ENCODINGS as option (option.id)}
-                <option value={option.id}>{option.label}</option>
+                <option value={option.id}>{t(option.label)}</option>
               {/each}
             </select>
           </label>
@@ -1993,7 +2002,7 @@
         <span class="oa-caption">{cues.length} cues</span>
         <label class="btn btn-ghost btn-sm">
           <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
-          Replace
+          {t("Replace")}
         </label>
       </div>
       <ol class="cue-list">
@@ -2006,7 +2015,7 @@
                 selectedCue = i;
                 seekTo(cue.start);
               }}
-              title="Jump here"
+              title={t("Jump here")}
             >
               {formatTime(cue.start)}
             </button>
@@ -2029,7 +2038,7 @@
         they have would be a strange way to offer a second attempt.
       -->
       <div class="subsection-head">
-        <h3 class="subsection-title">Generate again</h3>
+        <h3 class="subsection-title">{t("Generate again")}</h3>
       </div>
       {#if transcribing}
         {@render transcribeProgress()}
@@ -2057,7 +2066,7 @@
         <label class="dropzone dropzone-sm">
           <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
           <Icon name="upload" size={18} />
-          <span>Or open an .srt / .vtt you already have</span>
+          <span>{t("Or open an .srt / .vtt you already have")}</span>
         </label>
       {/if}
       {#if asrError}
@@ -2084,7 +2093,7 @@
           {spokenNames.length > 2 ? "were all heard" : "were both heard"}, and the
           subtitles below carry {spokenNames.length > 2 ? "all of them" : "both"}.
           Translating now renders the whole thing into one language, and
-          <em>Keep the original on screen too</em> shows the translation beside
+          <em>{t("Keep the original on screen too")}</em> shows the translation beside
           what was said.
           {#if spokenLanguage === "auto" && spokenNames.length > 2}
             Three or more is often one of them being misheard &mdash; if you know
@@ -2108,10 +2117,10 @@
     <!-- 3. style -->
     <section class="card">
       <div class="subsection-head">
-        <h2 class="section-title">Style</h2>
+        <h2 class="section-title">{t("Style")}</h2>
         <CostBadge cost="free" />
         {#if thumbnailsBusy}
-          <span class="oa-caption">rendering previews&hellip;</span>
+          <span class="oa-caption">{t("rendering previews…")}</span>
         {/if}
       </div>
       <p class="oa-caption card-intro">
@@ -2147,7 +2156,7 @@
       </div>
       {#if advancedPresets.length > 0}
         <div class="subsection-head">
-          <h3 class="subsection-title">Advanced pack</h3>
+          <h3 class="subsection-title">{t("Advanced pack")}</h3>
           <CostBadge cost="free" label="Included, free" />
         </div>
         <div class="style-grid">
@@ -2179,7 +2188,7 @@
       {/if}
       {#if hasCues}
         <div class="subsection-head">
-          <h3 class="subsection-title">Word effects</h3>
+          <h3 class="subsection-title">{t("Word effects")}</h3>
           <CostBadge cost="free" />
         </div>
         <label class="checkbox">
@@ -2189,7 +2198,7 @@
             bind:group={wordEffect}
             onchange={showACue}
           />
-          <span>None</span>
+          <span>{t("None")}</span>
         </label>
         <label class="checkbox">
           <input
@@ -2198,7 +2207,7 @@
             bind:group={wordEffect}
             onchange={showACue}
           />
-          <span>Highlight each word as it is spoken</span>
+          <span>{t("Highlight each word as it is spoken")}</span>
         </label>
         <label class="checkbox" class:disabled={loudness.length === 0}>
           <input
@@ -2208,7 +2217,7 @@
             disabled={loudness.length === 0}
             onchange={showACue}
           />
-          <span>Size every word by how loud it was</span>
+          <span>{t("Size every word by how loud it was")}</span>
         </label>
         {#if loudness.length === 0}
           <p class="oa-caption">
@@ -2221,7 +2230,7 @@
         {#if wordEffect === "karaoke"}
           <div class="field-row emphasis-row">
             <label class="field field-wide">
-              <span class="field-label">Growth</span>
+              <span class="field-label">{t("Growth")}</span>
               <input
                 class="input range"
                 type="range"
@@ -2232,7 +2241,7 @@
               />
             </label>
             <label class="field field-wide">
-              <span class="field-label">Glow</span>
+              <span class="field-label">{t("Glow")}</span>
               <input
                 class="input range"
                 type="range"
@@ -2243,7 +2252,7 @@
               />
             </label>
             <label class="field">
-              <span class="field-label">Colour</span>
+              <span class="field-label">{t("Colour")}</span>
               <input class="input swatch" type="color" bind:value={karaokeAccent} />
             </label>
           </div>
@@ -2258,7 +2267,7 @@
         {#if emphasise}
           <div class="field-row emphasis-row">
             <label class="field field-wide">
-              <span class="field-label">Strength</span>
+              <span class="field-label">{t("Strength")}</span>
               <input
                 class="input range"
                 type="range"
@@ -2279,7 +2288,7 @@
                 : `${emphasisSkipped} of ${cues.length} lines are not being emphasised`}
               &mdash; their words no longer match the audio that was measured.
               Translating a line, or adding and removing words while editing,
-              breaks that match. Re-run <strong>Generate from the audio</strong>
+              breaks that match. Re-run <strong>{t("Generate from the audio")}</strong>
               to measure the current words, or turn emphasis off.
             </p>
           {/if}
@@ -2296,15 +2305,15 @@
     <!-- 4. clip and size -->
     {#if hasDimensions}
       <section class="card">
-        <h2 class="section-title">Clip &amp; size</h2>
+        <h2 class="section-title">{t("Clip & size")}</h2>
         <div class="field-row">
           <label class="field">
-            <span class="field-label">Start</span>
+            <span class="field-label">{t("Start")}</span>
             <input class="oa-mono input" type="number" min="0" step="0.1" placeholder="0" bind:value={trimStart} />
             <span class="field-unit">sec</span>
           </label>
           <label class="field">
-            <span class="field-label">End</span>
+            <span class="field-label">{t("End")}</span>
             <input
               class="oa-mono input"
               type="number"
@@ -2316,7 +2325,7 @@
             <span class="field-unit">sec</span>
           </label>
           <label class="field field-wide">
-            <span class="field-label">Resolution</span>
+            <span class="field-label">{t("Resolution")}</span>
             <select class="input" bind:value={exportHeight}>
               <option value="">Source ({videoWidth}&times;{videoHeight})</option>
               {#each heightOptions as h (h)}
@@ -2329,7 +2338,7 @@
           <p class="field-error">{trimProblem}</p>
         {:else if isTrimmed}
           <p class="oa-caption">
-            Exporting {formatDuration(clipSeconds)} of {formatDuration(videoDuration)}.
+            {t("Exporting {clip} of {total}.", { clip: formatDuration(clipSeconds), total: formatDuration(videoDuration) })}
           </p>
         {/if}
       </section>
@@ -2338,7 +2347,7 @@
     <!-- 5. translation -->
     <section class="card">
       <div class="subsection-head">
-        <h2 class="section-title">Translate</h2>
+        <h2 class="section-title">{t("Translate")}</h2>
       </div>
       <p class="oa-caption card-intro">
         Timings are never touched &mdash; only the text inside each cue is replaced,
@@ -2346,9 +2355,9 @@
       </p>
       <div class="field-row">
         <label class="field field-wide">
-          <span class="field-label">Into</span>
+          <span class="field-label">{t("Into")}</span>
           <select class="input" bind:value={translateTo} disabled={translating}>
-            <option value="">Don't translate</option>
+            <option value="">{t("Don't translate")}</option>
             {#each languages as l (l.code)}
               <option value={l.code}>{l.endonym} &middot; {l.name}</option>
             {/each}
@@ -2356,10 +2365,10 @@
         </label>
         {#if activeProvider.local}
           <label class="field field-wide">
-            <span class="field-label">Translate from</span>
+            <span class="field-label">{t("Translate from")}</span>
             <select class="input" bind:value={sourceLanguage} disabled={translating}>
               {#if canDetect}
-                <option value="auto">Detect automatically</option>
+                <option value="auto">{t("Detect automatically")}</option>
               {/if}
               {#each languages as l (l.code)}
                 <option value={l.code}>{l.endonym} &middot; {l.name}</option>
@@ -2378,7 +2387,7 @@
 
       {#if translateRoute === "key"}
         <label class="field field-wide route-detail">
-          <span class="field-label">Service</span>
+          <span class="field-label">{t("Service")}</span>
           <select
             class="input"
             value={providerId}
@@ -2389,17 +2398,17 @@
             }}
           >
             {#each keyProviders as p (p.id)}
-              <option value={p.id}>{p.label}</option>
+              <option value={p.id}>{t(p.label)}</option>
             {/each}
           </select>
         </label>
-        <p class="oa-caption">{activeProvider.note}</p>
+        <p class="oa-caption">{t(activeProvider.note)}</p>
       {/if}
 
       {#if activeProvider.needsKey}
         <div class="field-row">
           <label class="field field-wide">
-            <span class="field-label">API key</span>
+            <span class="field-label">{t("API key")}</span>
             <input
               class="input oa-mono"
               type="password"
@@ -2411,7 +2420,7 @@
           </label>
           {#if activeProvider.needsBaseUrl}
             <label class="field field-wide">
-              <span class="field-label">Server</span>
+              <span class="field-label">{t("Server")}</span>
               <input
                 class="input oa-mono"
                 type="text"
@@ -2421,7 +2430,7 @@
               />
             </label>
             <label class="field field-wide">
-              <span class="field-label">Model</span>
+              <span class="field-label">{t("Model")}</span>
               <input
                 class="input oa-mono"
                 type="text"
@@ -2458,11 +2467,11 @@
           onclick={doTranslate}
         >
           {#if translating}
-            {translateProgress || "Translating"}
+            {translateProgress || t("Translating")}
           {:else if translationQuote}
-            Translate for {creditWord(translationQuote.credits)}
+            {t("Translate for {price}", { price: creditWord(translationQuote.credits) })}
           {:else}
-            Translate cues
+            {t("Translate cues")}
           {/if}
         </button>
       </div>
@@ -2480,23 +2489,23 @@
         <div class="bilingual">
           <label class="checkbox">
             <input type="checkbox" bind:checked={bilingual} />
-            <span>Keep the original on screen too</span>
+            <span>{t("Keep the original on screen too")}</span>
           </label>
           {#if bilingual}
             <div class="field-row">
               <label class="field">
-                <span class="field-label">Order</span>
+                <span class="field-label">{t("Order")}</span>
                 <select class="input" bind:value={bilingualOrder}>
-                  <option value="original-first">Original on top</option>
-                  <option value="translation-first">Translation on top</option>
+                  <option value="original-first">{t("Original on top")}</option>
+                  <option value="translation-first">{t("Translation on top")}</option>
                 </select>
               </label>
               <label class="field">
-                <span class="field-label">Original size</span>
+                <span class="field-label">{t("Original size")}</span>
                 <select class="input" bind:value={originalScale}>
                   <option value={1}>Same as the translation</option>
-                  <option value={0.8}>Smaller (80%)</option>
-                  <option value={0.65}>Much smaller (65%)</option>
+                  <option value={0.8}>{t("Smaller (80%)")}</option>
+                  <option value={0.65}>{t("Much smaller (65%)")}</option>
                 </select>
               </label>
             </div>
@@ -2524,12 +2533,12 @@
     <!-- 6. export -->
     <section class="card">
       <div class="subsection-head">
-        <h2 class="section-title">Export</h2>
+        <h2 class="section-title">{t("Export")}</h2>
         <CostBadge cost="free" />
       </div>
       <div class="subsection-head">
-        <h3 class="subsection-title">A subtitle file</h3>
-        <span class="tag">text only</span>
+        <h3 class="subsection-title">{t("A subtitle file")}</h3>
+        <span class="tag">{t("text only")}</span>
       </div>
       <p class="oa-caption card-intro">
         The subtitles on their own, to hand to a player, a platform or an editor
@@ -2567,7 +2576,7 @@
 
       {#if hasDimensions}
         <div class="subsection-head">
-          <h3 class="subsection-title">A video, with the subtitles burned in</h3>
+          <h3 class="subsection-title">{t("A video, with the subtitles burned in")}</h3>
           {#if support?.ok}
             <span class="tag tag-unlocked">
               {support.container === "mp4" ? "MP4 · H.264" : "WebM · VP9"}
@@ -2592,10 +2601,10 @@
             <div class="success-actions">
               <a class="btn btn-primary btn-sm" href={burnedUrl} download={burnedName}>
                 <Icon name="download" size={14} />
-                Save
+                {t("Save")}
               </a>
               <button type="button" class="btn btn-ghost btn-sm" onclick={clearBurned}>
-                Burn again
+                {t("Burn again")}
               </button>
             </div>
           </div>
@@ -2611,15 +2620,15 @@
               <div class="progress-fill" style:width={`${burnPercent}%`}></div>
             </div>
             <span class="oa-mono progress-label">
-              {progressLabel(burnNote, burnPercent, burnRemaining)}
+              {progressLabel(t(burnNote), burnPercent, burnRemaining)}
             </span>
             <button type="button" class="btn btn-ghost btn-sm" onclick={cancelBurn}>
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         {:else}
           <p class="oa-caption card-intro">
-            Saves <strong class="oa-mono">{burnWillSave}</strong> &mdash; the
+            {t("Saves")} <strong class="oa-mono">{burnWillSave}</strong> &mdash; the
             picture with the subtitles drawn into it, so they show up anywhere
             without a subtitle file beside them. Encoded here in the browser with
             WebCodecs; the audio is copied across untouched rather than
@@ -2633,7 +2642,7 @@
               disabled={!assDocument}
               onclick={doBurn}
             >
-              Burn subtitles into the video
+              {t("Burn subtitles into the video")}
             </button>
           </div>
         {/if}
@@ -2645,7 +2654,7 @@
 
       {#if cliLine}
         <details class="raw-command">
-          <summary class="oa-caption">Prefer to burn it on the command line?</summary>
+          <summary class="oa-caption">{t("Prefer to burn it on the command line?")}</summary>
           <p class="oa-caption card-intro">
             The CLI probes the real file, so it gets colour tags, rotation and
             variable frame rate right in ways a browser cannot see. Worth using for
@@ -2686,8 +2695,8 @@
         onclick={() => (showFeatures = !showFeatures)}
         aria-expanded={showFeatures}
       >
-        <h2 class="section-title">What's included</h2>
-        <span class="oa-caption">{showFeatures ? "Hide" : "Everything is unlocked"}</span>
+        <h2 class="section-title">{t("What's included")}</h2>
+        <span class="oa-caption">{showFeatures ? t("Hide") : t("Everything is unlocked")}</span>
       </button>
       {#if showFeatures}
         <p class="oa-caption card-intro">

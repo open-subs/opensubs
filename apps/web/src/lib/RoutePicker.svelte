@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "./i18n/index.svelte";
   // Three ways to do one job, side by side.
   //
   // Subtitles and translation each have the same three routes -- run it
@@ -61,12 +62,12 @@
       onclick={() => onselect(route.id)}
     >
       <span class="route-head">
-        <span class="route-label">{route.label}</span>
-        <CostBadge cost={route.cost} label={route.costLabel} />
+        <span class="route-label">{t(route.label)}</span>
+        <CostBadge cost={route.cost} label={route.costLabel && t(route.costLabel)} />
       </span>
-      <span class="route-note">{route.note}</span>
+      <span class="route-note">{t(route.note)}</span>
       {#if route.unavailable}
-        <span class="route-price route-unavailable">{route.unavailable}</span>
+        <span class="route-price route-unavailable">{t(route.unavailable)}</span>
       {:else if route.price}
         <span class="route-price">{route.price}</span>
       {/if}
