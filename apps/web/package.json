@@ -23,7 +23,8 @@
     "test:context": "node --experimental-strip-types e2e/context.mjs",
     "test:i18n": "node --experimental-strip-types e2e/i18n.mjs",
     "test:i18n-live": "node e2e/i18n-live.mjs",
-    "test:vad": "node e2e/vad.mjs"
+    "test:vad": "node e2e/vad.mjs",
+    "test:labels": "node --experimental-strip-types e2e/labels.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

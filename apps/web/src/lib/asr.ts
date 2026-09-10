@@ -28,6 +28,7 @@ import {
 } from "mediabunny";
 
 import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
+import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
 
@@ -807,18 +808,7 @@ async function languageRuns(
     });
   }
 
-  // A single disagreeing cell is treated as noise -- a bar of music, a
-  // held silence, one ambiguous sentence.
-  //
-  // This is a deliberately weak rule and it used to be stronger, when the
-  // cells were ten seconds: back then it erased the *only* cell that had
-  // caught an eight-second return to English, and the narration was
-  // captioned in Chinese. Two cells now means eight seconds, which is
-  // about as short as a real stretch of speech gets, so anything that
-  // survives two cells is believed.
-  for (let i = 1; i < labels.length - 1; i += 1) {
-    if (labels[i] !== labels[i - 1] && labels[i - 1] === labels[i + 1]) labels[i] = labels[i - 1];
-  }
+  smoothLabels(labels);
 
   const runs: LanguageRun[] = [];
   for (const [i, language] of labels.entries()) {
