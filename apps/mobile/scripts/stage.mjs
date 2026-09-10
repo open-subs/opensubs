@@ -61,5 +61,80 @@ for (const id of [...MARKETING, "app"]) {
   html = html.replace(new RegExp(`<a\\b[^>]*href="#${id}"[^>]*>[\\s\\S]*?</a>`, "g"), "");
 }
 
+// The site's own copy says "in your browser", which is true of the site
+// and false of the thing the reader is holding. Rewritten rather than
+// rewritten-around: an app store listing whose first screenshot says
+// "browser" reads as a web page someone wrapped, which is exactly the
+// impression to avoid.
+//
+// Each replacement asserts, so a copy change upstream fails the build
+// instead of silently shipping the wrong words to three stores.
+const COPY = [
+  [
+    "<title>Free AI Subtitle Generator &mdash; In Your Browser | OpenSubs</title>",
+    "<title>OpenSubs &mdash; subtitle any video, on your device</title>",
+  ],
+  [
+    "Free AI subtitle generator that runs in your browser",
+    "Subtitles for any video, made on your device",
+  ],
+  [
+    "all inside your browser. The video file never\n      leaves your machine, because there is nowhere for it to go.",
+    "all on your device. The video file never\n      leaves it, because there is nowhere for it to go.",
+  ],
+  [
+    // The static skeleton, which is what shows before Svelte mounts. The
+    // mounted app decides this at runtime from the pointer type.
+    "Drop a video here, or choose one",
+    "Choose a video",
+  ],
+  [
+    "entirely in your browser. The video never leaves your machine.",
+    "entirely on your device. The video never leaves it.",
+  ],
+];
+COPY.push([
+  "Whisper runs here, in your browser, and writes",
+  "Whisper runs here, on your device, and writes",
+]);
+// og:title and twitter:title, which are share-card metadata for a web
+// page. Harmless in an app and wrong, so they say the same as <title>.
+COPY.push([
+  "Free AI Subtitle Generator \u2014 In Your Browser | OpenSubs",
+  "OpenSubs \u2014 subtitle any video, on your device",
+]);
+
+const missed = [];
+for (const [from, to] of COPY) {
+  if (!html.includes(from)) { missed.push(from); continue; }
+  html = html.split(from).join(to);
+}
+if (missed.length) {
+  console.error("stage: the site's copy changed -- these strings were not found:");
+  for (const m of missed) console.error(`  ${JSON.stringify(m)}`);
+  console.error("stage: update COPY in this script so the app does not ship the site's wording.");
+  process.exit(1);
+}
+
+// Structured data is search-engine markup for a web page. Inside an app
+// binary it is dead weight that also describes the wrong product -- it
+// names an operating system of "Any browser with WebAssembly".
+const ld = /<script type="application\/ld\+json">[\s\S]*?<\/script>/g;
+const before = html.length;
+html = html.replace(ld, "");
+if (html.length === before) {
+  console.error("stage: no JSON-LD block found -- the site's <head> changed.");
+  process.exit(1);
+}
+
+// Nothing visible or machine-readable in the shipped app should claim the
+// product runs in a browser. Checked rather than hoped for.
+const stray = html.match(/.{0,50}(browser|your machine|Drop a video).{0,50}/gi) ?? [];
+if (stray.length) {
+  console.error(`stage: ${stray.length} phrase(s) that do not belong in an app survive:`);
+  for (const m of stray.slice(0, 6)) console.error(`  ...${m.replace(/\s+/g, " ")}...`);
+  process.exit(1);
+}
+
 writeFileSync(index, html);
 console.log(`stage: www/ ready (${html.length} bytes of index.html)`);

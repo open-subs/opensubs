@@ -1,5 +1,12 @@
 // The extension's icons, rendered from the product's own SVG.
 //
+// Run by hand (`npm run icons`), not from the build. The output is
+// committed, and the renderers this needs -- librsvg, or macOS Quick Look
+// -- are on a developer's Mac and not on a Linux CI runner. Wiring it into
+// prebuild made every CI run fail before it compiled anything, with a
+// message about installing a package that has nothing to do with the
+// extension. Re-run it when the logo changes and commit the PNGs.
+//
 // Not copied from apps/web/public: those are favicons, sized 16/32/48/180
 // and up, and a browser toolbar wants 16/48/128 exactly. Rendering from the
 // one SVG keeps every surface on the same mark, so a change to the logo

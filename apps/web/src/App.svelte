@@ -101,6 +101,20 @@
 
   // --- state -------------------------------------------------------------
 
+  /**
+   * Whether this is a device with no mouse to drag with.
+   *
+   * "Drop a video here" is an instruction a phone cannot follow, and it is
+   * the first line of the app-shell build's opening screen. A coarse
+   * pointer is the honest test rather than a check for the native wrapper:
+   * a tablet in a browser cannot drag either, and gets the same wording.
+   *
+   * Read once. A pointer does not change type mid-session, and a media
+   * query subscription here would re-render the drop zone for nothing.
+   */
+  const touchOnly =
+    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+
   let engineReady = $state(false);
   let engineError = $state<string | null>(null);
   let version = $state("");
@@ -1935,8 +1949,8 @@
         -->
         <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
         <Icon name="film" size={22} />
-        <span>Drop a video here, or choose one</span>
-        <span class="oa-caption">It stays on your machine. No upload, no account.</span>
+        <span>{touchOnly ? "Choose a video" : "Drop a video here, or choose one"}</span>
+        <span class="oa-caption">It stays on your device. No upload, no account.</span>
       </label>
     {/if}
     {#if videoError}
