@@ -86,6 +86,13 @@ export function contextGroups(cues: Timed[], texts: string[]): Group[] {
   return groups;
 }
 
+/** Punctuation a subtitle can end on without looking cut off. */
+const BREAKS_WELL = /[，。、；：！？,.;:!?…]/;
+
+/** How far back from the proportional split point to look for one, as a
+ * fraction of the piece just taken. */
+const PUNCTUATION_REACH = 0.25;
+
 /** Scripts that do not put spaces between words. */
 const UNSPACED = /[\u3000-\u303f\u3040-\u9fff\uf900-\ufaff\uff00-\uffef\u0e00-\u0e7f]/;
 
@@ -108,12 +115,57 @@ export function joinGroup(parts: string[]): string {
 }
 
 /**
+ * The pieces a translation may be broken into.
+ *
+ * APP-53. This used to be "words if the translation has any, characters
+ * otherwise", which reads sensibly and is wrong for exactly the case it
+ * was written for. A Chinese translation of two sentences comes back as
+ *
+ *     地震是世界上最常见的自然灾害之一。 转眼之间，大地开始震动…
+ *
+ * -- one space, between the sentences, because the translator put it
+ * there. That single space means "the translation has words", so forty
+ * available break points collapse to two, and two pieces cannot fill
+ * three cues.
+ *
+ * The unit is a property of the *script*, not of whether a space happens
+ * to appear. Chinese, Japanese and Thai may be broken at any character;
+ * everything else breaks at whitespace.
+ */
+function unitsOf(text: string): string[] {
+  // Judged on the text as a whole rather than its first character: a
+  // Chinese line often opens with a Latin acronym or a numeral.
+  const unspaced = [...text].filter((c) => UNSPACED.test(c)).length;
+  const letters = [...text].filter((c) => /\S/.test(c)).length;
+  if (letters > 0 && unspaced / letters >= 0.5) {
+    // Drop whitespace the translator inserted between two characters of a
+    // script that does not use it -- typically one space between
+    // sentences. Chinese does not put a space there, so it is the
+    // translator's punctuation habit rather than the text's, and left in
+    // it becomes a unit of its own that pushes the sentence-final 。 out
+    // of reach of the break-point search below.
+    //
+    // A space with a Latin word on either side is kept: "iPhone 15" and
+    // an embedded acronym are real.
+    const chars = [...text];
+    return chars.filter((c, i) => {
+      if (/\S/.test(c)) return true;
+      const before = chars[i - 1];
+      const after = chars[i + 1];
+      return !(before && after && UNSPACED.test(before) && UNSPACED.test(after));
+    });
+  }
+  const words = text.split(/(?<=\s)/);
+  return words.length > 1 ? words : [...text];
+}
+
+/**
  * Divide one translated sentence back across the cues it came from.
  *
  * The split is proportional to the source cues' lengths and lands on a
  * word boundary, or on any character in a script that has none. Each cue
- * is left at least one word where there are enough to go round, and the
- * last takes everything remaining, so no text is lost to rounding.
+ * takes at least one unit while any remain, and the last takes everything
+ * left over, so no text is lost to rounding.
  */
 export function spread(translated: string, sources: string[]): string[] {
   if (sources.length <= 1) return [translated];
@@ -123,11 +175,12 @@ export function spread(translated: string, sources: string[]): string[] {
   const total = sources.reduce((sum, part) => sum + part.length, 0);
   if (total === 0) return sources.map((_, i) => (i === 0 ? text : ""));
 
-  // Words if the translation has any, characters otherwise -- which is
-  // the right unit for Chinese, Japanese and Thai, where every position
-  // is a legal break.
-  const words = text.split(/(?<=\s)/);
-  const units = words.length > 1 ? words : [...text];
+  const units = unitsOf(text);
+  // Not `text.length`: unitsOf may have dropped translator-inserted
+  // whitespace, and the proportions have to be measured against what is
+  // actually being divided up or the last cue silently absorbs the
+  // difference.
+  const length = units.reduce((sum, u) => sum + u.length, 0);
   const out: string[] = [];
 
   let at = 0;
@@ -135,17 +188,43 @@ export function spread(translated: string, sources: string[]): string[] {
   let source = 0;
   for (let i = 0; i < sources.length - 1; i += 1) {
     source += sources[i].length;
-    const target = (text.length * source) / total;
+    const target = (length * source) / total;
     // Leave one unit for each cue still to come, so a short translation
-    // spreads thin rather than leaving later cues blank.
-    const limit = units.length - (sources.length - 1 - i);
+    // spreads thin rather than leaving later cues blank...
+    const reserved = units.length - (sources.length - 1 - i);
+    // ...but never at the cost of this one. The reservation above can go
+    // to zero -- or negative -- when there are fewer units than cues, and
+    // then the loop below runs zero times and *this* cue is the one left
+    // blank. That is APP-53's visible half: the first cue of a group kept
+    // its untranslated source while the whole translation landed on the
+    // second. A cue that gets nothing has to be a later one, never an
+    // earlier one, because the reader meets it first.
+    const limit = Math.max(reserved, at + 1);
+    const started = at;
     let piece = "";
-    while (at < limit) {
+    while (at < Math.min(limit, units.length)) {
       const next = consumed + units[at].length;
       if (piece && Math.abs(next - target) > Math.abs(consumed - target)) break;
       piece += units[at];
       consumed = next;
       at += 1;
+    }
+    // Prefer a punctuation boundary if one is close.
+    //
+    // Character-unit splitting is free to break anywhere, and left alone
+    // it breaks 转眼之间 into 转眼之 / 间 -- legal, and unreadable. A comma
+    // or full stop within a short reach of the proportional split point
+    // is a much better place to end a subtitle, and moving to it costs at
+    // most a few characters of drift against the audio.
+    const reach = Math.max(2, Math.round((consumed - (consumed - piece.length)) * PUNCTUATION_REACH));
+    for (let back = 1; back <= reach && at - back > started; back += 1) {
+      if (!BREAKS_WELL.test(units[at - back - 1] ?? "")) continue;
+      for (let n = 0; n < back; n += 1) {
+        at -= 1;
+        consumed -= units[at].length;
+        piece = piece.slice(0, -units[at].length);
+      }
+      break;
     }
     out.push(piece.trim());
   }

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OpenSubs</string>
+    <string name="title_activity_main">OpenSubs</string>
+    <string name="package_name">app.opensubs.mobile</string>
+    <string name="custom_url_scheme">app.opensubs.mobile</string>
+</resources>
