@@ -80,4 +80,24 @@ https://opensubs.app
 - [Subtitle generator](https://opensubs.app/): the tool, and what it does.
 - [Burn subtitles into video](https://opensubs.app/burn-subtitles-into-video):
   hardcoding captions into the picture.
+- [Subtitle styles](https://opensubs.app/styles): the twelve presets, each
+  rendered live from the engine's own numbers rather than screenshotted.
 - [Privacy](https://opensubs.app/privacy.html): what is stored, and where.
+
+## Languages
+
+Every page above exists as a real document in eight languages, translated
+at build time rather than by script, each with its own URL and canonical:
+
+- English — https://opensubs.app/ (also the hreflang x-default)
+- 简体中文 — https://opensubs.app/zh-Hans
+- 繁體中文 — https://opensubs.app/zh-Hant
+- 日本語 — https://opensubs.app/ja
+- 한국어 — https://opensubs.app/ko
+- Deutsch — https://opensubs.app/de
+- Español — https://opensubs.app/es
+- Português — https://opensubs.app/pt
+
+The sub-pages sit under the same prefix: /ja/styles, /de/privacy.html, and
+so on. The tool itself follows the page it is embedded in, so the interface
+and the copy around it are always the same language.
