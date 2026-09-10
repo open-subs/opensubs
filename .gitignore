@@ -62,3 +62,10 @@ test-results/
 # Videos copied in by e2e/pipeline.mjs so the harness can serve them from
 # its own origin. Someone else's footage, and 18 MB of it.
 /apps/extension/public/testmedia/
+
+# The mobile shell's web payload, and the two copies `cap sync` makes of
+# it. All three are generated: `scripts/stage.mjs` builds www/ from
+# apps/web/dist, and Capacitor copies it into each native project.
+/apps/mobile/www/
+/apps/mobile/ios/App/App/public/
+/apps/mobile/android/app/src/main/assets/public/

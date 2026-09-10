@@ -1,0 +1,27 @@
+{
+  "name": "opensubs-mobile",
+  "version": "0.1.0",
+  "description": "OpenSubs for iOS, iPadOS and Android -- the web app in a native shell",
+  "type": "module",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "build:web": "npm --prefix ../web run build",
+    "sync": "npm run build:web && node scripts/stage.mjs && cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android",
+    "run:ios": "cap run ios",
+    "run:android": "cap run android",
+    "check": "node scripts/check-engine.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/ios": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "typescript": "~5.7.2"
+  }
+}

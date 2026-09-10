@@ -229,21 +229,38 @@ if (!existsSync(DIST)) {
 
 console.log("backend domain masking");
 {
-  // The accounts server and the gateway are shared across every OpenApps
-  // product, and a user of this one must never see that. This is the check
-  // that keeps it true: one hardcoded URL in one call site, added in a
-  // hurry, undoes the whole arrangement and nothing else would notice.
+  // The accounts server and the gateway are shared infrastructure, and a
+  // user of this app must never see whose. Every request leaves for an
+  // `opensubs.app` host (see src/lib/account.ts); one hardcoded URL in one
+  // call site, added in a hurry, undoes the whole arrangement and nothing
+  // else would notice.
+  //
+  // The host to look for is not written down here. This file is public, so
+  // hardcoding the name would publish the very string the check exists to
+  // keep out of public view -- the test would become the leak. It comes
+  // from the environment instead, and the deploy script (which is not in
+  // this repository) sets it and refuses to ship on a hit.
+  //
+  //   OPENSUBS_MASKED_HOSTS=example.internal,other.internal npm test
+  const masked = (process.env.OPENSUBS_MASKED_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean);
   const bundles = (await readdir(join(DIST, "assets"))).filter((f) => f.endsWith(".js"));
-  let leaked = [];
-  for (const file of bundles) {
-    const text = await readFile(join(DIST, "assets", file), "utf8");
-    if (text.includes("openapps.network")) leaked.push(file);
+  if (masked.length === 0) {
+    console.log("  --   backend domain masking not checked (OPENSUBS_MASKED_HOSTS unset)");
+  } else {
+    const leaked = [];
+    for (const file of bundles) {
+      const text = await readFile(join(DIST, "assets", file), "utf8");
+      for (const host of masked) if (text.includes(host)) leaked.push(`${file} (${host})`);
+    }
+    check(
+      "the built bundle never names a masked backend host",
+      leaked.length === 0,
+      leaked.join(", "),
+    );
   }
-  check(
-    "the built bundle never names the backend domain",
-    leaked.length === 0,
-    `openapps.network appears in ${leaked.join(", ")}`,
-  );
 
   const all = (
     await Promise.all(bundles.map((f) => readFile(join(DIST, "assets", f), "utf8")))

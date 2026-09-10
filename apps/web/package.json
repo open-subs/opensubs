@@ -19,7 +19,8 @@
     "test:video-diff": "node e2e/video-diff.mjs",
     "burn": "node e2e/burn.mjs",
     "capture": "node e2e/capture.mjs",
-    "check": "svelte-check --tsconfig ./tsconfig.json --threshold error"
+    "check": "svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "test:context": "node --experimental-strip-types e2e/context.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
