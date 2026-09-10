@@ -69,6 +69,59 @@ fn must_break(group: &[&Word], next: &Word, cfg: &SegmentConfig) -> bool {
     false
 }
 
+/// How long a group's cue would actually be on screen, once the next
+/// group's start has clipped it.
+fn shown_for(group: &[&Word], next: Option<&Vec<&Word>>) -> f64 {
+    let start = group[0].start;
+    let natural_end = group[group.len() - 1].end;
+    match next {
+        Some(n) => (n[0].start - start).min(natural_end - start).max(0.0),
+        None => natural_end - start,
+    }
+}
+
+/// Join adjacent groups whose cues would be too brief to read.
+///
+/// Left to right, and repeatedly: joining two still-brief groups can
+/// leave a group that is brief, and the reader does not care that it took
+/// two steps to get there.
+fn merge_flickering(groups: &mut Vec<Vec<&Word>>, cfg: &SegmentConfig) {
+    let mut i = 0;
+    while i + 1 < groups.len() {
+        let shown = shown_for(&groups[i], groups.get(i + 1));
+        if shown >= cfg.min_duration {
+            i += 1;
+            continue;
+        }
+
+        // A real silence is a sentence boundary and outranks flicker: two
+        // sentences welded together read worse than one brief cue.
+        let gap = groups[i + 1][0].start - groups[i][groups[i].len() - 1].end;
+        if gap >= cfg.pause_split {
+            i += 1;
+            continue;
+        }
+
+        // The joined cue still has to fit on screen and in time.
+        let span = groups[i + 1][groups[i + 1].len() - 1].end - groups[i][0].start;
+        if span > cfg.max_duration {
+            i += 1;
+            continue;
+        }
+        let mut tokens = tokens_of(&groups[i]);
+        tokens.extend(tokens_of(&groups[i + 1]));
+        let text = join_tokens(&tokens);
+        if joined_len(&tokens) > line_budget(&text) * cfg.max_lines {
+            i += 1;
+            continue;
+        }
+
+        let tail = groups.remove(i + 1);
+        groups[i].extend(tail);
+        // Deliberately not advancing: the merged group may still be brief.
+    }
+}
+
 /// Build one cue from a word group.
 ///
 /// `start` is always the group's own first word, snapped to a frame --
@@ -153,7 +206,30 @@ pub fn segment(t: &Transcript, fps: Rational, cfg: &SegmentConfig) -> Vec<Cue> {
         groups.push(group);
     }
 
-    // Second pass: build each cue from its own group, anchored to its own
+    // Second pass: put back together the groups that would flicker.
+    //
+    // APP-52. `must_break` closes a group as soon as the text would run
+    // past `max_cps`, which is right on its own terms and wrong in its
+    // consequences on a fast speaker. A dense passage becomes a run of
+    // two-word groups; each cue is then pulled back by `enforce_gaps` to
+    // just short of the next one's start, and the reader gets seven
+    // subtitles in five seconds, none of them on screen long enough to
+    // read. Measured on the reported clip: ten of twenty-eight cues under
+    // 0.9 s, seven of them consecutive and each exactly two frames apart.
+    //
+    // The trade looks like "reading speed against flicker", and it is
+    // not: the clamped cues are *already* worse on reading speed than the
+    // merge would be. "production" alone is ten characters in 0.50 s --
+    // 20 cps, above the 17 this rule exists to hold. Joined with its
+    // neighbours it is 45 characters in 3.3 s, which is 13.6. Merging
+    // improves both numbers at once, so there is nothing to trade away.
+    //
+    // Only what would otherwise flicker is touched, and only within the
+    // limits the first pass already guarantees: a real pause still ends a
+    // cue, capacity is still two lines, and `max_duration` still holds.
+    merge_flickering(&mut groups, cfg);
+
+    // Third pass: build each cue from its own group, anchored to its own
     // words' natural timing -- no cue is ever delayed by another.
     let mut cues: Vec<Cue> = groups.iter().map(|g| build_cue(g, fps, cfg)).collect();
 
@@ -341,6 +417,72 @@ mod tests {
         for pair in cues.windows(2) {
             assert!(pair[0].end <= pair[1].start + 1e-9, "overlap: {pair:?}");
         }
+    }
+
+    /// APP-52. thea's clip, cues 22-28: a fast passage that `must_break`
+    /// cut into two-word groups, each then clipped by the next one's
+    /// start to about half a second.
+    #[test]
+    fn a_fast_passage_does_not_become_a_run_of_flickers() {
+        // Real word timings from the reported clip, 104.3s to 109.7s.
+        let specs: Vec<(f64, f64, &str)> = vec![
+            (104.300, 104.600, "free"),
+            (104.600, 104.833, "video"),
+            (104.900, 105.300, "experts"),
+            (105.300, 105.667, "guide,"),
+            (105.733, 106.100, "seven"),
+            (106.100, 106.400, "things"),
+            (106.400, 106.600, "you"),
+            (106.667, 106.950, "should"),
+            (106.950, 107.233, "know"),
+            (107.300, 107.600, "before"),
+            (107.600, 107.900, "hiring"),
+            (107.900, 108.067, "a"),
+            (108.133, 108.633, "production"),
+            (108.700, 109.700, "company."),
+        ];
+        let t = Transcript {
+            language: "en".into(),
+            duration: 110.0,
+            words: words(&specs),
+            segments: vec![],
+        };
+        let cues = segment(&t, fps30(), &SegmentConfig::default());
+
+        let brief: Vec<_> = cues
+            .iter()
+            .filter(|c| c.end - c.start < SegmentConfig::default().min_duration)
+            .collect();
+        assert!(
+            brief.is_empty(),
+            "{} cue(s) too brief to read: {:?}",
+            brief.len(),
+            brief
+                .iter()
+                .map(|c| (c.end - c.start, c.lines.join(" ")))
+                .collect::<Vec<_>>()
+        );
+
+        // And nothing was lost putting them back together.
+        let out: Vec<String> = cues.iter().flat_map(|c| c.lines.clone()).collect();
+        let joined = out.join(" ");
+        for (_, _, w) in &specs {
+            assert!(joined.contains(w), "lost {w:?} from {joined:?}");
+        }
+    }
+
+    /// The merge must not weld two sentences over a real silence.
+    #[test]
+    fn a_pause_still_ends_a_cue_even_when_the_first_is_brief() {
+        let t = Transcript {
+            language: "en".into(),
+            duration: 10.0,
+            words: words(&[(0.0, 0.4, "Yes."), (3.0, 3.6, "Anyway,"), (3.6, 4.2, "onward.")]),
+            segments: vec![],
+        };
+        let cues = segment(&t, fps30(), &SegmentConfig::default());
+        assert!(cues.len() >= 2, "a 2.6s silence must still split: {cues:?}");
+        assert!(cues[0].lines.join(" ").contains("Yes."));
     }
 
     #[test]
