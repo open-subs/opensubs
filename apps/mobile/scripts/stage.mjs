@@ -28,7 +28,7 @@ cpSync(dist, www, { recursive: true });
 // privacy.html stays. The footer links to it, both stores require a
 // reachable privacy policy, and deleting it left that link 404ing inside
 // the app -- which is exactly the sort of thing a reviewer clicks.
-for (const page of ["burn-subtitles-into-video.html", "sitemap.xml", "robots.txt", "llms.txt", "og-image.png"]) {
+for (const page of ["burn-subtitles-into-video.html", "styles.html", "sitemap.xml", "robots.txt", "llms.txt", "og-image.png"]) {
   rmSync(join(www, page), { force: true });
 }
 
@@ -126,6 +126,11 @@ if (missed.length) {
 // the downloads section: it offers installers from outside the store. The
 // link to the source stays -- the AGPL wants the source offered, and an
 // open-source app linking its repository is ordinary.
+// The nav and footer links to /styles, which the app payload does not
+// carry -- the dead-link check below would catch the footer one, and the
+// nav one it would not, because it points at an extensionless path.
+html = html.replace(/<a[^>]*href="\/styles"[^>]*>[\s\S]*?<\/a>\s*/g, "");
+
 const releasesLink = /<a href="https:\/\/github\.com\/[^"]*\/releases"[^>]*>[\s\S]*?<\/a>\s*/g;
 if (!releasesLink.test(html)) {
   console.error("stage: no releases link found in the footer -- has it moved?");

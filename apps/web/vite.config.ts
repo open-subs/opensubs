@@ -25,6 +25,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, "index.html"),
         burn: resolve(__dirname, "burn-subtitles-into-video.html"),
+        styles: resolve(__dirname, "styles.html"),
       },
     },
     // The wasm is imported as a URL and fetched at runtime; never inline it
