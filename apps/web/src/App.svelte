@@ -314,6 +314,16 @@
   let asrPhase = "";
   let asrPhaseStarted = 0;
   let asrError = $state<string | null>(null);
+  /**
+   * The voice detector heard nobody, and is asking rather than refusing.
+   *
+   * Kept apart from `asrError` because it is not an error: the clip may
+   * genuinely be a song, and the answer to that is a button, not a
+   * message in red.
+   */
+  let noSpeechOffer = $state(false);
+  /** Set once the reader has said "yes, transcribe it anyway". */
+  let ignoreNoSpeech = $state(false);
   let asrAbort: AbortController | null = null;
 
   /**
@@ -1178,6 +1188,7 @@
     if (!videoFile || transcribing) return;
     transcribing = true;
     asrError = null;
+    noSpeechOffer = false;
     asrPercent = null;
     asrRemaining = "";
     spokenFound = [];
@@ -1213,7 +1224,7 @@
       };
       const result =
         asrEngine === "local"
-          ? await transcribeLocally(shared)
+          ? await transcribeLocally({ ...shared, allowEmpty: ignoreNoSpeech })
           : await transcribeRemotely({
               ...shared,
               hosted: asrEngine === "opensubs",
@@ -1225,6 +1236,24 @@
       // breaking, reading-speed caps and frame snapping all happen in the
       // same Rust the CLI runs.
       const { transcript, audio, audioOffset } = result;
+
+      // APP-54. A clip with nobody speaking in it comes back with a full
+      // set of confident subtitles, because the decoder always writes
+      // something. Saying so is the whole fix -- an empty subtitle list
+      // with no explanation reads as a failure of the app, and a page of
+      // invented English over a cooking video reads as a working one.
+      // APP-54. Nobody spoke, so there is nothing to transcribe, and
+      // Whisper would have written a confident page of English anyway.
+      //
+      // An offer rather than a refusal: singing is not speech to the
+      // detector, so a music video lands here too, and refusing one
+      // outright would be wrong about every music video.
+      if (result.noSpeech) {
+        noSpeechOffer = true;
+        transcribing = false;
+        return;
+      }
+
       spokenFound = result.languages ?? [];
       // A single spoken language is also the language to translate *from*,
       // and the user should not have to tell us twice. Mixed audio leaves
@@ -1831,6 +1860,28 @@
   ondrop={onDrop}
 />
 
+{#snippet noSpeechNotice()}
+  <!--
+    APP-54. The detector found no voice in the clip. Whisper would have
+    written a page of confident English over it, which is the fault this
+    replaces -- but singing is not speech to the detector either, so this
+    asks rather than refuses.
+  -->
+  <div class="no-speech">
+    <p>{t("No voice was found in this clip, so no subtitles were made.")}</p>
+    <p class="oa-caption">
+      {t("Whisper writes something for any sound, so a clip with only music or background noise comes back full of sentences nobody said. Singing does not count as speech here either — if this is a song, go ahead.")}
+    </p>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      onclick={() => { ignoreNoSpeech = true; noSpeechOffer = false; doTranscribe(); }}
+    >
+      {t("Transcribe it anyway")}
+    </button>
+  </div>
+{/snippet}
+
 <main class="screen" class:drag-over={isDragOver}>
 
   {#if restored}
@@ -2054,6 +2105,9 @@
           Load a video to generate subtitles from its audio.
         </p>
       {/if}
+      {#if noSpeechOffer}
+        {@render noSpeechNotice()}
+      {/if}
       {#if asrError}
         <p class="field-error">{asrError}</p>
       {/if}
@@ -2068,6 +2122,9 @@
           <Icon name="upload" size={18} />
           <span>{t("Or open an .srt / .vtt you already have")}</span>
         </label>
+      {/if}
+      {#if noSpeechOffer}
+        {@render noSpeechNotice()}
       {/if}
       {#if asrError}
         <p class="field-error">{asrError}</p>

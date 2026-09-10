@@ -203,11 +203,18 @@ for (const video of videos) {
     page
       .waitForSelector('.card:has-text("Subtitles") .field-error', { timeout: 3600000 })
       .then(() => "error"),
+    // APP-54. A clip with nobody speaking produces neither a cue nor an
+    // error -- it produces an offer to transcribe it anyway. Without
+    // this the race never settles and the run hangs for the full hour,
+    // which is exactly what it did the first time.
+    page.waitForSelector(".no-speech", { timeout: 3600000 }).then(() => "no-speech"),
   ]).catch(() => "timeout");
   if (outcome !== "cues") {
     const message = outcome === "error"
       ? (await page.textContent('.card:has-text("Subtitles") .field-error')).trim()
-      : "timed out";
+      : outcome === "no-speech"
+        ? (await page.textContent(".no-speech p")).trim()
+        : "timed out";
     console.log(`  FAILED: ${message}`);
     await context.close();
     continue;

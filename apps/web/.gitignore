@@ -11,3 +11,5 @@ dist/
 # 74 MB of third-party runtime binaries, copied from node_modules by
 # scripts/sync-ort.sh before every build. See that script for why.
 public/ort/
+# Fixtures for the VAD timing harness, decoded from clips that are not ours.
+/public/testmedia/

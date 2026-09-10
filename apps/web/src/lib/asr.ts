@@ -29,6 +29,7 @@ import {
 
 import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
 import { cleanUp, mergeBriefs } from "./cleanup";
+import { hasSpeech, speechSeconds } from "./vad";
 
 /** Whisper's native input rate. Anything else is resampled to it. */
 const TARGET_SAMPLE_RATE = 16_000;
@@ -175,6 +176,16 @@ export interface AsrResult {
   audio: Float32Array;
   /** Seconds of source timeline the audio starts at. */
   audioOffset: number;
+  /**
+   * The clip had nobody speaking in it, and the transcript is the
+   * decoder talking to itself.
+   *
+   * Reported rather than silently applied: the caller shows the reader
+   * why there are no subtitles, which is a far better answer than a
+   * confident page of English over a cooking video (APP-54), and a far
+   * better one than an empty screen with no explanation.
+   */
+  noSpeech?: boolean;
 }
 
 export interface AsrOptions {
@@ -923,6 +934,38 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     signal,
   );
 
+  // Ask whether anyone is speaking before asking what they said.
+  //
+  // Before the model, not after: a clip with nobody in it needs no
+  // transcription at all, so this saves the whole wait rather than
+  // throwing away its result. Costs a couple of seconds on a two-minute
+  // clip, against a minute or more of Whisper.
+  //
+  // `allowEmpty` callers -- one window of a live capture -- skip it. A
+  // ten-second window of silence between two sentences is ordinary and
+  // has its own handling; this test is about a whole clip.
+  if (!allowEmpty) {
+    onProgress?.({ stage: "audio", fraction: null, note: "Listening for a voice" });
+    try {
+      const heard = await speechSeconds(audio, (fraction) =>
+        onProgress?.({ stage: "audio", fraction, note: "Listening for a voice" }),
+      );
+      if (!hasSpeech(heard)) {
+        return {
+          transcript: { language: language ?? "auto", duration: 0, words: [], segments: [] },
+          audio,
+          audioOffset: 0,
+          noSpeech: true,
+        };
+      }
+    } catch (e) {
+      // A VAD that cannot load must not stop a transcription. The worst
+      // case without it is the bug this was written for, which is a
+      // great deal better than refusing to caption anything.
+      console.warn("voice detection unavailable, transcribing anyway:", e);
+    }
+  }
+
   onProgress?.({ stage: "model", fraction: null, note: "Loading the speech model" });
 
   /** Bytes per weight file, so the download reports as one figure. */
@@ -1221,6 +1264,10 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   partAtChanges(segments, runs);
   const spoken = [...new Set(runs.map((r) => r.language))];
 
+  // Whether anyone spoke at all, judged on the whole transcript once the
+  // per-line rules have had their say. It has to come last: the earlier
+  // passes remove the annotations and stutters, and what is left is the
+  // decoder's best effort, which is exactly what this weighs.
   // Word timings come from the engine, shared with the desktop. See the
   // note in `transcribeRemotely` for why the load is asked for here.
   await load();

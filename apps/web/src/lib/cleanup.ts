@@ -582,7 +582,10 @@ export function cleanUp(segments: Spoken[], options: CleanUpOptions): CleanUpRes
   // The debris comes off before anything else, because a line can be a
   // real sentence with a loop stuck to the end of it, and because the
   // runs below are runs of what the text *is* once that is gone.
-  const texts = segments.map((s) => trimTail(s.text));
+  // APP-31. The echo trim runs first: a line that ends by repeating
+  // itself is shorter afterwards, and every rule below judges the line
+  // it is given. Running it after would have them weigh the copy.
+  const texts = segments.map((s) => trimInlineEcho(trimTail(s.text)));
   // How long a run of identical consecutive segments each one sits in,
   // and where that run starts.
   const runLength = texts.map(() => 1);
@@ -774,3 +777,65 @@ function median(values: number[]): number {
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
+
+
+/**
+ * Cut a phrase the line has already said, when the line ends on it.
+ *
+ * APP-31. On a Japanese lesson video, 2:11 came back as
+ *
+ *     どうでしたかすみませんはいろいろなときによく使いますどうでしたか?
+ *     └── どうでしたか ──┘                              └── どうでしたか ──┘
+ *
+ * — one phrase, twice, with a whole sentence between the two. Every rule
+ * in this file lets it through, and it is worth saying exactly why,
+ * because each of them is right to:
+ *
+ * - `stutterOf` wants the repeats *adjacent* and separated by spaces.
+ *   Japanese has no spaces, and these are twenty characters apart.
+ * - The whole-line duplicate test compares one line against another.
+ *   This line is not a duplicate of anything; it contains one.
+ * - `crammedRepeat` compares against the neighbouring cue, which does
+ *   carry the middle sentence again — and scores 0.58 against a
+ *   threshold of 0.60. It misses by two hundredths, because the two
+ *   spellings differ: ときに in one and 時に in the other, the same word
+ *   written two ways.
+ *
+ * So the shape this catches is narrow and specific: the line *ends* with
+ * text it has already used. That is the decoder looping back to
+ * something it emitted a moment ago, and the tail is the copy — the
+ * first occurrence is where the phrase belongs, in the order it was
+ * spoken.
+ *
+ * Only the tail is cut, never the earlier occurrence, and only when the
+ * repeat is long enough not to be a coincidence. "はいはい" and a
+ * genuinely repeated short word stay.
+ */
+export function trimInlineEcho(text: string): string {
+  const trimmed = text.trim();
+  // Sentence-final punctuation is part of the echo, not part of the
+  // sentence it is echoing, so it comes off before matching and does not
+  // go back on.
+  const body = trimmed.replace(/[。．.!！?？…]+$/u, "");
+  if (body.length < MIN_ECHO * 2) return text;
+
+  // Longest tail that also appears earlier, without the two overlapping.
+  for (let n = Math.floor(body.length / 2); n >= MIN_ECHO; n -= 1) {
+    const tail = body.slice(body.length - n);
+    if (!tail.trim()) continue;
+    const earlier = body.slice(0, body.length - n).indexOf(tail);
+    if (earlier === -1) continue;
+    // Leave the line as the speaker said it up to the echo.
+    return body.slice(0, body.length - n).trimEnd();
+  }
+  return text;
+}
+
+/**
+ * Shorter than this, a repeat inside one line is a coincidence.
+ *
+ * Six characters is two or three Japanese words and about one English
+ * word and a half. Below it, "that that" and 「はいはい」 -- both things
+ * people actually say -- start being cut.
+ */
+const MIN_ECHO = 6;
