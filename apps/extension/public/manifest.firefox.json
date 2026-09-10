@@ -38,7 +38,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "opensubs@openapps.dev",
+      "id": "opensubs@opensubs.app",
       "strict_min_version": "128.0",
       "data_collection_permissions": {
         "required": [
