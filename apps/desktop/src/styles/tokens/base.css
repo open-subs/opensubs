@@ -1,0 +1,33 @@
+/* Base layer: resets + the handful of element defaults every OpenApps surface assumes. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg-page);color:var(--text-body);font:var(--type-body);letter-spacing:var(--tracking-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4,h5,h6{margin:0;color:var(--text-strong);font-weight:var(--weight-medium);letter-spacing:var(--tracking-heading)}
+h1{font:var(--type-h1);letter-spacing:var(--tracking-display)}
+h2{font:var(--type-h2)}
+h3{font:var(--type-h3)}
+h4{font:var(--type-h4)}
+p{margin:0;text-wrap:pretty}
+a{color:var(--text-link);text-decoration:none;text-underline-offset:3px;text-decoration-thickness:1px;transition:color var(--duration-fast) var(--ease-standard)}
+a:hover{color:var(--text-link-hover);text-decoration:underline}
+code,kbd,pre,samp{font-family:var(--font-mono);font-size:0.92em}
+hr{border:0;border-top:var(--border-width) solid var(--border-hairline);margin:var(--space-6) 0}
+button,input,select,textarea{font:inherit;letter-spacing:inherit;color:inherit}
+:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+::selection{background:var(--green-200);color:var(--gray-950)}
+img,svg,video{display:block;max-width:100%}
+ul,ol{margin:0;padding-left:1.15em}
+
+@keyframes oa-spin{to{transform:rotate(360deg)}}
+@keyframes oa-fade-up{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes oa-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){[style*="oa-marquee"]{animation:none!important}}
+
+/* Type role helpers — for prose and specimen surfaces, not a utility framework. */
+.oa-display{font:var(--type-display);letter-spacing:var(--tracking-display);color:var(--text-strong)}
+.oa-eyebrow{font:var(--type-eyebrow);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--text-muted)}
+.oa-lead{font:var(--type-body-lg);color:var(--text-muted);text-wrap:pretty}
+.oa-caption{font:var(--type-caption);color:var(--text-faint)}
+.oa-mono{font:var(--type-mono);color:var(--text-muted)}
+.oa-hairline{border:var(--border-width) solid var(--border-hairline)}
+.oa-grid-bg{background-image:linear-gradient(var(--border-hairline) 1px,transparent 1px),linear-gradient(90deg,var(--border-hairline) 1px,transparent 1px);background-size:24px 24px}

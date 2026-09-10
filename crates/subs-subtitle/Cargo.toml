@@ -1,0 +1,15 @@
+[package]
+name = "subs-subtitle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }
+subs-asr = { workspace = true }
+subs-media = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

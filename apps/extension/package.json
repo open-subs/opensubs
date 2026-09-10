@@ -1,0 +1,30 @@
+{
+  "name": "opensubs-extension",
+  "version": "0.1.0",
+  "description": "Subtitles for whatever is playing in the tab, generated on your own machine",
+  "type": "module",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "sync:ort": "node scripts/sync-ort.mjs",
+    "prebuild": "npm run sync:ort && npm run icons",
+    "build": "vite build && node scripts/copy-static.mjs chrome",
+    "build:firefox": "vite build --outDir dist-firefox && node scripts/copy-static.mjs firefox",
+    "build:all": "npm run build && npm run build:firefox",
+    "package": "node scripts/package.mjs",
+    "test": "node --experimental-strip-types e2e/unit.mjs",
+    "check": "tsc --noEmit",
+    "icons": "node scripts/generate-icons.mjs",
+    "test:pipeline": "node e2e/pipeline.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "mediabunny": "^1.55.3"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.9",
+    "playwright": "^1.63.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3"
+  }
+}

@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  The engine points ONNX Runtime at `./ort/` relative to document.baseURI,
+  because in the packaged extension engine.html sits at the package root
+  with ort/ beside it. This page does not, so it declares the base it would
+  have had. Without this the model load fails with "no available backend
+  found" and a 404 for a path nobody wrote.
+-->
+<base href="/">
+<title>capture pipeline harness</title>
+<body style="margin:0;background:#111;color:#eee;font:13px system-ui">
+<video id="v" style="width:70vw" controls></video>
+<pre id="log" style="padding:1em;white-space:pre-wrap"></pre>
+<script type="module" src="/e2e/harness/harness.ts"></script>

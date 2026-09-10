@@ -1,0 +1,45 @@
+{
+  "name": "opensubs-web",
+  "version": "0.1.0",
+  "description": "OpenSubs in the browser -- subtitle authoring with the same engine the desktop app burns with",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "sync:ort": "bash scripts/sync-ort.sh",
+    "predev": "npm run sync:ort",
+    "prebuild": "npm run sync:ort",
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node e2e/smoke.mjs",
+    "test:cleanup": "node e2e/cleanup.mjs",
+    "test:languages": "node e2e/languages.mjs",
+    "test:videos": "node e2e/videos.mjs",
+    "test:video-diff": "node e2e/video-diff.mjs",
+    "burn": "node e2e/burn.mjs",
+    "capture": "node e2e/capture.mjs",
+    "check": "svelte-check --tsconfig ./tsconfig.json --threshold error"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@fontsource/noto-sans-arabic": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "@fontsource/noto-sans-kr": "^5.3.0",
+    "@fontsource/noto-sans-sc": "^5.3.0",
+    "@fontsource/noto-sans-thai": "^5.3.0",
+    "@huggingface/transformers": "^4.2.0",
+    "@openapps/sdk": "file:vendor/openapps/sdk",
+    "@openapps/ui": "file:vendor/openapps/ui",
+    "jassub": "^1.7.15",
+    "mediabunny": "^1.55.3"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "playwright": "^1.62.1",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3"
+  }
+}

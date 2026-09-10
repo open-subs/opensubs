@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+  <head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Burn Subtitles Into Video &mdash; Free, In Your Browser | OpenSubs</title>
+<meta name="description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="theme-color" content="#f2f2f2" />
+
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/icon-180.png" />
+
+<link rel="canonical" href="https://opensubs.app/burn-subtitles-into-video" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="OpenSubs" />
+<meta property="og:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
+<meta property="og:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta property="og:url" content="https://opensubs.app/burn-subtitles-into-video" />
+<meta property="og:image" content="https://opensubs.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
+<meta name="twitter:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta name="twitter:image" content="https://opensubs.app/og-image.png" />
+
+<!-- Structured data. Three entities, each describing something already
+     visible on the page rather than adding hidden content: the publisher,
+     the software itself, and the FAQ.
+
+     The FAQ block is the one that most directly feeds AI answer engines —
+     it is already in the question/short-factual-answer shape those engines
+     extract and cite, so the answers below are written to stand alone out
+     of context and to state the differentiating facts (runs locally, no
+     upload, no account, what costs money) in the first sentence. -->
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "OpenSubs",
+  "url": "https://opensubs.app/",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://opensubs.app/icon-192.png",
+    "width": 192,
+    "height": 192
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "OpenSubs",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Any browser with WebAssembly — Chrome, Edge, Safari, Firefox",
+  "browserRequirements": "A browser with WebAssembly. WebGPU makes transcription faster but is not required.",
+  "url": "https://opensubs.app/",
+  "description": "A browser tool that transcribes speech to subtitles, translates them, styles them, and burns them into the video — all on the user's own machine. The video is never uploaded. Free with no account; optional paid translation on our own backend, priced before you run it.",
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Transcription, translation on-device, 12 subtitle styles, word-by-word highlighting, trimming, burning into video, and every export format."
+    },
+    {
+      "@type": "Offer",
+      "name": "Credits",
+      "price": "5.00",
+      "priceCurrency": "USD",
+      "description": "1,000 credits for optional cloud translation on our backend. Priced before you run it; a failed job costs nothing."
+    }
+  ],
+  "featureList": [
+    "Speech recognition in the browser",
+    "Translation to 20 languages",
+    "12 subtitle styles rendered by libass",
+    "Word-by-word highlighting timed to the speech",
+    "Burn subtitles into MP4",
+    "Export SRT, VTT and ASS"
+  ]
+}
+</script>
+
+<style>
+  /* The marketing page's own layout, unchanged apart from six class names.
+     `brand`, `btn`, `btn-primary`, `btn-secondary`, `card` and `tag` are
+     defined by the app's stylesheet too, and both stylesheets are on this
+     page now, so the marketing ones carry a `site-` prefix. e2e/smoke.mjs
+     asserts the two sheets share no class name, so the next collision is a
+     failing test rather than a button that quietly changes shape. */
+  /* Page-level layout only. Every colour, size, radius and duration below
+     comes from the shared design tokens — nothing here invents a value. */
+
+  /* `body` is the *light* ground now: the app sits directly on it, and
+     the marketing chrome paints its own dark ground over the top. Setting
+     dark here instead would put a dark strip above and below the app on a
+     short page, and flash dark before the app's stylesheet arrives. */
+  body {
+    margin: 0;
+  }
+
+  /* Both halves take the same ground, so there is no seam where the
+     marketing copy stops and the app starts. No rule between them either:
+     a border is only worth drawing where two surfaces actually differ. */
+  .site-chrome,
+  #app {
+    background: var(--bg-page);
+    color: var(--text-body);
+  }
+
+  .wrap {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+  }
+
+  /* --- header --- */
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklab, var(--bg-page) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: var(--border-width) solid var(--border-hairline);
+  }
+
+  .site-header .wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    height: 4rem;
+  }
+
+  /* The family wordmark. Every product in the suite uses this shape: a
+     tinted tile holding the product's own icon, then "Open" in muted grey,
+     the product name, and a period in the product's accent. OpenCapture is
+     blue, OpenSubs is orange (--app-opensubs). Brand green is reserved for
+     primary buttons on every product's page, which is why the tile and the
+     dot are the only things carrying the accent. */
+  .site-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+  }
+
+  .brand-tile {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
+    color: var(--app-opensubs);
+  }
+
+  .brand-tile svg { display: block; }
+
+  .brand-word {
+    font: var(--weight-medium) 17px/1 var(--font-display, var(--font-sans));
+    letter-spacing: -0.04em;
+    color: var(--text-strong);
+  }
+
+  .brand-word .muted { color: var(--text-muted); }
+  .brand-word .dot { color: var(--app-opensubs); }
+
+  .site-header nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .site-header nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font: var(--type-ui);
+  }
+
+  .site-header nav a:hover { color: var(--text-strong); }
+
+  @media (max-width: 40rem) {
+    .site-header nav a.hide-sm { display: none; }
+    .site-header nav .site-btn.hide-sm { display: none; }
+  }
+
+  /* --- buttons --- */
+
+  .site-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.7rem var(--space-5);
+    border-radius: var(--radius-full);
+    border: var(--border-width) solid transparent;
+    font: var(--type-ui);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+
+  .site-btn-primary {
+    background: var(--brand);
+    color: var(--brand-contrast);
+  }
+
+  .site-btn-primary:hover { background: var(--brand-strong); }
+
+  .site-btn-secondary {
+    border-color: var(--border-strong);
+    color: var(--text-strong);
+  }
+
+  .site-btn-secondary:hover { background: var(--surface-hover); }
+
+  .btn-lg { padding: 0.9rem var(--space-6); font-size: 1.02rem; }
+
+  /* --- hero --- */
+
+  /* Shorter than it was, and the headline a size down. The hero used to
+     be the whole first screen because the thing it was selling lived on
+     another domain; the thing itself is now directly underneath it, and
+     every pixel here is a pixel the drop zone is pushed below the fold. */
+  .hero { padding: var(--space-12) 0 var(--space-10); text-align: center; }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 0 0 var(--space-5);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .hero .subhead {
+    font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+    line-height: 1.3;
+    color: var(--text-strong);
+    margin: 0 auto var(--space-4);
+    max-width: 34rem;
+    text-wrap: balance;
+  }
+
+  .hero .lede {
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    color: var(--text-muted);
+    max-width: 40rem;
+    margin: 0 auto var(--space-8);
+    text-wrap: pretty;
+  }
+
+  .hero .cta { display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap; }
+
+  .hero .reassure {
+    margin-top: var(--space-5);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+  }
+
+  /* --- the demo strip: what the product actually produces --- */
+
+  .strip {
+    margin: var(--space-16) auto 0;
+    max-width: 46rem;
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-card);
+  }
+
+  .strip-frame {
+    position: relative;
+    aspect-ratio: 16 / 5;
+    display: grid;
+    place-items: end center;
+    padding-bottom: var(--space-7);
+    background:
+      radial-gradient(120% 120% at 30% 10%, color-mix(in oklab, var(--blue) 22%, transparent), transparent 60%),
+      radial-gradient(120% 120% at 80% 80%, color-mix(in oklab, var(--violet) 26%, transparent), transparent 60%),
+      var(--bg-sunken);
+  }
+
+  /* A real caption, styled the way the app styles them: white fill, hard
+     outline, and one word lit. Not a screenshot — a screenshot of a
+     subtitle is just text, and this stays sharp at any width. */
+  .caption-line {
+    font-size: clamp(1.3rem, 4.4vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--white);
+    -webkit-text-stroke: 0.09em var(--black);
+    paint-order: stroke fill;
+    text-align: center;
+    line-height: 1.2;
+    padding: 0 var(--space-5);
+  }
+
+  .caption-line .lit {
+    color: var(--yellow);
+    display: inline-block;
+    /* font-size, not transform: scale(). Scaling leaves the layout box at
+       the base width while the glyphs render 26% wider, so the word
+       overflows into the space before it and the line reads
+       "This isSparta!". The line is centred either way -- measured at 0px
+       offset from the frame centre at every width -- so there is nothing
+       to buy by fighting the reflow. */
+    font-size: 1.26em;
+    text-shadow:
+      0 0 0.3em color-mix(in oklab, var(--yellow) 70%, transparent),
+      0 0 0.7em color-mix(in oklab, var(--yellow) 45%, transparent);
+  }
+
+  .strip-note {
+    padding: var(--space-3) var(--space-5);
+    border-top: var(--border-width) solid var(--border-hairline);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  /* --- sections --- */
+
+  /* Generous and equal on both sides, so adjacent sections read as
+     separate rather than as one long column. A hairline between them
+     does the rest -- on a dark ground, space alone is not enough
+     separation once the cards inside are also dark. */
+  section {
+    padding: var(--space-20) 0;
+    border-top: var(--border-width) solid var(--border-hairline);
+  }
+
+  section:first-of-type { border-top: 0; }
+
+  .section-head { max-width: 42rem; margin-bottom: var(--space-10); }
+
+  h2 {
+    font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-3);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .section-head p { color: var(--text-muted); margin: 0; font-size: 1.05rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-5);
+  }
+
+  /* Four steps, so an auto-fit that lands on three leaves one card stranded
+     on its own row -- which reads as a missing fifth step rather than as a
+     wrap. Pinned to 4 / 2 / 1 so it always divides evenly. */
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  @media (max-width: 62rem) {
+    .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 34rem) {
+    .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .site-card {
+    padding: var(--space-6);
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+  }
+
+  .site-card h3 {
+    margin: 0 0 var(--space-2);
+    font-size: 1.05rem;
+    color: var(--text-strong);
+  }
+
+  .site-card p { margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.55; }
+
+  .site-tag {
+    display: inline-block;
+    margin-bottom: var(--space-3);
+    padding: 0.18rem var(--space-2);
+    border-radius: var(--radius-sm);
+    font: var(--type-caption, var(--type-ui));
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .tag-free { background: var(--brand-soft); color: var(--text-brand); }
+  .tag-paid { background: color-mix(in oklab, var(--blue) 20%, transparent); color: var(--blue); }
+
+  /* --- pricing --- */
+
+  .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--space-5); }
+
+  .price-card { padding: var(--space-7); }
+
+  .price-card .amount {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+    line-height: 1;
+    margin-bottom: var(--space-2);
+  }
+
+  .price-card .amount small { font-size: 0.9rem; font-weight: 400; color: var(--text-faint); }
+
+  .price-card ul { margin: var(--space-5) 0 0; padding-left: 1.15rem; }
+  .price-card li { color: var(--text-muted); margin-bottom: var(--space-2); font-size: 0.95rem; }
+
+  .featured { border-color: var(--brand); }
+
+  /* --- faq --- */
+
+  details {
+    border-bottom: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-5) 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-strong);
+    font-size: 1.05rem;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--text-faint); font-weight: 400; }
+  details[open] summary::after { content: "\2212"; }
+  details p { color: var(--text-muted); margin: var(--space-3) 0 0; max-width: 46rem; }
+
+  /* --- footer --- */
+
+  footer {
+    border-top: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-8) 0;
+    color: var(--text-faint);
+    font: var(--type-ui);
+  }
+
+  footer .wrap { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+  footer a { color: var(--text-muted); text-decoration: none; }
+  footer a:hover { color: var(--text-strong); }
+  footer .spacer { margin-left: auto; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+  </head>
+  <body>
+    <!-- One ground for the whole page.
+         The design system runs marketing surfaces dark and product
+         surfaces light, and this page is both, so it had a dark hero
+         above a light slab of app and dark sections below. That reads as
+         three pages stapled together rather than one. The app cannot
+         cheaply become dark -- every card, field and preview in it is
+         built for a light surface -- so the marketing chrome comes to
+         light instead, which the tokens do on their own: dropping
+         `.oa-dark` is the whole change. -->
+    <div class="site-chrome">
+<header class="site-header">
+  <div class="wrap">
+    <a class="site-brand" href="#top">
+      <span class="brand-tile" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4.5" width="20" height="15" rx="2.6" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="13" width="7.5" height="2.4" rx="1.2" fill="currentColor"/>
+          <rect x="15" y="13" width="3" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </span>
+      <span class="brand-word"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
+    </a>
+    <nav>
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#privacy">Privacy</a>
+      <a class="hide-sm" href="#pricing">Pricing</a>
+      <!-- APP-48: #app had no link anywhere on the site, so the one
+           URL that opens the tool directly could not be reached from it. -->
+      <a href="#app">Open the app</a>
+      <div id="account"></div>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <h1>Burn subtitles into video, in your browser</h1>
+    <p class="subhead">Hardcoded captions that play anywhere, with nothing uploaded.</p>
+    <p class="lede">
+      A subtitle file sits beside the video and every player treats it
+      differently &mdash; some ignore it, some restyle it, and most social
+      platforms drop it entirely. Burning the subtitles into the picture
+      settles that: the words are pixels in the frame, so they survive
+      re-encoding, they survive being uploaded somewhere else, and they look
+      the same to everyone.
+    </p>
+    <p class="lede">
+      OpenSubs does it here, in the tab. The video is read straight off your
+      disk, libass draws the subtitles exactly as the preview showed them,
+      and WebCodecs encodes the result to MP4 with the audio copied across
+      untouched rather than re-encoded. There is no upload step, because
+      there is no server to upload to &mdash; which is also why there is no
+      file-size cap, no queue and no watermark.
+    </p>
+    <p class="reassure">Free &middot; no account &middot; no watermark &middot; open source</p>
+  </div>
+</section>
+    </div>
+
+    <!-- The app. Above the fold, which is the whole point of the move.
+         The heading is for screen readers: sighted readers have the hero
+         directly above, but without this the page's main content is an
+         unlabelled region between two marketing sections. -->
+    <h2 class="sr-only">Subtitle your video</h2>
+    <div id="app">
+      <!-- APP-48: a static rendering of the tool's first screen, in the
+           HTML that comes off the wire.
+           
+           The app is client-rendered, so the first thing a crawler fetched
+           was a page whose subject -- the tool -- was not in it. Google
+           executes JavaScript but defers it, and a competitor whose upload
+           control is in the served HTML is read on the first pass while
+           this one waits for the second.
+           
+           Svelte replaces all of this the moment it mounts (see
+           src/main.ts, which empties the target first), so nobody sees it
+           for more than a frame. It is not a mock-up: the copy, the
+           heading and the control are the ones the app itself renders. -->
+      <main class="screen">
+        <section class="card">
+          <h2 class="section-title">Video</h2>
+          <label class="drop-zone">
+            <p class="drop-zone-title">Drop a video here, or choose one</p>
+            <p class="oa-caption">It stays on your machine. No upload, no account.</p>
+            <input type="file" accept="video/*" />
+          </label>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Subtitles</h2>
+          <p class="oa-caption">
+            Whisper runs here, in your browser, and writes the subtitles from
+            the video&rsquo;s own audio. Nothing is uploaded and no account is
+            needed.
+          </p>
+        </section>
+
+        <noscript>
+          <p class="oa-caption">
+            The recogniser, the styling and the burn all run in this tab, so
+            OpenSubs needs JavaScript. Nothing is uploaded either way.
+          </p>
+        </noscript>
+      </main>
+    </div>
+
+    <div class="site-chrome">
+      <main>
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>What burning in actually does.</h2>
+      <p>
+        Hardcoding, embedding, burning in &mdash; three names for the same
+        thing, and the reason to do it is always the same: to stop the
+        player deciding.
+      </p>
+    </div>
+    <div class="grid grid-4">
+      <div class="site-card">
+        <h3>The words become pixels</h3>
+        <p>
+          Once burned in, the subtitles are part of the picture. Nothing can
+          switch them off, restyle them or lose them in a re-upload.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>Drawn by libass</h3>
+        <p>
+          The same renderer the preview uses, so what you burn is what you
+          saw. Word-by-word highlighting, outlines and shadows all survive.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>The audio is copied, not re-encoded</h3>
+        <p>
+          Only the picture is touched. The soundtrack is passed through as it
+          was, so burning subtitles in costs nothing in audio quality.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>No size limit, because no upload</h3>
+        <p>
+          The encode runs on your machine with WebCodecs. A long recording is
+          a long encode, not a rejected upload.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+      </main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 OpenSubs</span>
+    <a href="/privacy.html">Privacy</a>
+    <span class="spacer"></span>
+    <span>Open source, AGPL-3.0</span>
+  </div>
+</footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

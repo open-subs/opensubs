@@ -1,0 +1,19 @@
+[package]
+name = "opensubs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "opensubs"
+path = "src/main.rs"
+
+[dependencies]
+subs-media = { workspace = true }
+subs-asr = { workspace = true }
+subs-subtitle = { workspace = true }
+subs-style = { workspace = true }
+subs-pipeline = { workspace = true }
+subs-tier = { workspace = true }
+subs-translate = { workspace = true, features = ["http"] }
+serde_json = { workspace = true }

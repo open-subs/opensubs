@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 5321652b62f2c1e110b689426855d5d656d64c8de731a80e6974ede26a332ad9 # shrinks to t = Transcript { language: "en", duration: 0.2, words: [Word { start: 0.05, end: 0.1, text: "字", confidence: 0.9 }, Word { start: 0.15000000000000002, end: 0.2, text: "字", confidence: 0.9 }], segments: [] }
+cc 663f79c30e1ab1e839826a4049f070d35ef4c46b46403960d3e3234860a51f54 # shrinks to t = Transcript { language: "en", duration: 0.2, words: [Word { start: 0.05, end: 0.1, text: "字", confidence: 0.9 }, Word { start: 0.15000000000000002, end: 0.2, text: "字", confidence: 0.9 }], segments: [] }

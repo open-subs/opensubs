@@ -1,0 +1,20 @@
+{
+  "name": "@openapps/ui",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./bundle": "./dist/bundle/openapps-ui.js",
+    "./bundle/*": "./dist/bundle/*.js"
+  },
+  "dependencies": {
+    "lit": "^3.3.0",
+    "nostr-tools": "^2.24.1"
+  },
+  "license": "MIT OR Apache-2.0"
+}

@@ -1,0 +1,83 @@
+# OpenSubs
+
+> A subtitle generator that runs inside the browser tab. It transcribes a
+> video's speech, translates it, styles it, and burns the result into the
+> picture. The video file is never uploaded, because the product contains no
+> upload endpoint.
+
+https://opensubs.app
+
+## How it works
+
+- Speech recognition is OpenAI's Whisper, compiled to ONNX and run by
+  transformers.js. WebGPU where the machine has it, WebAssembly otherwise.
+- Three model sizes are offered, downloaded once and then cached by the
+  browser: Tiny (English only, ~40 MB), Base (~80 MB), Small (~250 MB).
+  Only the model is fetched from the network. The audio is not.
+- Subtitles are rendered by libass — the same renderer used for the preview
+  and for the burn, so what is previewed is what is produced.
+- Burning in uses WebCodecs. Only the picture is re-encoded; the audio track
+  is copied across untouched.
+- The subtitle engine is Rust compiled to WebAssembly, shared with the
+  desktop build and the command-line tool.
+
+## What is different about it
+
+- **There is no upload endpoint in the product.** This is stronger than a
+  promise not to upload: there is no server to upload to, so a footage leak
+  is not something that has to be prevented. It can be checked in the
+  browser's Network tab — after the page and the model have loaded, working
+  on a video produces no requests.
+- **No file-size limit, no queue, no watermark.** All three exist on hosted
+  tools because the file has to reach a server and the server has to pay for
+  the encode. Neither applies here.
+- **No account for anything that runs locally.** Transcription, on-device
+  translation, all 12 subtitle styles, word-by-word highlighting, trimming,
+  burning into MP4 and every export format work signed out. An account is
+  needed only for optional cloud translation on our own backend, priced at
+  $5 for 1,000 credits, with the price of a job shown before it runs.
+- **Mixed-language audio produces one subtitle file.** The spoken language
+  is detected every four seconds rather than once per file, so a video that
+  switches between two languages is transcribed in both. Whisper's own
+  pipeline has no language detection at all; this is implemented on top of
+  it.
+- **Exports:** .srt, .vtt and .ass, or an MP4 with the subtitles burned in.
+- **Licence:** AGPL-3.0.
+
+## Honest limitations
+
+- Accuracy is Whisper's accuracy at the model size the machine can afford,
+  and a browser is a smaller budget than a server.
+- **The figures below are a floor, not field accuracy.** They are measured
+  on synthesised speech, where the reference transcript is exactly the text
+  that was spoken, so there is no annotator judgement in them — and also no
+  accent, no overlap, no room noise and no music. Real footage scores worse.
+  They are published in this form because a number with its method attached
+  can be checked, and "highly accurate" cannot.
+
+  Measured on 2026-09-09, three single-language clips, `e2e/accuracy.mjs`:
+
+  | Model | English (WER) | Chinese (CER) | Japanese (CER) |
+  |-------|---------------|---------------|----------------|
+  | Base (~80 MB)  | 7.7% | 3.4% | 4.3% |
+  | Small (~250 MB)| 0.0% | 1.7% | 4.3% |
+
+  Small roughly halves the error on English and Chinese and costs about
+  twice the time. On Japanese it scored identically to Base on this clip —
+  a bigger model is not a guaranteed improvement per language.
+- **No comparison against other tools yet.** A head-to-head against a
+  competing browser-based tool is open as a tracked task and unfinished, so
+  this file makes no relative claim.
+- The first visit downloads a model. That is a real wait, and it is the
+  price of not uploading the video.
+- Cloud translation, if chosen, sends the subtitle *text* — never the video
+  — to whichever provider was picked. The on-device option sends nothing and
+  is the default.
+- iOS 17 Safari cannot run the recogniser at all; iOS 26 and Android work.
+
+## Pages
+
+- [Subtitle generator](https://opensubs.app/): the tool, and what it does.
+- [Burn subtitles into video](https://opensubs.app/burn-subtitles-into-video):
+  hardcoding captions into the picture.
+- [Privacy](https://opensubs.app/privacy.html): what is stored, and where.

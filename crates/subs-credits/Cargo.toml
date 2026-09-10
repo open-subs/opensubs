@@ -1,0 +1,28 @@
+# Deliberately self-contained: no `workspace = true` inheritance anywhere.
+#
+# openapps-gateway consumes this crate by path from a different repository,
+# and workspace inheritance would drag the whole opensubs workspace root
+# along with it -- Cargo refuses to parse a root whose every listed member
+# is not present, so the gateway's build host would need the entire product
+# tree to compile two files. Spelling the versions out here costs a little
+# duplication and makes the crate portable, which is the point of it.
+
+[package]
+name = "subs-credits"
+version = "0.1.0"
+edition = "2021"
+# Deliberately NOT the workspace's AGPL-3.0.
+#
+# `openapps-gateway` links this crate, and that gateway is one binary
+# serving OpenCapture, OpenNoteTaker, OpenPdfEdit and OpenSubs. Making this
+# AGPL would make the gateway a derivative work of it, and AGPL section 13
+# would then oblige an offer of the gateway's source to the users of all
+# four products -- which is a decision about three other products, taken by
+# editing a line in this one.
+#
+# So the application is AGPL and the pieces the shared backend links are
+# permissive. Same split OpenCapture uses for its vendored ui and sdk.
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

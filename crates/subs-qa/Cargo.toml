@@ -1,0 +1,13 @@
+[package]
+name = "subs-qa"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "subs-qa"
+path = "src/main.rs"
+
+[dependencies]
+subs-media = { workspace = true }
+serde_json = { workspace = true }

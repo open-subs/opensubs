@@ -1,0 +1,42 @@
+# The app and the site are one page, so there is nothing to steer a crawler
+# away from: the copy that describes the product is in the same document as
+# the tool itself.
+User-agent: *
+Allow: /
+
+# APP-47. The rule above already admits everything, but several AI crawlers
+# read only the block naming their own User-agent and ignore `*` — so being
+# allowed in general is not the same as being allowed by them. Listed one at
+# a time for that reason, not because anything here is being treated
+# differently.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: https://opensubs.app/sitemap.xml

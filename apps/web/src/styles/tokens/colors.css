@@ -1,0 +1,317 @@
+/* OpenApps color system.
+   Layer 1 — the brand palette, verbatim from the supplied brand CSS (hex values unchanged).
+   Layer 2 — ramps derived from those hues with color-mix (no new hues invented).
+   Layer 3 — semantic aliases. Product code should only ever use layer 3. */
+:root{
+  /* ---- 1. Brand palette (verbatim) ---- */
+  --black:#000000;
+  --white:#ffffff;
+  --blue:#15b9eb;
+  --green:#00c896;
+  --red:#ff4d4d;
+  --yellow:#f2e863;
+  --orange:#ff8c42;
+  --violet:#8c6cff;
+  --gray-050:#f8f8f7;
+  --gray-100:#f0f0ee;
+  --gray-200:#deded9;
+  --gray-300:#c1c0b8;
+  --gray-400:#989898;
+  --gray-500:#7c7c7c;
+  --gray-600:#656565;
+  --gray-700:#464646;
+  --gray-800:#3d3d3d;
+  --gray-900:#282828;
+  --gray-950:#1a1a1a;
+
+  --white-90:rgba(255,255,255,0.9);
+  --white-80:rgba(255,255,255,0.8);
+  --white-70:rgba(255,255,255,0.7);
+  --white-60:rgba(255,255,255,0.6);
+  --white-50:rgba(255,255,255,0.5);
+  --white-40:rgba(255,255,255,0.4);
+  --white-30:rgba(255,255,255,0.3);
+  --white-20:rgba(255,255,255,0.2);
+  --white-10:rgba(255,255,255,0.1);
+  --white-04:rgba(255,255,255,0.04);
+  --white-00:rgba(255,255,255,0);
+  --black-90:rgba(0,0,0,0.9);
+  --black-80:rgba(0,0,0,0.8);
+  --black-70:rgba(0,0,0,0.7);
+  --black-60:rgba(0,0,0,0.6);
+  --black-50:rgba(0,0,0,0.5);
+  --black-40:rgba(0,0,0,0.4);
+  --black-30:rgba(0,0,0,0.3);
+  --black-20:rgba(0,0,0,0.2);
+  --black-10:rgba(0,0,0,0.1);
+  --black-04:rgba(0,0,0,0.04);
+  --black-00:rgba(0,0,0,0);
+
+  --color-font:#020202;
+  --color-background:#f2f2f2;
+  --color-background-alt:#111111;
+  --color-primary-focus:#e0e0e0;
+  --color-filter-background:rgb(42,42,42);
+  --color-nav:#ffffff;
+
+  /* ---- 2. Derived ramps ---- */
+  --gray-0:var(--white);
+  --gray-1000:var(--black);
+  --gray-025:#fcfcfb;
+  --gray-150:#e7e7e3;
+
+  --green-50:color-mix(in oklab,var(--green) 10%,var(--white));
+  --green-100:color-mix(in oklab,var(--green) 18%,var(--white));
+  --green-200:color-mix(in oklab,var(--green) 34%,var(--white));
+  --green-300:color-mix(in oklab,var(--green) 55%,var(--white));
+  --green-400:color-mix(in oklab,var(--green) 78%,var(--white));
+  --green-500:var(--green);
+  --green-600:color-mix(in oklab,var(--green) 88%,var(--black));
+  --green-700:color-mix(in oklab,var(--green) 72%,var(--black));
+  --green-800:color-mix(in oklab,var(--green) 55%,var(--black));
+  --green-900:color-mix(in oklab,var(--green) 38%,var(--black));
+
+  --blue-100:color-mix(in oklab,var(--blue) 14%,var(--white));
+  --blue-500:var(--blue);
+  --blue-600:color-mix(in oklab,var(--blue) 74%,var(--black));
+
+  --red-100:color-mix(in oklab,var(--red) 14%,var(--white));
+  --red-500:var(--red);
+  --red-600:color-mix(in oklab,var(--red) 78%,var(--black));
+
+  --yellow-100:color-mix(in oklab,var(--yellow) 30%,var(--white));
+  --yellow-500:var(--yellow);
+
+  --orange-100:color-mix(in oklab,var(--orange) 16%,var(--white));
+  --orange-500:var(--orange);
+  --orange-600:color-mix(in oklab,var(--orange) 68%,var(--black));
+  /* legacy alias — warning states used to be amber */
+  --amber-100:var(--orange-100);
+  --amber-500:var(--orange-500);
+  --amber-600:var(--orange-600);
+
+  /* ---- Extended hues ----
+     --violet is a first-class brand hue (it replaces the source CSS's --purple, which
+     was an off-white and almost certainly a mistake). --teal and --lime are MIXED FROM
+     the brand hues, never sampled, so they sit at the same chroma level. */
+  --violet-100:color-mix(in oklab,var(--violet) 14%,var(--white));
+  --violet-500:var(--violet);
+  --violet-600:color-mix(in oklab,var(--violet) 76%,var(--black));
+  --teal:color-mix(in oklab,var(--green) 62%,var(--blue) 38%);
+  --lime:color-mix(in oklab,var(--yellow) 52%,var(--green) 48%);
+  /* Five more hues, minted the same way and for the same reason teal and lime
+     were: the suite outgrew eight accent slots. Twelve applications were sharing
+     them by September 2026, four of them doubled up and one slot claimed three
+     times, which is not a naming problem — it is a palette that ran out. Each
+     of these sits between two adjacent brand hues at the same chroma level, so
+     nothing here is a new colour, only a new position on a wheel the brand
+     already defines. */
+  --amber:color-mix(in oklab,var(--orange) 55%,var(--yellow) 45%);
+  --coral:color-mix(in oklab,var(--red) 58%,var(--orange) 42%);
+  --rose:color-mix(in oklab,var(--red) 55%,var(--violet) 45%);
+  --indigo:color-mix(in oklab,var(--violet) 60%,var(--blue) 40%);
+  --cyan:color-mix(in oklab,var(--blue) 62%,var(--teal) 38%);
+  --plum:color-mix(in oklab,var(--violet) 66%,var(--red) 34%);
+  /* Slot 15, minted 6 September 2026 for opentagged. By then every adjacent
+     pair of brand hues already had a midpoint, so this one is a midpoint of two
+     minted slots — blue and indigo, the widest gap left on the wheel at 44.7°.
+     Measured: 6.5 ΔE from blue and 6.3 from indigo (OKLab ×100), which is the
+     spacing the ring already has elsewhere (rose and plum sit 6.9 apart). That
+     is fine for product accents, which are never seen side by side, and it does
+     mean the ring is now at its practical limit: a sixteenth hue at this chroma
+     would land under 5 ΔE from both neighbours. Separate by lightness or chroma
+     instead, or let two products share a hue deliberately. */
+  --azure:color-mix(in oklab,var(--blue) 50%,var(--indigo) 50%);
+  /* Slot 16. The hue ring is full; this one separates by lightness and
+     chroma instead, per ACCENT-SLOTS.md. Ledger ink: a deep blue that cannot
+     be mistaken for a red or green result state. */
+  --ink:color-mix(in oklab,var(--blue) 54%,var(--black) 46%);
+  /* Slot 17, minted the same way: a hue deepened, not the ring bisected. */
+  --mulberry:color-mix(in oklab,var(--violet) 58%,var(--black) 42%);
+  --petrol:color-mix(in oklab,var(--cyan) 62%,var(--black) 38%);
+
+  /* ---- Accent slots ----
+     Generic, product-neutral names. Any application built on this system claims a slot
+     rather than a colour, so palettes can be re-pointed centrally without touching code.
+     Rule: one slot per application, never two in a single surface.
+     Who holds which is recorded in tokens/ACCENT-SLOTS.md — check it before
+     claiming one. No single product can see the collision it is about to make. */
+  --accent-1:var(--green);
+  --accent-2:var(--blue);
+  --accent-3:var(--violet);
+  --accent-4:var(--orange);
+  --accent-5:var(--red);
+  --accent-6:var(--yellow);
+  --accent-7:var(--teal);
+  --accent-8:var(--lime);
+  --accent-9:var(--amber);
+  --accent-10:var(--coral);
+  --accent-11:var(--rose);
+  --accent-12:var(--indigo);
+  --accent-13:var(--cyan);
+  --accent-14:var(--plum);
+  --accent-15:var(--azure);
+  --accent-16:var(--ink);
+  --accent-17:var(--mulberry);
+  --accent-18:var(--petrol);
+
+  /* ---- App accents ----
+     The OpenApps suite's own assignment. These are aliases: consuming products should
+     either re-point them or use the --accent-N slots directly. */
+  --app-notes:var(--accent-6);
+  --app-tasks:var(--accent-1);
+  --app-calendar:var(--accent-5);
+  --app-mail:var(--accent-4);
+  --app-files:var(--accent-7);
+  --app-draw:var(--accent-3);
+  --app-terminal:var(--accent-8);
+  --app-vault:var(--gray-600);
+  /* OpenScreenCapture — a product in the family, with its own mobile app and extension. */
+  --app-screenshot:var(--accent-2);
+  /* Shipped products. These were defined only in downstream copies of this
+     file until 7 September 2026, which is why --app-pdfedit resolved to
+     nothing wherever the local copy was not the one in use. Promoted here so
+     the source of truth actually holds them. */
+  --app-pdfedit:var(--accent-5);
+  --app-frame:var(--accent-3);
+  /* OpenSubs was OpenVidSub. The product renamed; the token had not, and
+     opensubs' local copy carried a note asking for exactly this rename.
+     --app-vidsub stays as a legacy alias so no existing surface breaks. */
+  --app-opensubs:var(--accent-4);
+  --app-vidsub:var(--app-opensubs);
+
+  /* ---- 3. Semantic aliases (use these) ---- */
+  --brand:var(--green);
+  --brand-strong:var(--green-600);
+  --brand-soft:var(--green-50);
+  --brand-contrast:var(--black);
+
+  --bg-page:var(--color-background);
+  --bg-subtle:var(--gray-050);
+  --bg-sunken:var(--gray-100);
+  --surface-card:var(--white);
+  --surface-raised:var(--white);
+  --surface-inverse:var(--color-background-alt);
+  --surface-hover:var(--black-04);
+  --surface-active:var(--gray-100);
+  --surface-selected:var(--green-50);
+
+  --text-strong:var(--color-font);
+  --text-body:var(--gray-800);
+  --text-muted:var(--gray-600);
+  --text-faint:var(--gray-500);
+  --text-inverse:var(--white);
+  --text-brand:var(--green-700);
+  --text-link:var(--color-font);
+  --text-link-hover:var(--green-700);
+
+  --border-hairline:var(--gray-200);
+  --border-strong:var(--gray-300);
+  --border-inverse:var(--white-10);
+  --border-focus:var(--color-font);
+
+  --success-fg:var(--green-700);
+  --success-bg:var(--green-50);
+  --warning-fg:var(--orange-600);
+  --warning-bg:var(--orange-100);
+  --danger-fg:var(--red-600);
+  --danger-bg:var(--red-100);
+  --info-fg:var(--blue-600);
+  --info-bg:var(--blue-100);
+
+  --focus-ring:0 0 0 2px var(--bg-page),0 0 0 4px var(--color-font);
+}
+
+/* ---- Brand mark ----
+   The mark is typographic: the wordmark sets in the display font, the monogram is a
+   numeral in a squircle. These tokens let a host re-skin it without editing the SVGs.
+   The BrandMark component reads them, so re-pointing these re-skins every surface.
+   Dark overrides live in the shared dark block below, never here. */
+:root{
+  --logo-fg:var(--color-font);
+  --logo-dot:var(--brand);
+  --logo-tile-bg:var(--color-font);
+  --logo-tile-fg:var(--brand);
+  --logo-tile-radius:0.22em;
+  --logo-tracking:-0.04em;
+}
+
+/* ---- Dark scope ----
+   Declared ONCE and emitted into both dark selectors below. If you add a dark override,
+   add it to both blocks or neither — they are required to be character-identical.
+   .oa-dark  = opt in on any container.
+   .oa-auto  = on <html>, follows the OS/browser setting. */
+.oa-dark{
+  --bg-page:var(--color-background-alt);
+  --bg-subtle:var(--gray-950);
+  --bg-sunken:var(--black);
+  --surface-card:var(--gray-950);
+  --surface-raised:var(--gray-900);
+  --surface-inverse:var(--white);
+  --surface-hover:var(--white-04);
+  --surface-active:var(--white-10);
+  --surface-selected:color-mix(in oklab,var(--green) 20%,transparent);
+  --text-strong:var(--white);
+  --text-body:var(--white-70);
+  --text-muted:var(--white-60);
+  --text-faint:var(--white-40);
+  --text-inverse:var(--black);
+  --text-brand:var(--green);
+  --text-link:var(--white);
+  --text-link-hover:var(--green);
+  --border-hairline:var(--white-10);
+  --border-strong:var(--white-20);
+  --border-focus:var(--green);
+  --brand-soft:color-mix(in oklab,var(--green) 20%,transparent);
+  --brand-contrast:var(--black);
+  --success-bg:color-mix(in oklab,var(--green) 18%,transparent);
+  --success-fg:var(--green);
+  --danger-bg:color-mix(in oklab,var(--red) 20%,transparent);
+  --danger-fg:var(--red);
+  --warning-bg:color-mix(in oklab,var(--orange) 20%,transparent);
+  --warning-fg:var(--orange);
+  --info-bg:color-mix(in oklab,var(--blue) 20%,transparent);
+  --info-fg:var(--blue);
+  --focus-ring:0 0 0 2px var(--bg-page),0 0 0 4px var(--green);
+  --logo-fg:var(--white);
+  --logo-tile-bg:var(--white);
+  --logo-tile-fg:var(--color-font);
+}
+@media (prefers-color-scheme:dark){
+  .oa-auto{
+    --bg-page:var(--color-background-alt);
+    --bg-subtle:var(--gray-950);
+    --bg-sunken:var(--black);
+    --surface-card:var(--gray-950);
+    --surface-raised:var(--gray-900);
+    --surface-inverse:var(--white);
+    --surface-hover:var(--white-04);
+    --surface-active:var(--white-10);
+    --surface-selected:color-mix(in oklab,var(--green) 20%,transparent);
+    --text-strong:var(--white);
+    --text-body:var(--white-70);
+    --text-muted:var(--white-60);
+    --text-faint:var(--white-40);
+    --text-inverse:var(--black);
+    --text-brand:var(--green);
+    --text-link:var(--white);
+    --text-link-hover:var(--green);
+    --border-hairline:var(--white-10);
+    --border-strong:var(--white-20);
+    --border-focus:var(--green);
+    --brand-soft:color-mix(in oklab,var(--green) 20%,transparent);
+    --brand-contrast:var(--black);
+    --success-bg:color-mix(in oklab,var(--green) 18%,transparent);
+    --success-fg:var(--green);
+    --danger-bg:color-mix(in oklab,var(--red) 20%,transparent);
+    --danger-fg:var(--red);
+    --warning-bg:color-mix(in oklab,var(--orange) 20%,transparent);
+    --warning-fg:var(--orange);
+    --info-bg:color-mix(in oklab,var(--blue) 20%,transparent);
+    --info-fg:var(--blue);
+    --focus-ring:0 0 0 2px var(--bg-page),0 0 0 4px var(--green);
+    --logo-fg:var(--white);
+    --logo-tile-bg:var(--white);
+    --logo-tile-fg:var(--color-font);
+  }
+}

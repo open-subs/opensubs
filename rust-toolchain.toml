@@ -1,0 +1,7 @@
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
+# The browser build. Pinned here rather than left to `rustup target add`
+# so a fresh checkout can run apps/web/scripts/build-wasm.sh without a
+# separate setup step.
+targets = ["wasm32-unknown-unknown"]

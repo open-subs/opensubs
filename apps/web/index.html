@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+  <head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free AI Subtitle Generator &mdash; In Your Browser | OpenSubs</title>
+<meta name="description" content="Transcribe, translate, style and burn subtitles into video &mdash; entirely in your browser. The video never leaves your machine. Free, no account, open source." />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="theme-color" content="#f2f2f2" />
+
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/icon-180.png" />
+
+<link rel="canonical" href="https://opensubs.app/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="OpenSubs" />
+<meta property="og:title" content="Free AI Subtitle Generator — In Your Browser | OpenSubs" />
+<meta property="og:description" content="Transcribe, translate, style and burn subtitles into video — entirely in your browser. The video never leaves your machine." />
+<meta property="og:url" content="https://opensubs.app/" />
+<meta property="og:image" content="https://opensubs.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Free AI Subtitle Generator — In Your Browser | OpenSubs" />
+<meta name="twitter:description" content="Transcribe, translate, style and burn subtitles into video — entirely in your browser. The video never leaves your machine." />
+<meta name="twitter:image" content="https://opensubs.app/og-image.png" />
+
+<!-- Structured data. Three entities, each describing something already
+     visible on the page rather than adding hidden content: the publisher,
+     the software itself, and the FAQ.
+
+     The FAQ block is the one that most directly feeds AI answer engines —
+     it is already in the question/short-factual-answer shape those engines
+     extract and cite, so the answers below are written to stand alone out
+     of context and to state the differentiating facts (runs locally, no
+     upload, no account, what costs money) in the first sentence. -->
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "OpenSubs",
+  "url": "https://opensubs.app/",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://opensubs.app/icon-192.png",
+    "width": 192,
+    "height": 192
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "OpenSubs",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Any browser with WebAssembly — Chrome, Edge, Safari, Firefox",
+  "browserRequirements": "A browser with WebAssembly. WebGPU makes transcription faster but is not required.",
+  "url": "https://opensubs.app/",
+  "description": "A browser tool that transcribes speech to subtitles, translates them, styles them, and burns them into the video — all on the user's own machine. The video is never uploaded. Free with no account; optional paid translation on our own backend, priced before you run it.",
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Transcription, translation on-device, 12 subtitle styles, word-by-word highlighting, trimming, burning into video, and every export format."
+    },
+    {
+      "@type": "Offer",
+      "name": "Credits",
+      "price": "5.00",
+      "priceCurrency": "USD",
+      "description": "1,000 credits for optional cloud translation on our backend. Priced before you run it; a failed job costs nothing."
+    }
+  ],
+  "featureList": [
+    "Speech recognition in the browser",
+    "Translation to 20 languages",
+    "12 subtitle styles rendered by libass",
+    "Word-by-word highlighting timed to the speech",
+    "Burn subtitles into MP4",
+    "Export SRT, VTT and ASS"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is my video uploaded anywhere?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No, and not because we promise not to: there is no upload endpoint in the product. OpenSubs reads the file directly in your browser, and transcription, styling, translation on your device and burning all run on your own machine. You can check it rather than take it on trust — open the Network tab and subtitle a video: after the page and the speech model have loaded, there are no requests. The only thing that can ever leave your machine is subtitle text, and only if you choose a cloud translator."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need an account to use OpenSubs?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Transcription, translation on your device, styling, trimming, burning and every export work with no account and no sign-in. An account is only needed if you choose to pay for cloud translation on our backend."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does OpenSubs generate subtitles from speech?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It runs OpenAI's Whisper locally — ONNX weights driven by transformers.js, on WebGPU where the machine has it and on WebAssembly otherwise. Three model sizes are offered: Tiny (English only, about 40 MB), Base (about 80 MB) and Small (about 250 MB). The model downloads once and is then cached by the browser; only the model is fetched, never the audio. The spoken language is detected every four seconds rather than once per file, so a video that switches between two languages comes out as one subtitle file containing both."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can OpenSubs burn subtitles into the video file itself?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Subtitles are rendered by libass — the same renderer ffmpeg uses — compiled to WebAssembly, and encoded back into an MP4 using WebCodecs. What you see in the preview is what ends up in the pixels, and the audio is copied through untouched."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does OpenSubs cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Everything that runs on your machine is free: transcription, translation on your device, all 12 subtitle styles, word-by-word highlighting, trimming, burning into MP4 and every export format. There is no watermark, no file-size limit and no queue — none of those exist here because there is no server paying for the work. The one paid option is translation on our own backend, at $5 for 1,000 credits, with the price of a job shown before you run it and a failed job costing nothing."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which languages can OpenSubs translate subtitles into?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Twenty, including Simplified and Traditional Chinese, Japanese, Korean, Spanish, Portuguese, French, German, Italian, Russian, Arabic, Hindi, Indonesian, Thai, Vietnamese, Turkish, Polish, Dutch and Ukrainian. Fonts for non-Latin scripts are bundled, so Chinese and Arabic subtitles burn correctly instead of coming out as empty boxes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does OpenSubs work offline?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "After the first visit, largely yes. The speech model is cached by your browser after its first download, and everything except cloud translation runs locally. Translating on your device uses Chrome's built-in translation models, which are also downloaded once."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is OpenSubs open source?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, under the AGPL-3.0. The same engine — cue segmentation, line breaking, reading-speed limits, the style presets, the ASS writer — is compiled to WebAssembly for the browser and to a native binary for the desktop app and command-line tool, so all three produce identical output."
+      }
+    }
+  ]
+}
+</script>
+
+<style>
+  /* The marketing page's own layout, unchanged apart from six class names.
+     `brand`, `btn`, `btn-primary`, `btn-secondary`, `card` and `tag` are
+     defined by the app's stylesheet too, and both stylesheets are on this
+     page now, so the marketing ones carry a `site-` prefix. e2e/smoke.mjs
+     asserts the two sheets share no class name, so the next collision is a
+     failing test rather than a button that quietly changes shape. */
+  /* Page-level layout only. Every colour, size, radius and duration below
+     comes from the shared design tokens — nothing here invents a value. */
+
+  /* `body` is the *light* ground now: the app sits directly on it, and
+     the marketing chrome paints its own dark ground over the top. Setting
+     dark here instead would put a dark strip above and below the app on a
+     short page, and flash dark before the app's stylesheet arrives. */
+  body {
+    margin: 0;
+  }
+
+  /* Both halves take the same ground, so there is no seam where the
+     marketing copy stops and the app starts. No rule between them either:
+     a border is only worth drawing where two surfaces actually differ. */
+  .site-chrome,
+  #app {
+    background: var(--bg-page);
+    color: var(--text-body);
+  }
+
+  .wrap {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+  }
+
+  /* --- header --- */
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklab, var(--bg-page) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: var(--border-width) solid var(--border-hairline);
+  }
+
+  .site-header .wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    height: 4rem;
+  }
+
+  /* The family wordmark. Every product in the suite uses this shape: a
+     tinted tile holding the product's own icon, then "Open" in muted grey,
+     the product name, and a period in the product's accent. OpenCapture is
+     blue, OpenSubs is orange (--app-opensubs). Brand green is reserved for
+     primary buttons on every product's page, which is why the tile and the
+     dot are the only things carrying the accent. */
+  .site-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+  }
+
+  .brand-tile {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
+    color: var(--app-opensubs);
+  }
+
+  .brand-tile svg { display: block; }
+
+  .brand-word {
+    font: var(--weight-medium) 17px/1 var(--font-display, var(--font-sans));
+    letter-spacing: -0.04em;
+    color: var(--text-strong);
+  }
+
+  .brand-word .muted { color: var(--text-muted); }
+  .brand-word .dot { color: var(--app-opensubs); }
+
+  .site-header nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .site-header nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font: var(--type-ui);
+  }
+
+  .site-header nav a:hover { color: var(--text-strong); }
+
+  @media (max-width: 40rem) {
+    .site-header nav a.hide-sm { display: none; }
+    .site-header nav .site-btn.hide-sm { display: none; }
+  }
+
+  /* --- buttons --- */
+
+  .site-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.7rem var(--space-5);
+    border-radius: var(--radius-full);
+    border: var(--border-width) solid transparent;
+    font: var(--type-ui);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+
+  .site-btn-primary {
+    background: var(--brand);
+    color: var(--brand-contrast);
+  }
+
+  .site-btn-primary:hover { background: var(--brand-strong); }
+
+  .site-btn-secondary {
+    border-color: var(--border-strong);
+    color: var(--text-strong);
+  }
+
+  .site-btn-secondary:hover { background: var(--surface-hover); }
+
+  .btn-lg { padding: 0.9rem var(--space-6); font-size: 1.02rem; }
+
+  /* --- hero --- */
+
+  /* Shorter than it was, and the headline a size down. The hero used to
+     be the whole first screen because the thing it was selling lived on
+     another domain; the thing itself is now directly underneath it, and
+     every pixel here is a pixel the drop zone is pushed below the fold. */
+  .hero { padding: var(--space-12) 0 var(--space-10); text-align: center; }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 0 0 var(--space-5);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .hero .subhead {
+    font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+    line-height: 1.3;
+    color: var(--text-strong);
+    margin: 0 auto var(--space-4);
+    max-width: 34rem;
+    text-wrap: balance;
+  }
+
+  .hero .lede {
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    color: var(--text-muted);
+    max-width: 40rem;
+    margin: 0 auto var(--space-8);
+    text-wrap: pretty;
+  }
+
+  .hero .cta { display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap; }
+
+  .hero .reassure {
+    margin-top: var(--space-5);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+  }
+
+  /* --- the demo strip: what the product actually produces --- */
+
+  .strip {
+    margin: var(--space-16) auto 0;
+    max-width: 46rem;
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-card);
+  }
+
+  .strip-frame {
+    position: relative;
+    aspect-ratio: 16 / 5;
+    display: grid;
+    place-items: end center;
+    padding-bottom: var(--space-7);
+    background:
+      radial-gradient(120% 120% at 30% 10%, color-mix(in oklab, var(--blue) 22%, transparent), transparent 60%),
+      radial-gradient(120% 120% at 80% 80%, color-mix(in oklab, var(--violet) 26%, transparent), transparent 60%),
+      var(--bg-sunken);
+  }
+
+  /* A real caption, styled the way the app styles them: white fill, hard
+     outline, and one word lit. Not a screenshot — a screenshot of a
+     subtitle is just text, and this stays sharp at any width. */
+  .caption-line {
+    font-size: clamp(1.3rem, 4.4vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--white);
+    -webkit-text-stroke: 0.09em var(--black);
+    paint-order: stroke fill;
+    text-align: center;
+    line-height: 1.2;
+    padding: 0 var(--space-5);
+  }
+
+  .caption-line .lit {
+    color: var(--yellow);
+    display: inline-block;
+    /* font-size, not transform: scale(). Scaling leaves the layout box at
+       the base width while the glyphs render 26% wider, so the word
+       overflows into the space before it and the line reads
+       "This isSparta!". The line is centred either way -- measured at 0px
+       offset from the frame centre at every width -- so there is nothing
+       to buy by fighting the reflow. */
+    font-size: 1.26em;
+    text-shadow:
+      0 0 0.3em color-mix(in oklab, var(--yellow) 70%, transparent),
+      0 0 0.7em color-mix(in oklab, var(--yellow) 45%, transparent);
+  }
+
+  .strip-note {
+    padding: var(--space-3) var(--space-5);
+    border-top: var(--border-width) solid var(--border-hairline);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  /* --- sections --- */
+
+  /* Generous and equal on both sides, so adjacent sections read as
+     separate rather than as one long column. A hairline between them
+     does the rest -- on a dark ground, space alone is not enough
+     separation once the cards inside are also dark. */
+  section {
+    padding: var(--space-20) 0;
+    border-top: var(--border-width) solid var(--border-hairline);
+  }
+
+  section:first-of-type { border-top: 0; }
+
+  .section-head { max-width: 42rem; margin-bottom: var(--space-10); }
+
+  h2 {
+    font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-3);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .section-head p { color: var(--text-muted); margin: 0; font-size: 1.05rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-5);
+  }
+
+  /* Four steps, so an auto-fit that lands on three leaves one card stranded
+     on its own row -- which reads as a missing fifth step rather than as a
+     wrap. Pinned to 4 / 2 / 1 so it always divides evenly. */
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  @media (max-width: 62rem) {
+    .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 34rem) {
+    .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .site-card {
+    padding: var(--space-6);
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+  }
+
+  .site-card h3 {
+    margin: 0 0 var(--space-2);
+    font-size: 1.05rem;
+    color: var(--text-strong);
+  }
+
+  .site-card p { margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.55; }
+
+  .site-tag {
+    display: inline-block;
+    margin-bottom: var(--space-3);
+    padding: 0.18rem var(--space-2);
+    border-radius: var(--radius-sm);
+    font: var(--type-caption, var(--type-ui));
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .tag-free { background: var(--brand-soft); color: var(--text-brand); }
+  .tag-paid { background: color-mix(in oklab, var(--blue) 20%, transparent); color: var(--blue); }
+
+  /* --- pricing --- */
+
+  .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--space-5); }
+
+  .price-card { padding: var(--space-7); }
+
+  .price-card .amount {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+    line-height: 1;
+    margin-bottom: var(--space-2);
+  }
+
+  .price-card .amount small { font-size: 0.9rem; font-weight: 400; color: var(--text-faint); }
+
+  .price-card ul { margin: var(--space-5) 0 0; padding-left: 1.15rem; }
+  .price-card li { color: var(--text-muted); margin-bottom: var(--space-2); font-size: 0.95rem; }
+
+  .featured { border-color: var(--brand); }
+
+  /* --- faq --- */
+
+  details {
+    border-bottom: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-5) 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-strong);
+    font-size: 1.05rem;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--text-faint); font-weight: 400; }
+  details[open] summary::after { content: "\2212"; }
+  details p { color: var(--text-muted); margin: var(--space-3) 0 0; max-width: 46rem; }
+
+  /* --- footer --- */
+
+  footer {
+    border-top: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-8) 0;
+    color: var(--text-faint);
+    font: var(--type-ui);
+  }
+
+  footer .wrap { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+  footer a { color: var(--text-muted); text-decoration: none; }
+  footer a:hover { color: var(--text-strong); }
+  footer .spacer { margin-left: auto; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+  </head>
+  <body>
+    <!-- One ground for the whole page.
+         The design system runs marketing surfaces dark and product
+         surfaces light, and this page is both, so it had a dark hero
+         above a light slab of app and dark sections below. That reads as
+         three pages stapled together rather than one. The app cannot
+         cheaply become dark -- every card, field and preview in it is
+         built for a light surface -- so the marketing chrome comes to
+         light instead, which the tokens do on their own: dropping
+         `.oa-dark` is the whole change. -->
+    <div class="site-chrome">
+<header class="site-header">
+  <div class="wrap">
+    <a class="site-brand" href="#top">
+      <span class="brand-tile" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4.5" width="20" height="15" rx="2.6" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="13" width="7.5" height="2.4" rx="1.2" fill="currentColor"/>
+          <rect x="15" y="13" width="3" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </span>
+      <span class="brand-word"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
+    </a>
+    <nav>
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#privacy">Privacy</a>
+      <a class="hide-sm" href="#pricing">Pricing</a>
+      <!-- APP-48: #app had no link anywhere on the site, so the one
+           URL that opens the tool directly could not be reached from it. -->
+      <a href="#app">Open the app</a>
+      <div id="account"></div>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <h1>Free AI subtitle generator that runs in your browser</h1>
+    <!-- The old h1, kept. It is the better sentence and the better
+         positioning; it was only in the wrong element. -->
+    <p class="subhead">Subtitle any video, without uploading it anywhere.</p>
+    <p class="lede">
+      OpenSubs transcribes the speech, translates it, styles it and burns it
+      into the picture &mdash; all inside your browser. The video file never
+      leaves your machine, because there is nowhere for it to go.
+    </p>
+    <p class="reassure">No account. No upload. No watermark. Open source.</p>
+
+  </div>
+</section>
+    </div>
+
+    <!-- The app. Above the fold, which is the whole point of the move.
+         The heading is for screen readers: sighted readers have the hero
+         directly above, but without this the page's main content is an
+         unlabelled region between two marketing sections. -->
+    <h2 class="sr-only">Subtitle your video</h2>
+    <div id="app">
+      <!-- APP-48: a static rendering of the tool's first screen, in the
+           HTML that comes off the wire.
+           
+           The app is client-rendered, so the first thing a crawler fetched
+           was a page whose subject -- the tool -- was not in it. Google
+           executes JavaScript but defers it, and a competitor whose upload
+           control is in the served HTML is read on the first pass while
+           this one waits for the second.
+           
+           Svelte replaces all of this the moment it mounts (see
+           src/main.ts, which empties the target first), so nobody sees it
+           for more than a frame. It is not a mock-up: the copy, the
+           heading and the control are the ones the app itself renders. -->
+      <main class="screen">
+        <section class="card">
+          <h2 class="section-title">Video</h2>
+          <label class="drop-zone">
+            <p class="drop-zone-title">Drop a video here, or choose one</p>
+            <p class="oa-caption">It stays on your machine. No upload, no account.</p>
+            <input type="file" accept="video/*" />
+          </label>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Subtitles</h2>
+          <p class="oa-caption">
+            Whisper runs here, in your browser, and writes the subtitles from
+            the video&rsquo;s own audio. Nothing is uploaded and no account is
+            needed.
+          </p>
+        </section>
+
+        <noscript>
+          <p class="oa-caption">
+            The recogniser, the styling and the burn all run in this tab, so
+            OpenSubs needs JavaScript. Nothing is uploaded either way.
+          </p>
+        </noscript>
+      </main>
+    </div>
+
+    <div class="site-chrome">
+      <main>
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Four steps, none of them on a server.</h2>
+      <p>
+        The four steps above, in more detail. Every one of them runs on your
+        own machine unless you explicitly choose otherwise.
+      </p>
+    </div>
+    <h2 id="features-heading" class="sr-only">Features</h2>
+    <div class="grid grid-4">
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Transcribe the speech</h3>
+        <p>
+          Whisper runs in your browser, on the GPU where your machine has one.
+          Pick a model between 40&nbsp;MB and 250&nbsp;MB; it downloads once and
+          is cached after that. Only the model is fetched &mdash; the audio stays
+          put.
+        </p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Translate into 20 languages</h3>
+        <p>
+          Chrome's built-in translation runs on your device at no cost. Bring
+          your own Claude, OpenAI or DeepL key for better results on long
+          dialogue, or use ours and pay in credits.
+        </p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Style it, and see it</h3>
+        <p>
+          Twelve presets, from clean broadcast captions to bold social styles,
+          each previewed over your own footage. Words can grow and glow as
+          they are spoken.
+        </p>
+      </div>
+      <div class="site-card">
+        <span class="site-tag tag-free">Free</span>
+        <h3>Burn it into the video</h3>
+        <p>
+          Export a finished MP4 with the subtitles in the pixels, encoded in
+          the browser with WebCodecs. Or take the <code>.srt</code>,
+          <code>.vtt</code> or <code>.ass</code> and use them elsewhere.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>&ldquo;Private&rdquo; here means there is no server to send it to.</h2>
+      <p>
+        Most subtitle tools upload your video, process it, and promise to
+        delete it. OpenSubs is built the other way round.
+      </p>
+    </div>
+    <div class="grid">
+      <div class="site-card">
+        <h3>The video never moves</h3>
+        <p>
+          It is read through an object URL and decoded by your browser. There
+          is no upload endpoint in this product, so a footage leak is not
+          something we have to promise against &mdash; it is not possible.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>The one thing that can leave</h3>
+        <p>
+          Subtitle <em>text</em>, and only if you pick a cloud translator. The
+          on-device option sends nothing at all, and it is the default.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>Your key stays in the tab</h3>
+        <p>
+          Bring your own API key and it is used from your browser and never
+          stored, never sent to us, and never written to disk.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Free for everything that runs on your machine.</h2>
+      <p>
+        Which is nearly all of it. We charge only where we spend money on
+        your behalf, and we tell you the price before you press the button.
+      </p>
+    </div>
+    <div class="price-grid">
+      <div class="site-card price-card featured">
+        <span class="site-tag tag-free">Free</span>
+        <div class="amount">$0<small> &nbsp;forever</small></div>
+        <ul>
+          <li>Speech recognition in your browser</li>
+          <li>Translation on your device</li>
+          <li>All 12 subtitle styles</li>
+          <li>Word-by-word highlighting</li>
+          <li>Trimming and resolution control</li>
+          <li>Burning subtitles into MP4</li>
+          <li>SRT, VTT and ASS export</li>
+          <li>Your own API keys, if you have them</li>
+        </ul>
+      </div>
+      <div class="site-card price-card">
+        <span class="site-tag tag-paid">Credits</span>
+        <div class="amount">$5<small> &nbsp;for 1,000 credits</small></div>
+        <ul>
+          <li>Cloud translation on our backend</li>
+          <li>No key and no account with anyone else</li>
+          <li>The price of a job is shown before you run it</li>
+          <li>You are charged exactly that, never more</li>
+          <li>A job that fails costs nothing</li>
+          <li>Credits never expire</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Before you start.</h2>
+    </div>
+    <details open>
+      <summary>Is my video uploaded anywhere?</summary>
+      <p>
+        No. OpenSubs reads the file directly in your browser and every step
+        &mdash; transcription, styling, burning &mdash; runs on your own machine.
+        The video is never sent to a server. The only thing that can leave your
+        machine is subtitle text, and only if you choose a cloud translation
+        option.
+      </p>
+    </details>
+    <details>
+      <summary>Do I need an account?</summary>
+      <p>
+        No. Transcription, translation on your device, styling, trimming,
+        burning and every export work with no account and no sign-in. An
+        account is only needed if you choose to pay for cloud translation on
+        our backend.
+      </p>
+    </details>
+    <details>
+      <summary>How does it generate subtitles from speech?</summary>
+      <p>
+        It runs Whisper locally &mdash; ONNX weights driven by transformers.js,
+        on WebGPU where available and on WebAssembly otherwise. The model is
+        downloaded once, from 40&nbsp;MB to 250&nbsp;MB depending on which you
+        pick, and then cached by the browser. Only the model is fetched; the
+        audio stays on your machine.
+      </p>
+    </details>
+    <details>
+      <summary>Can it burn subtitles into the video file itself?</summary>
+      <p>
+        Yes. Subtitles are rendered by libass &mdash; the same renderer ffmpeg
+        uses &mdash; compiled to WebAssembly, and encoded back into an MP4 using
+        WebCodecs. What you see in the preview is what ends up in the pixels,
+        and the audio is copied through untouched.
+      </p>
+    </details>
+    <details>
+      <summary>What does it cost?</summary>
+      <p>
+        Everything that runs on your machine is free and always will be,
+        because it costs us nothing to provide. The one paid option is
+        translation on our own backend, at 1,000 credits for $5. The price of
+        a job is shown before you run it, you are charged exactly that, and a
+        job that fails costs nothing.
+      </p>
+    </details>
+    <details>
+      <summary>Which languages can it translate into?</summary>
+      <p>
+        Twenty, including Simplified and Traditional Chinese, Japanese,
+        Korean, Spanish, Portuguese, French, German, Italian, Russian, Arabic,
+        Hindi, Indonesian, Thai, Vietnamese, Turkish, Polish, Dutch and
+        Ukrainian. Fonts for non-Latin scripts are bundled, so Chinese and
+        Arabic subtitles burn correctly instead of coming out as empty boxes.
+      </p>
+    </details>
+    <details>
+      <summary>Does it work offline?</summary>
+      <p>
+        After the first visit, largely yes. The speech model is cached by your
+        browser after its first download, and everything except cloud
+        translation runs locally.
+      </p>
+    </details>
+    <details>
+      <summary>Is it open source?</summary>
+      <p>
+        Yes, under the AGPL-3.0. The same engine &mdash; cue segmentation, line
+        breaking, reading-speed limits, the style presets, the ASS writer
+        &mdash; is compiled to WebAssembly for the browser and to a native
+        binary for the desktop app and command-line tool, so all three produce
+        identical output.
+      </p>
+    </details>
+  </div>
+</section>
+
+
+      </main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 OpenSubs</span>
+    <a href="/privacy.html">Privacy</a>
+    <span class="spacer"></span>
+    <span>Open source, AGPL-3.0</span>
+  </div>
+</footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

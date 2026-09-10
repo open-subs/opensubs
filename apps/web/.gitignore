@@ -1,0 +1,13 @@
+node_modules/
+dist/
+# ...except the vendored packages, whose dist/ IS the source we carry.
+# They are built in a private monorepo that a clone of this repository does
+# not have, so `scripts/vendor-openapps.sh` copies the built output in and
+# package.json depends on it by path. Without this negation a clone gets
+# two package.json files pointing at nothing, npm install succeeds, and
+# the build fails on an import that looks fine.
+!vendor/openapps/*/dist/
+!vendor/openapps/*/dist/**
+# 74 MB of third-party runtime binaries, copied from node_modules by
+# scripts/sync-ort.sh before every build. See that script for why.
+public/ort/

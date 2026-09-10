@@ -1,0 +1,40 @@
+/* Geist and Geist Mono, subsetted for the SDK.
+
+   The design system ships 24 OTF faces totalling 3.9 MB. That is right for a
+   design tool and impossible for a package that has to load inside a Chrome
+   extension popup, so only the faces the product rules can actually reach are
+   shipped here, as latin-subset WOFF2 — 41 KB for all three.
+
+   Which three follows from the rules rather than taste: "product UI uses only
+   400 and 500", and Geist Mono carries everything numeric. Weights 300 and
+   700 are reserved for editorial and are deliberately absent — a marketing
+   page should link the design system's own stylesheet, not this one. A
+   product component asking for 600 or 700 gets a synthesised bold, which is a
+   visible signal that it has left the product type scale.
+
+   Self-hosted, never a CDN: Manifest V3 blocks remote font loads, so an
+   extension could not use these otherwise. */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/Geist-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/Geist-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/GeistMono-Regular.woff2") format("woff2");
+}

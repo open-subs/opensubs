@@ -1,0 +1,13 @@
+[package]
+name = "subs-pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+subs-asr = { workspace = true }
+subs-media = { workspace = true }
+subs-style = { workspace = true }
+subs-subtitle = { workspace = true }
+subs-translate = { workspace = true }
+thiserror = { workspace = true }

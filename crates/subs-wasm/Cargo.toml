@@ -1,0 +1,28 @@
+[package]
+name = "subs-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# cdylib for the wasm32 build; rlib so the same code is reachable from a
+# native `cargo test`, which is where its tests actually run.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+subs-media = { workspace = true }
+subs-style = { workspace = true }
+subs-subtitle = { workspace = true }
+subs-credits = { path = "../subs-credits" }
+subs-tier = { workspace = true }
+subs-translate = { workspace = true }
+subs-asr = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Pinned exact: wasm-bindgen requires the crate version and the
+# `wasm-bindgen-cli` binary version to match exactly, because the generated
+# JS glue is schema-versioned. Install the matching CLI with
+# `cargo install wasm-bindgen-cli --version 0.2.126`.
+wasm-bindgen = "=0.2.126"
+console_error_panic_hook = "0.1"

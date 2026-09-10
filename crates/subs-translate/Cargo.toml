@@ -1,0 +1,56 @@
+# Deliberately self-contained: no `workspace = true` inheritance anywhere.
+#
+# openapps-gateway consumes this crate by path from a different repository,
+# and workspace inheritance would drag the whole opensubs workspace root
+# along with it -- Cargo refuses to parse a root whose every listed member
+# is not present, so the gateway's build host would need the entire product
+# tree to compile two files. Spelling the versions out here costs a little
+# duplication and makes the crate portable, which is the point of it.
+
+[package]
+name = "subs-translate"
+version = "0.1.0"
+edition = "2021"
+# Deliberately NOT the workspace's AGPL-3.0.
+#
+# `openapps-gateway` links this crate, and that gateway is one binary
+# serving OpenCapture, OpenNoteTaker, OpenPdfEdit and OpenSubs. Making this
+# AGPL would make the gateway a derivative work of it, and AGPL section 13
+# would then oblige an offer of the gateway's source to the users of all
+# four products -- which is a decision about three other products, taken by
+# editing a line in this one.
+#
+# So the application is AGPL and the pieces the shared backend links are
+# permissive. Same split OpenCapture uses for its vendored ui and sdk.
+license = "MIT OR Apache-2.0"
+
+[features]
+# `cues` is on by default, so every existing consumer is unchanged.
+#
+# Turning it *off* leaves the half that builds the prompt, parses the reply
+# and prices the job -- and drops the half that rewraps translated text back
+# into cues. That half needs `subs-subtitle`, which needs `subs-asr` and
+# `subs-media`, and openapps-gateway needs none of it: it takes strings and
+# returns strings, and pricing must come from this crate so the quote the
+# browser shows and the charge the server takes cannot drift.
+#
+# Without this split the gateway's build would have to pull the entire
+# subtitle engine, and the whole opensubs workspace would have to exist
+# beside the platform repo just to satisfy manifest inheritance.
+default = ["cues"]
+cues = ["dep:subs-subtitle"]
+# Adds the blocking HTTP client that actually calls the Claude API.
+http = ["dep:reqwest"]
+
+[dependencies]
+subs-credits = { path = "../subs-credits" }
+# Explicit path, not `workspace = true`: an inherited dependency makes Cargo
+# demand a workspace root even when the dependency is optional and disabled,
+# which would defeat the whole point of this crate being portable. Verified:
+# with this form the crate builds against a bare directory containing only
+# itself and subs-credits, with subs-subtitle absent entirely.
+subs-subtitle = { path = "../subs-subtitle", version = "0.1.0", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+reqwest = { version = "0.13", features = ["blocking"], optional = true }

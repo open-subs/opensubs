@@ -1,0 +1,1221 @@
+/* opensubs desktop -- product surface, so it runs light per the
+   openapps-design system ("product runs light: #f2f2f2 page, white
+   panels"); marketing surfaces are the only thing that defaults dark. */
+@import "./styles/tokens/colors.css";
+@import "./styles/tokens/typography.css";
+@import "./styles/tokens/spacing.css";
+@import "./styles/tokens/radius.css";
+@import "./styles/tokens/elevation.css";
+@import "./styles/tokens/motion.css";
+@import "./styles/tokens/fonts.css";
+@import "./styles/tokens/base.css";
+
+:root {
+  color-scheme: light;
+}
+
+/* Not `height: 100%` on any of these. The app is one section of a longer
+   page now -- navbar and headline above it, the rest of the site below --
+   so a full-viewport height would either stretch the app over empty space
+   or cut the page off at the fold. It takes the height of what is in it. */
+html {
+  height: 100%;
+}
+
+.screen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+
+.screen.drag-over {
+  background: var(--surface-selected);
+}
+
+/* ---- header ---- */
+
+.app-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+}
+
+.brand {
+  font: var(--type-h2);
+  letter-spacing: var(--tracking-display);
+}
+
+.brand-open {
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+}
+
+.brand-name {
+  color: var(--text-strong);
+  font-weight: var(--weight-medium);
+}
+
+.brand-dot {
+  color: var(--app-opensubs);
+  font-weight: var(--weight-medium);
+}
+
+/* ---- cards ---- */
+
+.card {
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-title {
+  font: var(--type-ui);
+  color: var(--text-strong);
+  margin: 0;
+}
+
+/* ---- banners ---- */
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font: var(--type-caption);
+}
+
+.banner-danger {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+/* Not a warning. The two-language notice is good news that has to be
+   said, because a subtitle file that changes script halfway looks like a
+   fault when nothing explains it. */
+.banner-ok {
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.banner-ok :global(svg),
+.banner-danger :global(svg) {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.banner code {
+  background: var(--black-04);
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+}
+
+.banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.install-log {
+  max-height: 120px;
+  overflow-y: auto;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--black-04);
+  font: var(--type-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ---- drop zone ---- */
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-10) var(--space-4);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.drop-zone:hover {
+  background: var(--surface-hover);
+  border-color: var(--text-faint);
+}
+
+.drop-zone.active {
+  border-color: var(--brand);
+  background: var(--surface-selected);
+  color: var(--text-brand);
+}
+
+.drop-zone-title {
+  font: var(--type-ui);
+  color: var(--text-strong);
+  margin: 0;
+}
+
+/* ---- file summary ---- */
+
+.file-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.file-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--app-opensubs) 16%, white);
+  color: var(--app-opensubs);
+  flex-shrink: 0;
+}
+
+.file-summary-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.filename {
+  font: var(--type-ui);
+  color: var(--text-strong);
+  margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-meta {
+  margin: 0;
+}
+
+.error-text {
+  color: var(--danger-fg);
+  font: var(--type-caption);
+  margin: 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--orange-100);
+  color: var(--orange-600);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--tracking-caps);
+}
+
+/* ---- style picker ---- */
+
+/* Two columns, not three. A subtitle is a small part of a frame, so a
+   faithful full-frame thumbnail can only show legible letterforms if the
+   tile is reasonably large; cropping in would show the type but hide the
+   vertical position, which is half of what separates these presets. */
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+@media (max-width: 30rem) {
+  .style-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: var(--transition-control);
+  text-align: left;
+}
+
+.style-tile:hover {
+  background: var(--surface-hover);
+}
+
+.style-tile.selected {
+  background: var(--surface-selected);
+  border-color: var(--brand);
+}
+
+.style-tile:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The libass-rendered thumbnail, or a coloured placeholder until it
+   arrives. Both occupy the same box so the grid never reflows. */
+/* No forced aspect ratio and no `object-fit: cover`: the thumbnail is a
+   crop of the source at the source's own shape, so constraining it here
+   squashed portrait video. Let the image's intrinsic size decide. */
+.style-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+}
+
+/* The placeholder has no intrinsic size, so it needs one to hold the row
+   open until the render lands. */
+.style-shot-pending {
+  aspect-ratio: 16 / 5;
+  opacity: 0.3;
+}
+
+.style-name {
+  font: var(--type-ui);
+  font-weight: var(--weight-regular);
+  color: var(--text-body);
+  padding-inline: var(--space-1);
+}
+
+.style-tile.selected .style-name {
+  font-weight: var(--weight-medium);
+  color: var(--text-strong);
+}
+
+/* ---- model picker ---- */
+
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.model-hint {
+  margin: 0;
+}
+
+.model-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.model-download-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-hairline);
+}
+
+.model-download-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.model-download-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.model-download-name {
+  font: var(--type-ui);
+  color: var(--text-strong);
+}
+
+.model-download-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 140px;
+  flex-shrink: 0;
+}
+
+/* ---- burn row / progress ---- */
+
+.burn-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.progress-track {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--brand);
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+.progress-label {
+  min-width: 3.5em;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+/* ---- success ---- */
+
+.success-card {
+  flex-direction: row;
+  align-items: center;
+  border-color: var(--success-fg);
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.success-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.success-title {
+  font: var(--type-ui);
+  color: var(--text-strong);
+  margin: 0 0 2px;
+}
+
+.success-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* ---- buttons ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-h-lg);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid transparent;
+  font: var(--type-ui);
+  cursor: pointer;
+  transition: var(--transition-control);
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand) 85%, white);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--green-600);
+  transform: translateY(0.5px);
+}
+
+.btn-secondary {
+  background: var(--surface-card);
+  color: var(--text-strong);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.btn-sm {
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  font: var(--type-caption);
+}
+
+/* --- clip / export controls -------------------------------------------- */
+
+.card-intro {
+  margin: 0 0 var(--space-3);
+}
+
+.subsection-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-3);
+}
+
+.subsection-title {
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--text-muted);
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.field-wide {
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+
+.field-label {
+  font: var(--type-ui);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.field-unit {
+  font: var(--type-caption);
+  color: var(--text-faint);
+}
+
+.input {
+  min-width: 0;
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  font: var(--type-ui);
+  color: var(--text-body);
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  transition: var(--transition-control);
+}
+
+.field .input[type="number"] {
+  width: 7rem;
+  font-family: var(--font-mono);
+}
+
+.field-wide .input {
+  flex: 1;
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.input:disabled {
+  color: var(--text-faint);
+  background: var(--bg-sunken);
+}
+
+.field-error {
+  margin: var(--space-3) 0 0;
+  font: var(--type-caption);
+  color: var(--danger-fg);
+}
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-ui);
+  color: var(--text-muted);
+}
+
+.checkbox input {
+  accent-color: var(--brand);
+}
+
+/* --- tier tags and the included-features panel ------------------------- */
+
+.tag {
+  padding: 0.1rem 0.45rem;
+  font: var(--type-caption);
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+.tag-premium,
+.tag-unlocked {
+  color: var(--text-brand);
+  background: var(--brand-soft);
+}
+
+.features-toggle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.features-toggle .section-title {
+  margin: 0;
+}
+
+.features-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}
+
+.feature-list {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) auto 1fr;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: var(--border-width) solid var(--border-hairline);
+}
+
+.feature-title {
+  font: var(--type-ui);
+  color: var(--text-body);
+}
+
+.feature-why {
+  min-width: 0;
+}
+
+@media (max-width: 34rem) {
+  .feature-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .feature-why {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- web app only ------------------------------------------------------ */
+
+.stage {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--gray-1000);
+}
+
+.stage video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+}
+
+/* JASSUB owns the overlay canvas's geometry completely: it measures the
+   video element and sets the canvas's width, height, top and left in
+   pixels so the subtitle raster lands exactly over the picture. Setting
+   any of those from here fights that arithmetic and the subtitles end up
+   scaled wrong or positioned off-screen -- which looks precisely like
+   "the preview is broken", because it is. The wrapper it injects is
+   `.JASSUB`; leave both alone apart from making sure the canvas cannot
+   swallow clicks meant for the video's own controls. */
+.stage .JASSUB canvas {
+  pointer-events: none;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.dropzone:hover {
+  background: var(--surface-hover);
+  color: var(--text-body);
+}
+
+.dropzone-sm {
+  flex-direction: row;
+  padding: var(--space-5) var(--space-6);
+}
+
+.screen.drag-over .dropzone {
+  border-color: var(--brand);
+  background: var(--surface-selected);
+}
+
+.cue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.cue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.cue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-2) 0;
+  border-top: var(--border-width) solid var(--border-hairline);
+}
+
+.cue.selected {
+  background: var(--surface-selected);
+}
+
+.cue-time {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.cue-time:hover {
+  color: var(--text-brand);
+  background: var(--surface-hover);
+}
+
+.cue-text {
+  width: 100%;
+  padding: var(--space-2);
+  font: var(--type-ui);
+  color: var(--text-body);
+  background: var(--surface-card);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.cue-text:hover {
+  border-color: var(--border-hairline);
+}
+
+.cue-text:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.command {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.command code {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.raw-command {
+  margin-top: var(--space-4);
+}
+
+.raw-command summary {
+  cursor: pointer;
+  margin-bottom: var(--space-3);
+}
+
+.web-footer {
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--border-hairline);
+}
+
+.burn-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.burn-done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--success-bg);
+  border-radius: var(--radius-md);
+}
+
+.burn-done-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* An indeterminate stage: model download and inference report no fraction. */
+.progress-fill.indeterminate {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--brand-contrast) 50%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: subs-indeterminate 1.2s linear infinite;
+}
+
+@keyframes subs-indeterminate {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill.indeterminate { animation: none; }
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.file-row .file-meta {
+  margin: 0;
+  min-width: 0;
+}
+
+/* A <label> styled as a button still needs the disabled look when its
+   hidden input is disabled -- :disabled does not apply to the label. */
+.btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+
+/* --- style thumbnails --------------------------------------------------- */
+
+.style-shot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+}
+
+/* Shown until the libass render lands: the preset's own colours, so the
+   tile is never empty and never shifts size when the image arrives. */
+.style-shot-pending {
+  opacity: 0.35;
+}
+
+.emphasis-row {
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.input.range {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--brand);
+}
+
+/* The glow colour. A native picker is the honest control here: the value
+   goes straight to libass as the accent, so any hex is legitimate. */
+.input.swatch {
+  height: 2rem;
+  padding: 2px;
+  cursor: pointer;
+}
+
+/* An effect that needs audio the current subtitles do not have. Dimmed
+   rather than hidden, so the option is discoverable and the caption below
+   can explain what would enable it. */
+.checkbox.disabled {
+  opacity: 0.45;
+}
+
+.checkbox.disabled input {
+  cursor: not-allowed;
+}
+
+/* --- header account ---------------------------------------------------- */
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Pushed right, and vertically centred against the wordmark. */
+.header-account {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.header-balance {
+  font: var(--type-ui);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.header-balance strong {
+  color: var(--text);
+}
+
+/* --- recovered work ---------------------------------------------------- */
+
+/* Marked out from the ordinary cards: it is an interruption, and it should
+   read as one rather than as another step in the flow. */
+.restore-card {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.restore-title {
+  font: var(--type-ui);
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+}
+
+/* The offer to reopen the video the last visit was working on. Sits above
+   the dropzone rather than replacing it: reopening is the likely choice,
+   but picking a different file must stay one click away. */
+.resume-video {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.resume-video-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--text);
+}
+
+.resume-video-text .oa-caption {
+  display: block;
+}
+
+@media (max-width: 560px) {
+  .resume-video {
+    flex-wrap: wrap;
+  }
+}
+
+/* Bilingual burn: a checkbox plus, once ticked, which language leads.
+   Separated from the translate button above it because it changes what is
+   drawn rather than running anything. */
+.bilingual {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bilingual .field {
+  max-width: 15rem;
+}
+
+/* The encoding guess for an imported subtitle file. Above the cues,
+   because it decides what they say. */
+.encoding-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.encoding-row .field {
+  max-width: 24rem;
+}
+
+/* --- route picker ------------------------------------------------------ */
+
+/* Three columns on any screen wide enough to read them side by side, which
+   is the whole point -- the comparison is the layout. Below that they
+   stack, still in cost order, so the free one is met first. */
+.routes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 560px) {
+  .routes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.route {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
+}
+
+.route:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.route:focus-visible {
+  outline: var(--border-width) solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Two signals rather than one. Colour alone fails for a third of readers
+   on a red/green axis and washes out on a projector; the weight of the
+   border carries the same information. */
+.route.selected {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+  background: var(--surface-selected);
+}
+
+.route:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.route-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.route-label {
+  font: var(--type-ui-strong, var(--type-ui));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.route-note {
+  font: var(--type-caption, var(--type-ui));
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* The price sits last and lowest, so scanning down a column ends on the
+   number -- and an empty slot on the free routes is honest emptiness. */
+.route-price {
+  margin-top: auto;
+  font: var(--type-ui);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.route-unavailable {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* --- credits ----------------------------------------------------------- */
+
+/* Balance and price side by side, because the only question a user has
+   here is "can I afford this", and answering it should not need a second
+   glance somewhere else on the page. */
+.credit-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  font: var(--type-ui);
+}
+
+.credit-balance {
+  color: var(--text-muted);
+}
+
+/* The dollar value of what is left, in the same breath as the count. A
+   balance in a private currency tells a user nothing on its own. */
+.credit-worth {
+  color: var(--text-subtle, var(--text-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-price {
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-price {
+  color: var(--text);
+}
+
+/* Not an error -- the price is fine, the balance is short. Coloured as a
+   warning so the disabled button below has a visible reason. */
+.credit-short {
+  color: var(--warning-fg);
+}
+
+.credit-bar .btn {
+  margin-left: auto;
+}
+
+/* --- cost badges -------------------------------------------------------- */
+
+/* One visual language for what a capability costs, so "free" reads the
+   same wherever a user meets it. Colour carries meaning here, so each
+   variant also differs in wording -- never colour alone. */
+.cost-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font: var(--type-caption);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cost-free {
+  color: var(--success-fg);
+  background: var(--success-bg);
+}
+
+.cost-free-or-own-key {
+  color: var(--text-brand);
+  background: var(--brand-soft);
+}
+
+.cost-own-key {
+  color: var(--warning-fg);
+  background: var(--warning-bg);
+}
+
+.cost-paid {
+  color: var(--info-fg);
+  background: var(--info-bg);
+}

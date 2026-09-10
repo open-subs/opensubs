@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+# Only crates that exist. Cargo refuses every command -- including `-p` for an
+# unrelated crate -- if any listed member's manifest is missing, so a member is
+# added in the same commit that creates its crate:
+#   crates/subs-style     -> Task 16
+#   crates/subs-pipeline  -> Task 19
+#   crates/subs-qa        -> Task 22
+#   apps/cli                -> M8 (the `opensubs` end-user CLI)
+#   apps/desktop/src-tauri  -> M7 (the Tauri 2 + Svelte desktop GUI)
+members = [
+    "crates/subs-media",
+    "crates/subs-asr",
+    "crates/subs-subtitle",
+    "crates/subs-style",
+    "crates/subs-pipeline",
+    "crates/subs-qa",
+    "crates/subs-tier",
+    "crates/subs-credits",
+    "crates/subs-wasm",
+    "crates/subs-translate",
+    "apps/cli",
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# AGPL-3.0-or-later, matching OpenCapture, which is the other AGPL product
+# in the suite. Two crates opt out of this deliberately -- see the note in
+# subs-credits and subs-translate.
+license = "AGPL-3.0-or-later"
+
+[workspace.dependencies]
+subs-media = { path = "crates/subs-media" }
+subs-asr = { path = "crates/subs-asr" }
+subs-subtitle = { path = "crates/subs-subtitle" }
+subs-style = { path = "crates/subs-style" }
+subs-pipeline = { path = "crates/subs-pipeline" }
+subs-tier = { path = "crates/subs-tier" }
+subs-wasm = { path = "crates/subs-wasm" }
+subs-translate = { path = "crates/subs-translate" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+unicode-width = "0.2"
+unicode-segmentation = "1"
+proptest = "1"
+insta = { version = "1", features = ["json"] }
+
+# The browser build. `opt-level="s"` rather than "z": this crate is pure
+# string and number work, and the size difference between the two is small
+# next to the cost of a slow segmenter on a long transcript.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

@@ -1,0 +1,64 @@
+# OpenSubs is its own repository, so it no longer inherits the monorepo's
+# ignore rules. Everything here was inherited until now; losing it would
+# put about 1.1 GB of node_modules, build output and vendored WebAssembly
+# into the first commit -- which fails the push outright, and would
+# publish a gigabyte of other people's code if it did not.
+
+# --- Rust ---
+/target
+**/target/
+**/*-target/
+**/src-tauri/target/
+
+# --- Node ---
+node_modules/
+dist/
+dist-firefox/
+*-dist.zip
+playwright-report/
+test-results/
+
+# --- Vendored binaries, fetched by scripts rather than committed ---
+# `public/ort/` is 74 MB of ONNX Runtime, copied in by scripts/sync-ort.sh
+# on prebuild. It is a build input, not source.
+/apps/web/public/ort/
+/vendor/ffmpeg/
+
+# Test media: large, and not ours to redistribute.
+/testdata/fixtures/
+
+# --- Local state and secrets ---
+.env
+.env.*
+!.env.example
+.claude/
+*.log
+.DS_Store
+
+# Evidence from local test runs. Real subtitles from real videos, written
+# by e2e/videos.mjs and e2e/capture.mjs -- someone else's footage, and not
+# something a first push should carry.
+/apps/web/e2e/video-results/
+/apps/web/e2e/shots/
+
+# Internal planning documents. They carry absolute paths from the machine
+# they were written on and reference sibling products, neither of which
+# means anything to a reader of this repository.
+/docs/superpowers/
+
+# A workaround for a shared-VM mount, hardcoding /tmp/opensubs-target. It is
+# correct on exactly one machine and wrong everywhere else, CI included.
+/.cargo/config.toml
+
+# The extension fetches its ONNX Runtime the same way the web app does --
+# scripts/sync-ort.mjs copies it out of node_modules before every build.
+# 23 MB of somebody else's binary, pinned by package-lock, is a build
+# input and not source.
+/apps/extension/public/ort/
+
+# Store upload archives, rebuilt by `npm run package`.
+/apps/extension/packages/
+
+# Videos copied in by e2e/pipeline.mjs so the harness can serve them from
+# its own origin. Someone else's footage, and 18 MB of it.
+/apps/extension/public/testmedia/

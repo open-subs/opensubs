@@ -1,0 +1,38 @@
+[package]
+name = "opensubs-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "opensubs desktop app (Tauri shell)"
+
+[lib]
+# The `_lib` suffix keeps the lib crate name from colliding with the `opensubs-desktop`
+# binary target -- an issue on Windows only, but harmless everywhere. Matches the pattern
+# `tauri`'s own scaffolding uses (see openpdfedit's/openphotoid's desktop crates).
+name = "opensubs_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+reqwest = { version = "0.13", features = ["blocking"] }
+dirs = "6"
+serde = { workspace = true }
+serde_json = { workspace = true }
+subs-media = { workspace = true }
+subs-asr = { workspace = true }
+subs-style = { workspace = true }
+subs-subtitle = { workspace = true }
+subs-pipeline = { workspace = true }
+subs-tier = { workspace = true }
+subs-translate = { workspace = true, features = ["http"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "opensubs-desktop"
+path = "src/main.rs"

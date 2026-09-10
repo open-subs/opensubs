@@ -1,0 +1,4 @@
+{
+  "name": { "message": "OpenSubs — local subtitles for any video" },
+  "description": { "message": "Generate subtitles for whatever is playing in the tab. The speech model runs on your own machine; no audio is uploaded." }
+}

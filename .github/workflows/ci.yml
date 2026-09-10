@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine:
+    name: rust engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The desktop app is a workspace member and needs GTK and WebKit to
+      # even resolve, which the engine crates do not. Test the crates the
+      # library actually consists of.
+      - run: cargo test -p subs-media -p subs-subtitle -p subs-style -p subs-pipeline -p subs-qa -p subs-tier
+
+  web:
+    name: web app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web
+      - run: npm run test:cleanup
+        working-directory: apps/web
+
+  extension:
+    name: extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/extension/package-lock.json }
+      - run: npm ci
+        working-directory: apps/extension
+      - run: npm run check
+        working-directory: apps/extension
+      - run: npm test
+        working-directory: apps/extension
+      # Both manifests, because the two stores reject each other's.
+      - run: npm run build:all
+        working-directory: apps/extension

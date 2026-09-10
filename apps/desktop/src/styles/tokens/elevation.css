@@ -1,0 +1,14 @@
+/* Shadows are quiet. Hierarchy comes from hairlines first, elevation second.
+   All shadows are pure black at low alpha, from the brand's black-XX ramp. */
+:root{
+  --shadow-none:none;
+  --shadow-xs:0 1px 1px var(--black-04);
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.06),0 1px 1px var(--black-04);
+  --shadow-md:0 2px 4px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg:0 4px 8px rgba(0,0,0,0.05),0 12px 32px rgba(0,0,0,0.09);
+  --shadow-xl:0 8px 16px rgba(0,0,0,0.06),0 24px 64px rgba(0,0,0,0.12);
+  --shadow-inset-top:inset 0 1px 0 var(--white-10);
+  --shadow-key:0 1px 0 var(--black-10);
+  --blur-panel:saturate(180%) blur(20px); /* @kind other */
+  --scrim:var(--black-50);
+}

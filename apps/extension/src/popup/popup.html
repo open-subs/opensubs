@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSubs</title>
+<link rel="stylesheet" href="./popup.css">
+<div class="pad">
+  <header>
+    <h1>OpenSubs</h1>
+    <p class="sub" id="device">Subtitles for whatever is playing, made on this machine.</p>
+  </header>
+
+  <div class="row">
+    <label for="model">Speech model</label>
+    <select id="model"></select>
+    <p class="hint" id="model-note"></p>
+  </div>
+
+  <div class="row">
+    <label for="language">Language</label>
+    <select id="language"></select>
+  </div>
+
+  <div class="row">
+    <label for="window">Seconds per pass <output id="window-out"></output></label>
+    <input type="range" id="window" min="10" max="30" step="5">
+    <p class="hint">Longer passes read better and appear later.</p>
+  </div>
+
+  <div class="row check">
+    <input type="checkbox" id="overlay">
+    <label for="overlay">Show subtitles over the video</label>
+  </div>
+
+  <div id="status" class="status" hidden></div>
+
+  <div class="actions">
+    <button id="go" class="primary">Start</button>
+    <button id="save" disabled>Save .srt</button>
+  </div>
+
+  <p class="foot">Audio never leaves this machine. The model is downloaded once, from Hugging Face.</p>
+</div>
+<script type="module" src="./popup.js"></script>

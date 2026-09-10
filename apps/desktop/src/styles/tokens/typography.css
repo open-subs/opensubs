@@ -1,0 +1,49 @@
+:root{
+  --font-sans:"Geist","Helvetica Neue",Arial,sans-serif;
+  --font-display:"Geist","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --weight-light:300;
+  --weight-regular:400;
+  --weight-medium:500;
+  --weight-bold:700;
+
+  /* Sizes — 15px body. Product UI lives between 12 and 20. */
+  --text-2xs:11px;
+  --text-xs:12px;
+  --text-sm:13px;
+  --text-base:15px;
+  --text-md:17px;
+  --text-lg:20px;
+  --text-xl:24px;
+  --text-2xl:32px;
+  --text-3xl:40px;
+  --text-4xl:56px;
+  --text-5xl:72px;
+  --text-6xl:96px;
+
+  --leading-tight:1.05;
+  --leading-snug:1.2;
+  --leading-normal:1.45;
+  --leading-relaxed:1.6;
+
+  /* Optical tracking: the bigger the type, the tighter it sets */
+  --tracking-display:-0.035em;
+  --tracking-heading:-0.02em;
+  --tracking-body:-0.005em;
+  --tracking-wide:0.02em;
+  --tracking-caps:0.08em;
+
+  /* Composed roles */
+  --type-display:var(--weight-medium) var(--text-4xl)/var(--leading-tight) var(--font-display);
+  --type-h1:var(--weight-medium) var(--text-3xl)/1.1 var(--font-display);
+  --type-h2:var(--weight-medium) var(--text-2xl)/1.15 var(--font-display);
+  --type-h3:var(--weight-medium) var(--text-xl)/1.25 var(--font-sans);
+  --type-h4:var(--weight-medium) var(--text-lg)/1.3 var(--font-sans);
+  --type-body-lg:var(--weight-regular) var(--text-md)/var(--leading-relaxed) var(--font-sans);
+  --type-body:var(--weight-regular) var(--text-base)/var(--leading-normal) var(--font-sans);
+  --type-ui:var(--weight-medium) var(--text-sm)/1.3 var(--font-sans);
+  --type-caption:var(--weight-regular) var(--text-xs)/1.35 var(--font-sans);
+  --type-mono:var(--weight-regular) var(--text-sm)/1.5 var(--font-mono);
+  --type-eyebrow:var(--weight-medium) var(--text-xs)/1.2 var(--font-sans);
+}

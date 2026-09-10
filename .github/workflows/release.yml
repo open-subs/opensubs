@@ -1,0 +1,82 @@
+name: release
+
+# Every tag builds artefacts and attaches them to a release, release
+# candidates included -- `v0.1.0-rc.1` is how a build reaches a tester.
+#
+# Nothing here submits to a store. Store submission lives in its own
+# workflow, filtered to tags with no hyphen in them, so an RC physically
+# cannot reach one.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  extension:
+    name: browser extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/extension/package-lock.json }
+      - run: npm ci
+        working-directory: apps/extension
+      - run: npm run build:all && npm run package
+        working-directory: apps/extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: apps/extension/packages/*.zip
+
+  desktop:
+    name: desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux build dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: npm install
+        working-directory: apps/desktop
+      - run: npx tauri build
+        working-directory: apps/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/**/*.deb
+            apps/desktop/src-tauri/target/release/bundle/**/*.msi
+            apps/desktop/src-tauri/target/release/bundle/**/*.exe
+
+  publish:
+    name: attach to the release
+    needs: [extension, desktop]
+    # The desktop matrix is allowed to fail a platform without losing the
+    # extension build; a release with the extension on it is still a
+    # release, and an empty one is worse than a partial one.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - name: list what was built
+        run: find artifacts -type f | sort
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true

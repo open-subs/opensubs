@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>OpenSubs engine</title>
+<!--
+  Nothing is ever shown here. This document exists because Whisper needs a
+  DOM: OfflineAudioContext to decode the captured audio, and WebGPU to run
+  the model on the GPU. A Chromium MV3 service worker has neither, so it
+  hosts this as an offscreen document. Firefox has no chrome.offscreen and
+  does not need one -- its background page is already a document, and loads
+  the same module directly.
+-->
+<script type="module" src="./offscreen.js"></script>
