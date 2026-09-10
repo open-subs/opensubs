@@ -20,7 +20,7 @@ import assert from "node:assert/strict";
 
 import {
   cleanUp, scriptFits, scriptsIn, stutterOf, isSignOff, bare, trimTail, foreignOnly,
-  isNonSpeech, trimDebrisTail, mergeBriefs,
+  isNonSpeech, trimDebrisTail, mergeBriefs, trimInlineEcho,
 } from "../src/lib/cleanup.ts";
 import { contextGroups, joinGroup, spread } from "../src/lib/context.ts";
 import { wantsTraditional, isChinese, toSimplified } from "../src/lib/script.ts";
@@ -553,6 +553,55 @@ test("a translation shorter than its cues still fills every one", () => {
 test("a cue that is already a sentence is passed through untouched", () => {
   assert.deepEqual(spread("公司表示下一次发射将推迟", ["The company said the launch would slip."]),
     ["公司表示下一次发射将推迟"]);
+});
+
+
+// --- APP-31: a phrase repeated inside one line -------------------------
+//
+// Japanese lesson video, 2:11. One phrase, twice, with a whole sentence
+// between them -- and nothing here caught it, each rule correctly:
+// stutterOf wants the repeats adjacent and space-separated, the
+// whole-line duplicate test compares one line against another, and
+// crammedRepeat scored 0.58 against its 0.60 threshold because ときに and
+// 時に write the same word two ways.
+
+test("APP-31: the reported line loses its echo", () => {
+  assert.equal(
+    trimInlineEcho("どうでしたかすみませんはいろいろなときによく使いますどうでしたか?"),
+    "どうでしたかすみませんはいろいろなときによく使います",
+  );
+});
+
+test("APP-31: an English echo goes too", () => {
+  assert.equal(
+    trimInlineEcho("I'll see you next time, everyone. I'll see you next time"),
+    "I'll see you next time, everyone.",
+  );
+});
+
+test("APP-31: only the tail is cut, never the first occurrence", () => {
+  assert.equal(trimInlineEcho("thank you very much thank you very much"), "thank you very much");
+});
+
+// The guards. Each is something a person actually says, and cutting any
+// of them would be a worse fault than the one being fixed.
+test("APP-31: a short repeat is left alone", () => {
+  assert.equal(trimInlineEcho("はいはい"), "はいはい");
+});
+test("APP-31: a short English repeat is left alone", () => {
+  assert.equal(trimInlineEcho("that that is a problem"), "that that is a problem");
+});
+test("APP-31: an ordinary line is untouched", () => {
+  assert.equal(trimInlineEcho("すみません注文いいですか"), "すみません注文いいですか");
+});
+test("APP-31: a line with no repeat is untouched", () => {
+  assert.equal(
+    trimInlineEcho("The quick brown fox jumps over the lazy dog"),
+    "The quick brown fox jumps over the lazy dog",
+  );
+});
+test("APP-31: an empty line survives", () => {
+  assert.equal(trimInlineEcho(""), "");
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
