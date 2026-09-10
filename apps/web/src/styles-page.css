@@ -1,0 +1,169 @@
+/* The /styles gallery.
+ *
+ * The tokens only -- not app.css. This page has no app on it, and pulling
+ * the product stylesheet in for six colours would also pull the eight
+ * hundred kilobytes of tool behind it, on a page whose whole purpose is
+ * to be crawled and read quickly.
+ */
+@import "./styles/tokens/colors.css";
+@import "./styles/tokens/typography.css";
+@import "./styles/tokens/spacing.css";
+@import "./styles/tokens/radius.css";
+@import "./styles/tokens/elevation.css";
+@import "./styles/tokens/motion.css";
+@import "./styles/tokens/fonts.css";
+@import "./styles/tokens/base.css";
+
+:root { color-scheme: light; }
+
+/* --- the gallery ---------------------------------------------------- */
+
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-6);
+  margin: var(--space-8) 0 0;
+}
+
+.style-card {
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The "video frame".
+ *
+ * A dark rectangle with a faint gradient, not a screenshot and not a
+ * still from anybody's footage. The product is a renderer, so the
+ * honest sample is the renderer's own output -- and a rendered sample
+ * costs nothing to keep current when a preset changes, where a
+ * screenshot is wrong the day after it is taken.
+ *
+ * 16:9 through aspect-ratio, so the percentage sizes below mean what
+ * they mean in the ASS file: a share of the frame height.
+ */
+.frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #2a3038 0%, #171a1f 55%, #0e1013 100%);
+  container-type: size;
+}
+
+/*
+ * One preset is drawn for a light picture, not a dark one.
+ *
+ * `Minimal` is near-black text with a white outline -- it exists for a
+ * screencast or a whiteboard. Showing it on the dark frame every other
+ * card uses makes the one style built for light backgrounds look like
+ * the one style that is broken.
+ */
+.frame.light {
+  background:
+    radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #eef1f5 55%, #dfe4ea 100%);
+}
+.frame.light::before {
+  background:
+    radial-gradient(38% 55% at 22% 68%, rgba(90,120,160,0.12), transparent 70%),
+    radial-gradient(30% 45% at 78% 40%, rgba(200,160,120,0.14), transparent 70%);
+}
+
+/* A hint of picture, so the caption is read against something rather
+   than floating on flat grey. Deliberately shapeless -- it must not
+   look like a frame from a real video we do not have. */
+.frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(38% 55% at 22% 68%, rgba(120,150,190,0.20), transparent 70%),
+    radial-gradient(30% 45% at 78% 40%, rgba(190,140,110,0.16), transparent 70%);
+}
+
+/*
+ * One caption, positioned and drawn from the preset's own numbers.
+ *
+ * Every value here comes out of `opensubs styles --export <name>`:
+ * size_pct, alignment, margin_v_pct, the three colours, the outline
+ * width and whether it is an opaque box. Nothing is eyeballed.
+ */
+.cap {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: pre-line;
+  /*
+   * `size_pct` is a share of the frame height, and rendering it at true
+   * proportion here makes it unreadable: 4.5% of a 200-pixel card is
+   * nine pixels, where 4.5% of a 1080p frame is forty-eight. The card is
+   * a video shrunk to a third, so the caption is scaled back up by
+   * roughly that much.
+   *
+   * A constant, deliberately, and applied to every card: what a gallery
+   * has to get right is how the presets differ from each other, and a
+   * constant leaves every ratio between them exactly as the engine has
+   * it -- Punch still twice Minimal, Shorts still larger than Clean.
+   */
+  font-size: calc(var(--size, 4.5) * var(--legible, 2.6) * 1cqh);
+  color: var(--fg, #fff);
+  text-shadow: var(--ring, none);
+}
+
+/* alignment 2 = bottom centre, 8 = top centre, 5 = middle centre */
+.cap.bottom { bottom: calc(var(--mv, 6) * 1cqh); }
+.cap.top    { top:    calc(var(--mv, 6) * 1cqh); }
+.cap.middle { top: 50%; transform: translateY(-50%); }
+
+/* border_style OpaqueBox: the box is drawn behind the text, hugging it,
+   rather than across the whole line -- which is what libass does. */
+.cap.boxed span {
+  background: var(--box, rgba(0,0,0,0.7));
+  padding: 0.12em 0.5em;
+  border-radius: 0.14em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.style-meta { padding: var(--space-5) var(--space-5) var(--space-6); }
+.style-name {
+  margin: 0;
+  font: var(--type-ui);
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: var(--text-strong);
+}
+.style-preset {
+  margin: var(--space-2) 0 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+.style-preset code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: var(--bg-sunken);
+  padding: 0.05em 0.35em;
+  border-radius: var(--radius-sm);
+  color: var(--text-body);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tags li {
+  font: var(--type-caption);
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-full);
+  padding: 0.15rem var(--space-3);
+}

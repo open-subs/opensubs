@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs</title>
+  <meta name="description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="theme-color" content="#f2f2f2" />
+  <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+  <link rel="canonical" href="https://opensubs.app/styles" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="OpenSubs" />
+  <meta property="og:title" content="Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs" />
+  <meta property="og:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <meta property="og:url" content="https://opensubs.app/styles" />
+  <meta property="og:image" content="https://opensubs.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs" />
+  <meta name="twitter:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <meta name="twitter:image" content="https://opensubs.app/og-image.png" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "OpenSubs",
+      "item": "https://opensubs.app/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Subtitle styles",
+      "item": "https://opensubs.app/styles"
+    }
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can I change the subtitle font and colour?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Every preset here is a starting point: font, size, colour, outline, shadow, box and position are all editable in the app, and a style can be exported as JSON and loaded back."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which subtitle style should I use for TikTok or Reels?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Shorts Safe Area and Reel Box sit high enough to clear the interface a vertical platform draws over the bottom of the frame. Both use a large size so the text survives being watched on a phone."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are these styles free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The six in the core pack are free. The advanced pack is free too at the moment — the badge in the app says what a thing costs you today."
+      }
+    }
+  ]
+}
+  </script>
+  <style>
+
+  /* The marketing page's own layout, unchanged apart from six class names.
+     `brand`, `btn`, `btn-primary`, `btn-secondary`, `card` and `tag` are
+     defined by the app's stylesheet too, and both stylesheets are on this
+     page now, so the marketing ones carry a `site-` prefix. e2e/smoke.mjs
+     asserts the two sheets share no class name, so the next collision is a
+     failing test rather than a button that quietly changes shape. */
+  /* Page-level layout only. Every colour, size, radius and duration below
+     comes from the shared design tokens — nothing here invents a value. */
+
+  /* `body` is the *light* ground now: the app sits directly on it, and
+     the marketing chrome paints its own dark ground over the top. Setting
+     dark here instead would put a dark strip above and below the app on a
+     short page, and flash dark before the app's stylesheet arrives. */
+  body {
+    margin: 0;
+  }
+
+  /* Both halves take the same ground, so there is no seam where the
+     marketing copy stops and the app starts. No rule between them either:
+     a border is only worth drawing where two surfaces actually differ. */
+  .site-chrome,
+  #app {
+    background: var(--bg-page);
+    color: var(--text-body);
+  }
+
+  .wrap {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+  }
+
+  /* --- header --- */
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklab, var(--bg-page) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: var(--border-width) solid var(--border-hairline);
+  }
+
+  .site-header .wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    height: 4rem;
+  }
+
+  /* The family wordmark. Every product in the suite uses this shape: a
+     tinted tile holding the product's own icon, then "Open" in muted grey,
+     the product name, and a period in the product's accent. OpenCapture is
+     blue, OpenSubs is orange (--app-opensubs). Brand green is reserved for
+     primary buttons on every product's page, which is why the tile and the
+     dot are the only things carrying the accent. */
+  .site-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+  }
+
+  .brand-tile {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
+    color: var(--app-opensubs);
+  }
+
+  .brand-tile svg { display: block; }
+
+  .brand-word {
+    font: var(--weight-medium) 17px/1 var(--font-display, var(--font-sans));
+    letter-spacing: -0.04em;
+    color: var(--text-strong);
+  }
+
+  .brand-word .muted { color: var(--text-muted); }
+  .brand-word .dot { color: var(--app-opensubs); }
+
+  .site-header nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .site-header nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font: var(--type-ui);
+  }
+
+  .site-header nav a:hover { color: var(--text-strong); }
+
+  @media (max-width: 40rem) {
+    .site-header nav a.hide-sm { display: none; }
+    .site-header nav .site-btn.hide-sm { display: none; }
+  }
+
+  /* --- buttons --- */
+
+  .site-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 0.7rem var(--space-5);
+    border-radius: var(--radius-full);
+    border: var(--border-width) solid transparent;
+    font: var(--type-ui);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--duration-base) var(--ease-standard);
+  }
+
+  .site-btn-primary {
+    background: var(--brand);
+    color: var(--brand-contrast);
+  }
+
+  .site-btn-primary:hover { background: var(--brand-strong); }
+
+  .site-btn-secondary {
+    border-color: var(--border-strong);
+    color: var(--text-strong);
+  }
+
+  .site-btn-secondary:hover { background: var(--surface-hover); }
+
+  .btn-lg { padding: 0.9rem var(--space-6); font-size: 1.02rem; }
+
+  /* --- hero --- */
+
+  /* Shorter than it was, and the headline a size down. The hero used to
+     be the whole first screen because the thing it was selling lived on
+     another domain; the thing itself is now directly underneath it, and
+     every pixel here is a pixel the drop zone is pushed below the fold. */
+  .hero { padding: var(--space-12) 0 var(--space-10); text-align: center; }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    margin: 0 0 var(--space-5);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .hero .subhead {
+    font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+    line-height: 1.3;
+    color: var(--text-strong);
+    margin: 0 auto var(--space-4);
+    max-width: 34rem;
+    text-wrap: balance;
+  }
+
+  .hero .lede {
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    color: var(--text-muted);
+    max-width: 40rem;
+    margin: 0 auto var(--space-8);
+    text-wrap: pretty;
+  }
+
+  .hero .cta { display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap; }
+
+  .hero .reassure {
+    margin-top: var(--space-5);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+  }
+
+  /* --- the demo strip: what the product actually produces --- */
+
+  .strip {
+    margin: var(--space-16) auto 0;
+    max-width: 46rem;
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-card);
+  }
+
+  .strip-frame {
+    position: relative;
+    aspect-ratio: 16 / 5;
+    display: grid;
+    place-items: end center;
+    padding-bottom: var(--space-7);
+    background:
+      radial-gradient(120% 120% at 30% 10%, color-mix(in oklab, var(--blue) 22%, transparent), transparent 60%),
+      radial-gradient(120% 120% at 80% 80%, color-mix(in oklab, var(--violet) 26%, transparent), transparent 60%),
+      var(--bg-sunken);
+  }
+
+  /* A real caption, styled the way the app styles them: white fill, hard
+     outline, and one word lit. Not a screenshot — a screenshot of a
+     subtitle is just text, and this stays sharp at any width. */
+  .caption-line {
+    font-size: clamp(1.3rem, 4.4vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--white);
+    -webkit-text-stroke: 0.09em var(--black);
+    paint-order: stroke fill;
+    text-align: center;
+    line-height: 1.2;
+    padding: 0 var(--space-5);
+  }
+
+  .caption-line .lit {
+    color: var(--yellow);
+    display: inline-block;
+    /* font-size, not transform: scale(). Scaling leaves the layout box at
+       the base width while the glyphs render 26% wider, so the word
+       overflows into the space before it and the line reads
+       "This isSparta!". The line is centred either way -- measured at 0px
+       offset from the frame centre at every width -- so there is nothing
+       to buy by fighting the reflow. */
+    font-size: 1.26em;
+    text-shadow:
+      0 0 0.3em color-mix(in oklab, var(--yellow) 70%, transparent),
+      0 0 0.7em color-mix(in oklab, var(--yellow) 45%, transparent);
+  }
+
+  .strip-note {
+    padding: var(--space-3) var(--space-5);
+    border-top: var(--border-width) solid var(--border-hairline);
+    font: var(--type-caption, var(--type-ui));
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  /* --- sections --- */
+
+  /* Generous and equal on both sides, so adjacent sections read as
+     separate rather than as one long column. A hairline between them
+     does the rest -- on a dark ground, space alone is not enough
+     separation once the cards inside are also dark. */
+  section {
+    padding: var(--space-20) 0;
+    border-top: var(--border-width) solid var(--border-hairline);
+  }
+
+  section:first-of-type { border-top: 0; }
+
+  .section-head { max-width: 42rem; margin-bottom: var(--space-10); }
+
+  h2 {
+    font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-3);
+    color: var(--text-strong);
+    text-wrap: balance;
+  }
+
+  .section-head p { color: var(--text-muted); margin: 0; font-size: 1.05rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-5);
+  }
+
+  /* Four steps, so an auto-fit that lands on three leaves one card stranded
+     on its own row -- which reads as a missing fifth step rather than as a
+     wrap. Pinned to 4 / 2 / 1 so it always divides evenly. */
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  @media (max-width: 62rem) {
+    .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 34rem) {
+    .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .site-card {
+    padding: var(--space-6);
+    border: var(--border-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+  }
+
+  .site-card h3 {
+    margin: 0 0 var(--space-2);
+    font-size: 1.05rem;
+    color: var(--text-strong);
+  }
+
+  .site-card p { margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.55; }
+
+  .site-tag {
+    display: inline-block;
+    margin-bottom: var(--space-3);
+    padding: 0.18rem var(--space-2);
+    border-radius: var(--radius-sm);
+    font: var(--type-caption, var(--type-ui));
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .tag-free { background: var(--brand-soft); color: var(--text-brand); }
+  .tag-paid { background: color-mix(in oklab, var(--blue) 20%, transparent); color: var(--blue); }
+
+  /* --- pricing --- */
+
+  .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--space-5); }
+
+  .price-card { padding: var(--space-7); }
+
+  .price-card .amount {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+    line-height: 1;
+    margin-bottom: var(--space-2);
+  }
+
+  .price-card .amount small { font-size: 0.9rem; font-weight: 400; color: var(--text-faint); }
+
+  .price-card ul { margin: var(--space-5) 0 0; padding-left: 1.15rem; }
+  .price-card li { color: var(--text-muted); margin-bottom: var(--space-2); font-size: 0.95rem; }
+
+  .featured { border-color: var(--brand); }
+
+  /* --- faq --- */
+
+  details {
+    border-bottom: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-5) 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-strong);
+    font-size: 1.05rem;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--text-faint); font-weight: 400; }
+  details[open] summary::after { content: "\2212"; }
+  details p { color: var(--text-muted); margin: var(--space-3) 0 0; max-width: 46rem; }
+
+  /* --- footer --- */
+
+  footer {
+    border-top: var(--border-width) solid var(--border-hairline);
+    padding: var(--space-8) 0;
+    color: var(--text-faint);
+    font: var(--type-ui);
+  }
+
+  footer .wrap { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+  footer a { color: var(--text-muted); text-decoration: none; }
+  footer a:hover { color: var(--text-strong); }
+  footer .spacer { margin-left: auto; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  </style>
+</head>
+<body>
+<!--
+  GENERATED by scripts/build-styles-page.py -- edit that, not this.
+
+  Every caption on this page is drawn from `opensubs styles --export`,
+  so a preset change is one regeneration away from being right here. The
+  category has nobody shipping screenshots for this, and rightly: the
+  product is a renderer, so its own output is both more convincing and
+  free to keep current.
+-->
+<div class="site-chrome">
+<header class="site-header">
+  <div class="wrap">
+    <a class="site-brand" href="/">
+      <span class="brand-tile" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4.5" width="20" height="15" rx="2.6" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="13" width="7.5" height="2.4" rx="1.2" fill="currentColor"/>
+          <rect x="15" y="13" width="3" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
+        </svg>
+      </span>
+      <span class="brand-word"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
+    </a>
+    <nav>
+      <a class="hide-sm" href="/#how">How it works</a>
+      <a class="hide-sm" href="/#privacy">Privacy</a>
+      <a class="hide-sm" href="/#pricing">Pricing</a>
+      <a class="hide-sm" href="/#downloads">Downloads</a>
+      <a class="hide-sm" href="/styles">Styles</a>
+      <!-- APP-48: #app had no link anywhere on the site, so the one
+           URL that opens the tool directly could not be reached from it. -->
+      <a href="/#app">Open the app</a>
+      <div id="account"></div>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="top">
+    <div class="wrap">
+      <h1>Twelve subtitle styles, rendered here rather than screenshotted</h1>
+      <p class="subhead">
+        Every caption below is drawn by the browser from the same style file the
+        app burns with &mdash; the sizes, colours and outlines are the preset&rsquo;s own.
+      </p>
+      <p class="lede">
+        Pick one in the app and it looks like this. Change the font, colour,
+        outline or position and it stops looking like this, which is rather the
+        point: a preset is a starting point, not a fixed set.
+      </p>
+      <div class="cta">
+        <a class="site-btn site-btn-primary btn-lg" href="/#app">Open the app</a>
+        <a class="site-btn site-btn-secondary btn-lg" href="/burn-subtitles-into-video">Burn them into a video</a>
+      </div>
+      <p class="reassure">Free. No account, no watermark, nothing uploaded.</p>
+    </div>
+  </section>
+
+  <section id="gallery">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>The twelve</h2>
+        <p>
+          Six in the core pack, six in the advanced pack. The name under each one
+          is what to pick in the app. Captions are scaled up for legibility; the
+          sizes relative to one another are the engine&rsquo;s.
+        </p>
+      </div>
+      <div class="style-grid">
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:4.5;--fg:rgba(255,255,255,1.0);--mv:6.0;--ring:0.68px 0px 0 rgba(0,0,0,1.0), -0.68px 0px 0 rgba(0,0,0,1.0), 0px 0.68px 0 rgba(0,0,0,1.0), 0px -0.68px 0 rgba(0,0,0,1.0), 0.476px 0.476px 0 rgba(0,0,0,1.0), -0.476px 0.476px 0 rgba(0,0,0,1.0), 0.476px -0.476px 0 rgba(0,0,0,1.0), -0.476px -0.476px 0 rgba(0,0,0,1.0);font-weight:700;"><span>so we started in a garage</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Interview Clean White</h3>
+          <p class="style-preset">Preset <code>Clean</code> — 4.5% height, 2.0px outline</p>
+          <ul class="tags"><li>interview</li><li>documentary</li><li>talking head</li><li>white subtitles</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:5.5;--fg:rgba(255,255,255,1.0);--mv:6.0;--ring:1.36px 0px 0 rgba(0,0,0,1.0), -1.36px 0px 0 rgba(0,0,0,1.0), 0px 1.36px 0 rgba(0,0,0,1.0), 0px -1.36px 0 rgba(0,0,0,1.0), 0.952px 0.952px 0 rgba(0,0,0,1.0), -0.952px 0.952px 0 rgba(0,0,0,1.0), 0.952px -0.952px 0 rgba(0,0,0,1.0), -0.952px -0.952px 0 rgba(0,0,0,1.0);font-weight:700;"><span>10 REPS · 3 SETS · NO REST</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Fitness Bold White</h3>
+          <p class="style-preset">Preset <code>Bold</code> — 5.5% height, 4.0px outline</p>
+          <ul class="tags"><li>fitness</li><li>gym</li><li>workout</li><li>bold subtitles</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom boxed" style="--size:4.5;--fg:rgba(255,255,255,1.0);--mv:6.0;--ring:none;--box:rgba(0,0,0,0.706);font-weight:700;"><span>Q3 revenue grew 18%</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Corporate Clean Box</h3>
+          <p class="style-preset">Preset <code>Boxed</code> — 4.5% height, boxed</p>
+          <ul class="tags"><li>corporate</li><li>explainer</li><li>training</li><li>boxed subtitles</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:6.5;--fg:rgba(255,255,255,1.0);--mv:18.0;--ring:1.02px 0px 0 rgba(0,0,0,1.0), -1.02px 0px 0 rgba(0,0,0,1.0), 0px 1.02px 0 rgba(0,0,0,1.0), 0px -1.02px 0 rgba(0,0,0,1.0), 0.714px 0.714px 0 rgba(0,0,0,1.0), -0.714px 0.714px 0 rgba(0,0,0,1.0), 0.714px -0.714px 0 rgba(0,0,0,1.0), -0.714px -0.714px 0 rgba(0,0,0,1.0);font-weight:700;"><span>wait for the last one</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Shorts Safe Area</h3>
+          <p class="style-preset">Preset <code>Shorts</code> — 6.5% height, 3.0px outline</p>
+          <ul class="tags"><li>youtube shorts</li><li>tiktok</li><li>reels</li><li>vertical video</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:4.5;--fg:rgba(255,214,10,1.0);--mv:6.0;--ring:0.68px 0px 0 rgba(0,0,0,1.0), -0.68px 0px 0 rgba(0,0,0,1.0), 0px 0.68px 0 rgba(0,0,0,1.0), 0px -0.68px 0 rgba(0,0,0,1.0), 0.476px 0.476px 0 rgba(0,0,0,1.0), -0.476px 0.476px 0 rgba(0,0,0,1.0), 0.476px -0.476px 0 rgba(0,0,0,1.0), -0.476px -0.476px 0 rgba(0,0,0,1.0);font-weight:700;"><span>BREAKING: markets open higher</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Broadcast Caption Yellow</h3>
+          <p class="style-preset">Preset <code>Caption</code> — 4.5% height, 2.0px outline</p>
+          <ul class="tags"><li>broadcast</li><li>news</li><li>accessibility</li><li>yellow subtitles</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:5.0;--fg:rgba(255,255,255,1.0);--mv:8.0;--ring:0.68px 0px 0 rgba(0,0,0,1.0), -0.68px 0px 0 rgba(0,0,0,1.0), 0px 0.68px 0 rgba(0,0,0,1.0), 0px -0.68px 0 rgba(0,0,0,1.0), 0.476px 0.476px 0 rgba(0,0,0,1.0), -0.476px 0.476px 0 rgba(0,0,0,1.0), 0.476px -0.476px 0 rgba(0,0,0,1.0), -0.476px -0.476px 0 rgba(0,0,0,1.0);font-weight:700;"><span>字幕は自動で作れます</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">CJK Clean 中日韓</h3>
+          <p class="style-preset">Preset <code>CJK</code> — 5.0% height, 2.0px outline</p>
+          <ul class="tags"><li>chinese subtitles</li><li>japanese subtitles</li><li>korean subtitles</li><li>cjk</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:5.5;--fg:rgba(34,245,220,1.0);--mv:6.0;--ring:1.19px 0px 0 rgba(190,24,160,1.0), -1.19px 0px 0 rgba(190,24,160,1.0), 0px 1.19px 0 rgba(190,24,160,1.0), 0px -1.19px 0 rgba(190,24,160,1.0), 0.833px 0.833px 0 rgba(190,24,160,1.0), -0.833px 0.833px 0 rgba(190,24,160,1.0), 0.833px -0.833px 0 rgba(190,24,160,1.0), -0.833px -0.833px 0 rgba(190,24,160,1.0), 0.5px 0.5px 0.8px rgba(0,0,0,0.65);font-weight:700;"><span>GG that was insane</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Gaming Neon Cyan</h3>
+          <p class="style-preset">Preset <code>Neon</code> — 5.5% height, 3.5px outline</p>
+          <ul class="tags"><li>gaming</li><li>streaming</li><li>twitch</li><li>neon subtitles</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap top boxed" style="--size:4.5;--fg:rgba(255,255,255,1.0);--mv:8.0;--ring:none;--box:rgba(12,12,16,0.698);font-weight:700;"><span>…and that's when it clicked</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Podcast Top Bar</h3>
+          <p class="style-preset">Preset <code>Podcast</code> — 4.5% height, boxed</p>
+          <ul class="tags"><li>podcast</li><li>interview</li><li>top captions</li><li>clips</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom" style="--size:4.0;--fg:rgba(245,240,228,1.0);--mv:9.0;--ring:0.51px 0px 0 rgba(0,0,0,1.0), -0.51px 0px 0 rgba(0,0,0,1.0), 0px 0.51px 0 rgba(0,0,0,1.0), 0px -0.51px 0 rgba(0,0,0,1.0), 0.357px 0.357px 0 rgba(0,0,0,1.0), -0.357px 0.357px 0 rgba(0,0,0,1.0), 0.357px -0.357px 0 rgba(0,0,0,1.0), -0.357px -0.357px 0 rgba(0,0,0,1.0), 0.5px 0.5px 0.8px rgba(0,0,0,0.65);font-weight:400;"><span>Paris, 1968</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Cinema Letterbox Cream</h3>
+          <p class="style-preset">Preset <code>Cinema</code> — 4.0% height, 1.5px outline</p>
+          <ul class="tags"><li>cinema</li><li>film</li><li>trailer</li><li>documentary</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap middle" style="--size:8.5;--fg:rgba(255,255,255,1.0);--mv:0.0;--ring:1.7px 0px 0 rgba(0,0,0,1.0), -1.7px 0px 0 rgba(0,0,0,1.0), 0px 1.7px 0 rgba(0,0,0,1.0), 0px -1.7px 0 rgba(0,0,0,1.0), 1.19px 1.19px 0 rgba(0,0,0,1.0), -1.19px 1.19px 0 rgba(0,0,0,1.0), 1.19px -1.19px 0 rgba(0,0,0,1.0), -1.19px -1.19px 0 rgba(0,0,0,1.0), 0.75px 0.75px 1.2000000000000002px rgba(0,0,0,0.65);font-weight:700;"><span>NOBODY TELLS YOU THIS</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Punch Centre Impact</h3>
+          <p class="style-preset">Preset <code>Punch</code> — 8.5% height, 5.0px outline</p>
+          <ul class="tags"><li>meme</li><li>viral</li><li>hook</li><li>centre captions</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame light">
+          <div class="cap bottom" style="--size:4.0;--fg:rgba(16,18,24,1.0);--mv:6.0;--ring:0.34px 0px 0 rgba(255,255,255,1.0), -0.34px 0px 0 rgba(255,255,255,1.0), 0px 0.34px 0 rgba(255,255,255,1.0), 0px -0.34px 0 rgba(255,255,255,1.0), 0.238px 0.238px 0 rgba(255,255,255,1.0), -0.238px 0.238px 0 rgba(255,255,255,1.0), 0.238px -0.238px 0 rgba(255,255,255,1.0), -0.238px -0.238px 0 rgba(255,255,255,1.0), 0.25px 0.25px 0.4px rgba(0,0,0,0.65);font-weight:400;"><span>step 3 — add the garlic</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Minimal Dark on Light</h3>
+          <p class="style-preset">Preset <code>Minimal</code> — 4.0% height, 1.0px outline</p>
+          <ul class="tags"><li>minimal</li><li>tutorial</li><li>screencast</li><li>light background</li></ul>
+        </div>
+      </article>
+      <article class="style-card">
+        <div class="frame">
+          <div class="cap bottom boxed" style="--size:6.0;--fg:rgba(255,255,255,1.0);--mv:20.0;--ring:none;--box:rgba(12,12,16,0.698);font-weight:700;"><span>save this for later</span></div>
+        </div>
+        <div class="style-meta">
+          <h3 class="style-name">Reel Box Bottom</h3>
+          <p class="style-preset">Preset <code>Reel Box</code> — 6.0% height, boxed</p>
+          <ul class="tags"><li>instagram reels</li><li>vertical video</li><li>social</li><li>boxed captions</li></ul>
+        </div>
+      </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Questions</h2>
+      </div>
+      <div class="faq">
+        <details>
+          <summary>Can I change the subtitle font and colour?</summary>
+          <p>Yes. Every preset here is a starting point: font, size, colour, outline, shadow, box and position are all editable in the app, and a style can be exported as JSON and loaded back.</p>
+        </details>
+        <details>
+          <summary>Which subtitle style should I use for TikTok or Reels?</summary>
+          <p>Shorts Safe Area and Reel Box sit high enough to clear the interface a vertical platform draws over the bottom of the frame. Both use a large size so the text survives being watched on a phone.</p>
+        </details>
+        <details>
+          <summary>Are these styles free?</summary>
+          <p>The six in the core pack are free. The advanced pack is free too at the moment — the badge in the app says what a thing costs you today.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 OpenSubs</span>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/styles">Styles</a>
+    <a href="https://github.com/open-subs/opensubs/releases">Downloads</a>
+    <span class="spacer"></span>
+    <a href="https://github.com/open-subs/opensubs">Source, AGPL-3.0</a>
+  </div>
+</footer>
+</div>
+<script type="module" src="/src/styles-page.ts"></script>
+</body>
+</html>
