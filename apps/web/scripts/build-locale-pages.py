@@ -320,8 +320,32 @@ def main():
     check_only = "--check" in sys.argv
     root = DIST if os.path.isdir(DIST) and not check_only else WEB
     if check_only:
-        sources = {p: os.path.join(WEB, "public" if p == "privacy.html" else "", p)
-                   for p in PAGES}
+        # `--check` reads the sources rather than the build. privacy.html is
+        # the site's, so since the website moved out it is no longer under
+        # `public/` here; SITE_SOURCE points at the site repo's copy. Without
+        # it a bare `--check` would report the page as missing, which is not
+        # the same thing as untranslated and would read as a real gap.
+        # `--check` reads sources rather than the build, and since the website
+        # moved out two of them are no longer in this repo. `SITE_SOURCE`
+        # points at the site repo: index.html is its template (the page with
+        # the app cut out, which still holds every translatable string on it),
+        # and privacy.html is under its public/. The two SEO pages stay here,
+        # because they are bundler entry points.
+        #
+        # Without this a bare `--check` reads the bare app shell as index.html
+        # and reports most of the catalogue as unused — which looks like the
+        # translations rotting rather than the file having moved.
+        site_src = os.environ.get("SITE_SOURCE")
+        site_at = {"index.html": ("template", "index.html"),
+                   "privacy.html": ("public", "privacy.html")}
+        sources = {}
+        for p in PAGES:
+            if site_src and p in site_at:
+                sources[p] = os.path.join(site_src, *site_at[p])
+            elif p == "privacy.html":
+                sources[p] = os.path.join(WEB, "public", p)
+            else:
+                sources[p] = os.path.join(WEB, p)
     else:
         sources = {p: os.path.join(DIST, p) for p in PAGES}
 
