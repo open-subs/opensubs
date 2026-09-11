@@ -17,9 +17,15 @@
 import assert from "node:assert/strict";
 
 import {
+  GEMINI_DEFAULT_BASE,
   REMOTE_MODELS,
+  geminiBase,
+  geminiChunkPlan,
+  geminiRequest,
   hasKnownUploadLimit,
+  isGemini,
   lacksTimestamps,
+  parseGeminiSegments,
   remoteError,
   remoteUploadSeconds,
 } from "../src/lib/remote.ts";
@@ -168,6 +174,100 @@ test("a missing model is told apart from a model that cannot do timings", () => 
   const message = raw(remoteError(404, body, "whisper-2"));
   assert.match(message, /no model called/);
   assert.match(message, /whisper-2/);
+});
+
+
+// APP-74: Gemini through its native API, since the OpenAI-compatible
+// layer has no transcription endpoint (measured: 404).
+test("a gemini model is routed natively, whisper models are not", () => {
+  assert.equal(isGemini("gemini-2.5-flash"), true);
+  assert.equal(isGemini(" Gemini-2.0-flash-lite "), true);
+  assert.equal(isGemini("whisper-1"), false);
+  assert.equal(isGemini("gpt-4o-transcribe"), false);
+  assert.ok(REMOTE_MODELS.some((m) => m.id === "gemini-2.5-flash"));
+});
+
+test("the OpenAI-compatible URL from Google's docs is turned into the native base", () => {
+  assert.equal(geminiBase("https://generativelanguage.googleapis.com/v1beta/openai/"), GEMINI_DEFAULT_BASE);
+  assert.equal(geminiBase("https://generativelanguage.googleapis.com/v1beta"), GEMINI_DEFAULT_BASE);
+  // The route's own default server is OpenAI's; for a Gemini model it is ignored.
+  assert.equal(geminiBase("https://api.openai.com/v1"), GEMINI_DEFAULT_BASE);
+  assert.equal(geminiBase(""), GEMINI_DEFAULT_BASE);
+  assert.equal(geminiBase(undefined), GEMINI_DEFAULT_BASE);
+});
+
+test("audio is cut into pieces of at most thirty seconds, at the quietest moment nearby", () => {
+  const exact = geminiChunkPlan(75);
+  assert.deepEqual(exact, [
+    { start: 0, end: 30 },
+    { start: 30, end: 60 },
+    { start: 60, end: 75 },
+  ]);
+  // A quiet moment 1.4 s before the mark pulls the cut earlier; one after it does not push it later.
+  const early = geminiChunkPlan(45, 30, (around) => around - 1.4);
+  assert.deepEqual(early, [{ start: 0, end: 28.6 }, { start: 28.6, end: 45 }]);
+  const late = geminiChunkPlan(45, 30, (around) => around + 1.4);
+  assert.deepEqual(late, [{ start: 0, end: 30 }, { start: 30, end: 45 }]);
+  assert.deepEqual(geminiChunkPlan(12), [{ start: 0, end: 12 }]);
+});
+
+test("the request carries the audio inline, the key in a header, and asks for JSON segments", () => {
+  const { url, init } = geminiRequest(GEMINI_DEFAULT_BASE, "gemini-2.5-flash", "AIza-test", "UklGRg==", "ja");
+  assert.equal(url, `${GEMINI_DEFAULT_BASE}/models/gemini-2.5-flash:generateContent`);
+  assert.equal(init.method, "POST");
+  assert.equal(init.headers["x-goog-api-key"], "AIza-test");
+  assert.ok(!url.includes("AIza-test"), "the key must not be in the URL");
+  const body = JSON.parse(init.body);
+  assert.equal(body.contents[0].parts[0].inline_data.mime_type, "audio/wav");
+  assert.equal(body.contents[0].parts[0].inline_data.data, "UklGRg==");
+  assert.match(body.contents[0].parts[1].text, /in ja\./);
+  assert.equal(body.generationConfig.responseMimeType, "application/json");
+  assert.deepEqual(body.generationConfig.responseSchema.required, ["segments"]);
+});
+
+test("a gemini response becomes segments in clip time", () => {
+  const response = JSON.stringify({
+    candidates: [
+      {
+        content: {
+          parts: [
+            {
+              text: JSON.stringify({
+                segments: [
+                  { start: 0.2, end: 2.9, text: "こんにちは、今日は" },
+                  { start: 3.1, end: 6.0, text: "天気がいいですね。" },
+                ],
+              }),
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const segs = parseGeminiSegments(response, 30, 30);
+  assert.deepEqual(segs, [
+    { start: 30.2, end: 32.9, text: "こんにちは、今日は" },
+    { start: 33.1, end: 36.0, text: "天気がいいですね。" },
+  ]);
+});
+
+test("fenced JSON, clock-style times and out-of-range times are still read", () => {
+  const text = "```json\n" + JSON.stringify([{ start: "0:05.5", end: "0:41", text: "late" }, { start: 1, end: 0.5, text: "backwards" }]) + "\n```";
+  const response = JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] });
+  const segs = parseGeminiSegments(response, 0, 30);
+  assert.deepEqual(segs, [
+    { start: 1, end: 1, text: "backwards" },
+    { start: 5.5, end: 30, text: "late" },
+  ]);
+  assert.deepEqual(parseGeminiSegments("not json at all", 0, 30), []);
+  assert.deepEqual(parseGeminiSegments(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"segments":[]}' }] } }] }), 0, 30), []);
+});
+
+test("google's key error reads as a rejected key", () => {
+  const body = JSON.stringify({
+    error: { code: 400, message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT" },
+  });
+  assert.equal(remoteError(400, body, "gemini-2.5-flash").message, "That transcription service rejected the key.");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

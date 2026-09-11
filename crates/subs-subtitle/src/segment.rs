@@ -80,14 +80,50 @@ fn shown_for(group: &[&Word], next: Option<&Vec<&Word>>) -> f64 {
     }
 }
 
+/// Would these words, as one group, fit on screen and in time?
+///
+/// The two hard limits `must_break` enforces while grouping, re-checked
+/// on a proposed merge: at most `max_lines` of text, at most
+/// `max_duration` from first word to last.
+fn fits(words: &[&Word], cfg: &SegmentConfig) -> bool {
+    let span = words[words.len() - 1].end - words[0].start;
+    if span > cfg.max_duration {
+        return false;
+    }
+    let tokens = tokens_of(words);
+    let text = join_tokens(&tokens);
+    joined_len(&tokens) <= line_budget(&text) * cfg.max_lines
+}
+
+/// The silence between two adjacent groups.
+fn gap_between(a: &[&Word], b: &[&Word]) -> f64 {
+    b[0].start - a[a.len() - 1].end
+}
+
 /// Join adjacent groups whose cues would be too brief to read.
 ///
 /// Left to right, and repeatedly: joining two still-brief groups can
 /// leave a group that is brief, and the reader does not care that it took
 /// two steps to get there.
+///
+/// Three ways to put a brief group back, tried in this order:
+///
+/// 1. **Into the group before it** (APP-73). A fragment is most often the
+///    tail of the phrase it follows, and the group before it is the one
+///    that tends to have room: the twelve cases in the report all had a
+///    one-line cue ahead of the fragment and a full two-line cue after it.
+/// 2. **Into the group after it** (APP-52), when the one before is full or
+///    absent.
+/// 3. **Re-cut three groups as two**, when both neighbours are full. The
+///    words of all three are pooled and split once, at the word boundary
+///    that leaves both halves fitting and neither brief. The report's
+///    "#31, full on both sides" is this case; nothing else can help it.
+///
+/// Every step keeps the first pass's guarantees: a real pause is never
+/// crossed, capacity stays `max_lines`, and `max_duration` still holds.
 fn merge_flickering(groups: &mut Vec<Vec<&Word>>, cfg: &SegmentConfig) {
     let mut i = 0;
-    while i + 1 < groups.len() {
+    while i < groups.len() {
         let shown = shown_for(&groups[i], groups.get(i + 1));
         if shown >= cfg.min_duration {
             i += 1;
@@ -96,30 +132,128 @@ fn merge_flickering(groups: &mut Vec<Vec<&Word>>, cfg: &SegmentConfig) {
 
         // A real silence is a sentence boundary and outranks flicker: two
         // sentences welded together read worse than one brief cue.
-        let gap = groups[i + 1][0].start - groups[i][groups[i].len() - 1].end;
-        if gap >= cfg.pause_split {
-            i += 1;
-            continue;
+        let prev_ok = i > 0 && gap_between(&groups[i - 1], &groups[i]) < cfg.pause_split;
+        let next_ok =
+            i + 1 < groups.len() && gap_between(&groups[i], &groups[i + 1]) < cfg.pause_split;
+
+        // 1. Into the previous group.
+        if prev_ok {
+            let mut joined = groups[i - 1].clone();
+            joined.extend(groups[i].iter().copied());
+            if fits(&joined, cfg) {
+                let tail = groups.remove(i);
+                groups[i - 1].extend(tail);
+                // Not advancing: what is now at `i` may itself be brief.
+                continue;
+            }
         }
 
-        // The joined cue still has to fit on screen and in time.
-        let span = groups[i + 1][groups[i + 1].len() - 1].end - groups[i][0].start;
-        if span > cfg.max_duration {
-            i += 1;
-            continue;
-        }
-        let mut tokens = tokens_of(&groups[i]);
-        tokens.extend(tokens_of(&groups[i + 1]));
-        let text = join_tokens(&tokens);
-        if joined_len(&tokens) > line_budget(&text) * cfg.max_lines {
-            i += 1;
-            continue;
+        // 2. Into the next group.
+        if next_ok {
+            let mut joined = groups[i].clone();
+            joined.extend(groups[i + 1].iter().copied());
+            if fits(&joined, cfg) {
+                let tail = groups.remove(i + 1);
+                groups[i].extend(tail);
+                // Deliberately not advancing: the merged group may still be brief.
+                continue;
+            }
         }
 
-        let tail = groups.remove(i + 1);
-        groups[i].extend(tail);
-        // Deliberately not advancing: the merged group may still be brief.
+        // 3. Both neighbours full: pool the three groups' words and cut
+        //    again -- as two groups when they fit, otherwise as three with
+        //    the words shared out so that none is brief.
+        if prev_ok && next_ok {
+            let after = groups.get(i + 2).cloned();
+            let pool: Vec<&Word> = groups[i - 1]
+                .iter()
+                .chain(groups[i].iter())
+                .chain(groups[i + 1].iter())
+                .copied()
+                .collect();
+            if let Some(cut) = recut(&pool, after.as_ref(), cfg) {
+                groups.splice(i - 1..i + 2, cut);
+                // Re-examine from the first of the new groups.
+                i -= 1;
+                continue;
+            }
+        }
+
+        i += 1;
     }
+}
+
+/// Cut the pooled words of three adjacent groups again.
+///
+/// Two groups when some word boundary leaves both within capacity and
+/// duration and neither brief; otherwise three, sharing the words out so
+/// that every group fits and none is brief -- the case the report calls
+/// "full on both sides", where the neighbours are already near capacity
+/// and the only room for the fragment is made by moving words toward it.
+/// Among the boundaries that work, the most even split by character
+/// count. `None` when nothing works, and the three stay as they are.
+fn recut<'a>(
+    pool: &[&'a Word],
+    after: Option<&Vec<&'a Word>>,
+    cfg: &SegmentConfig,
+) -> Option<Vec<Vec<&'a Word>>> {
+    let n = pool.len();
+    let chars = |ws: &[&Word]| joined_len(&tokens_of(ws));
+    let total = chars(pool);
+
+    // Every group must fit, not straddle a pause, and stay on screen long
+    // enough; `after` is what clips the last one.
+    let ok = |ws: &[&'a Word], next: Option<&Vec<&'a Word>>| {
+        fits(ws, cfg) && shown_for(ws, next) >= cfg.min_duration
+    };
+    let no_pause_at = |k: usize| gap_between(&pool[..k], &pool[k..]) < cfg.pause_split;
+
+    let mut best: Option<(usize, Vec<Vec<&'a Word>>)> = None;
+    let mut consider = |imbalance: usize, groups: Vec<Vec<&'a Word>>| {
+        if best.as_ref().is_none_or(|(worst, _)| imbalance < *worst) {
+            best = Some((imbalance, groups));
+        }
+    };
+
+    for k in 1..n {
+        if !no_pause_at(k) {
+            continue;
+        }
+        let (a, b) = (pool[..k].to_vec(), pool[k..].to_vec());
+        if ok(&a, Some(&b)) && ok(&b, after) {
+            consider((2 * chars(&a)).abs_diff(total), vec![a, b]);
+        }
+    }
+    if let Some((_, g)) = best {
+        return Some(g);
+    }
+
+    let third = total / 3;
+    let mut best3: Option<(usize, Vec<Vec<&'a Word>>)> = None;
+    for k1 in 1..n.saturating_sub(1) {
+        if !no_pause_at(k1) {
+            continue;
+        }
+        for k2 in k1 + 1..n {
+            if !no_pause_at(k2) {
+                continue;
+            }
+            let (a, b, c) = (
+                pool[..k1].to_vec(),
+                pool[k1..k2].to_vec(),
+                pool[k2..].to_vec(),
+            );
+            if ok(&a, Some(&b)) && ok(&b, Some(&c)) && ok(&c, after) {
+                let imbalance = chars(&a).abs_diff(third)
+                    + chars(&b).abs_diff(third)
+                    + chars(&c).abs_diff(third);
+                if best3.as_ref().is_none_or(|(worst, _)| imbalance < *worst) {
+                    best3 = Some((imbalance, vec![a, b, c]));
+                }
+            }
+        }
+    }
+    best3.map(|(_, g)| g)
 }
 
 /// Build one cue from a word group.
@@ -477,12 +611,153 @@ mod tests {
         let t = Transcript {
             language: "en".into(),
             duration: 10.0,
-            words: words(&[(0.0, 0.4, "Yes."), (3.0, 3.6, "Anyway,"), (3.6, 4.2, "onward.")]),
+            words: words(&[
+                (0.0, 0.4, "Yes."),
+                (3.0, 3.6, "Anyway,"),
+                (3.6, 4.2, "onward."),
+            ]),
             segments: vec![],
         };
         let cues = segment(&t, fps30(), &SegmentConfig::default());
         assert!(cues.len() >= 2, "a 2.6s silence must still split: {cues:?}");
         assert!(cues[0].lines.join(" ").contains("Yes."));
+    }
+
+    /// APP-73. The reported shape, twelve times over: a one-line cue, a
+    /// brief fragment, then a cue already two lines full. Backward merge
+    /// is blocked by capacity; the fragment belongs to the line before it.
+    #[test]
+    fn a_brief_fragment_joins_the_previous_cue_when_the_next_is_full() {
+        // Fast speech: `must_break`'s reading-speed rule closes the first
+        // group before "this," (23 chars in 1.3 s is 17.7 cps), and again
+        // before the long words (30 chars in 1.55 s). That leaves "this, of
+        // course." as a group of its own, shown for 0.85 s until the next
+        // group starts -- the fragment. The long words behind it fill two
+        // lines, so the APP-52 merge into the next group is blocked by
+        // capacity; only the group before has room.
+        let mut specs: Vec<(f64, f64, String)> = vec![
+            (0.0, 0.35, "We".into()),
+            (0.35, 0.7, "should".into()),
+            (0.7, 1.0, "mention".into()),
+            (1.05, 1.3, "this,".into()),
+            (1.35, 1.5, "of".into()),
+            (1.5, 1.8, "course.".into()),
+        ];
+        for i in 0..8 {
+            let t0 = 1.9 + i as f64;
+            specs.push((t0, t0 + 0.8, format!("considerable{i}")));
+        }
+        let w: Vec<Word> = specs
+            .iter()
+            .map(|(s, e, t)| Word {
+                start: *s,
+                end: *e,
+                text: t.clone(),
+                confidence: 0.9,
+            })
+            .collect();
+        let cfg = SegmentConfig::default();
+        let cues = segment(&transcript(w), fps30(), &cfg);
+        let first = &cues[0];
+        assert!(
+            first.text().ends_with("of course."),
+            "fragment did not join the cue before it: {:?}",
+            cues.iter().map(|c| c.text()).collect::<Vec<_>>()
+        );
+        for c in &cues {
+            assert!(
+                c.duration() >= cfg.min_duration - 1e-6,
+                "brief cue survived: {c:?}"
+            );
+            assert!(c.lines.len() <= cfg.max_lines);
+            assert!(c.duration() <= cfg.max_duration + 1e-6);
+        }
+    }
+
+    /// APP-73, the case that neither merge can fix: full on both sides.
+    /// Both neighbours sit at 83 of the 84-character capacity, so the
+    /// fragment fits into neither. The three are cut again so that no cue
+    /// is brief, and nothing is lost.
+    #[test]
+    fn a_fragment_between_two_full_cues_is_recut() {
+        let mut specs: Vec<(f64, f64, String)> = Vec::new();
+        let mut t0 = 0.0;
+        // Seven eleven-letter words: 83 characters, one short of capacity,
+        // spoken slowly enough (0.8 s each; two of them in 1.4 s is 16.4
+        // cps, where 0.75 s would be 17.04 and split the group) to stay
+        // under 17 cps as one group.
+        for i in 0..7 {
+            specs.push((t0, t0 + 0.6, format!("beforehand{i}")));
+            t0 += 0.8;
+        }
+        // The fragment: two words. The first word after it is long and
+        // close behind (27 characters in 1.5 s is 18 cps), so the first
+        // pass closes the fragment as a group of its own, shown for half a
+        // second until that word starts.
+        // `t0` is 0.2 s past the last word's end here.
+        specs.push((t0 - 0.15, t0 + 0.05, "and".into()));
+        specs.push((t0 + 0.05, t0 + 0.25, "so".into()));
+        t0 += 0.35;
+        // Four twenty-letter words behind it: 83 characters again, at 1.45 s
+        // apart so the group itself stays under 17 cps.
+        for i in 0..4 {
+            specs.push((t0, t0 + 1.0, format!("afterwardsafterward{i}")));
+            t0 += 1.45;
+        }
+        let w: Vec<Word> = specs
+            .iter()
+            .map(|(s, e, t)| Word {
+                start: *s,
+                end: *e,
+                text: t.clone(),
+                confidence: 0.9,
+            })
+            .collect();
+        let cfg = SegmentConfig::default();
+        let cues = segment(&transcript(w), fps30(), &cfg);
+        let brief: Vec<_> = cues
+            .iter()
+            .filter(|c| c.duration() < cfg.min_duration - 1e-6)
+            .collect();
+        assert!(
+            brief.is_empty(),
+            "brief cues: {:?} in {:?}",
+            brief
+                .iter()
+                .map(|c| (c.duration(), c.text()))
+                .collect::<Vec<_>>(),
+            cues.iter()
+                .map(|c| (c.duration(), c.text()))
+                .collect::<Vec<_>>()
+        );
+        let joined: Vec<String> = cues.iter().map(|c| c.text()).collect();
+        for (_, _, t) in &specs {
+            assert!(
+                joined.iter().any(|c| c.contains(t.as_str())),
+                "lost {t:?}: {joined:?}"
+            );
+        }
+        for c in &cues {
+            assert!(c.lines.len() <= cfg.max_lines, "{c:?}");
+            assert!(c.duration() <= cfg.max_duration + 1e-6, "{c:?}");
+        }
+    }
+
+    /// Forward merge still never crosses a real pause.
+    #[test]
+    fn a_fragment_after_a_pause_does_not_join_the_previous_cue() {
+        let t = transcript(words(&[
+            (0.0, 0.5, "First"),
+            (0.5, 1.0, "sentence."),
+            // 1.5 s of silence, then a fragment clipped by a full cue after it
+            (2.5, 2.7, "Then"),
+            (2.7, 2.9, "this"),
+            (3.0, 3.5, "continues"),
+            (3.5, 4.0, "onward"),
+        ]));
+        let cues = segment(&t, fps30(), &SegmentConfig::default());
+        assert_eq!(cues[0].text(), "First sentence.");
+        assert!(!cues[0].text().contains("Then"));
     }
 
     #[test]
