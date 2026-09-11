@@ -33,8 +33,13 @@ import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
 import {
   TARGET_SAMPLE_RATE,
+  geminiBase,
+  geminiChunkPlan,
+  geminiRequest,
   hasKnownUploadLimit,
+  isGemini,
   lacksTimestamps,
+  parseGeminiSegments,
   remoteError,
   remoteUploadSeconds,
 } from "./remote";
@@ -466,13 +471,14 @@ export async function transcribeRemotely(
   // and both of these failures were previously discovered by the service
   // after that minute had been spent -- so the user waited, and then got
   // a truncated JSON body for their trouble.
+  const gemini = !options.hosted && isGemini(model);
   if (lacksTimestamps(model)) {
     throw new Error(
       `\u201c${model}\u201d transcribes speech but does not time it, so it cannot ` +
         "produce subtitles. Use whisper-1, or one of the Whisper models on Groq.",
     );
   }
-  if (!options.hosted && hasKnownUploadLimit(base)) {
+  if (!options.hosted && !gemini && hasKnownUploadLimit(base)) {
     // Metadata only -- mediabunny reads the container's duration without
     // decoding a frame, which is why this can run first.
     const probe = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
@@ -507,6 +513,27 @@ export async function transcribeRemotely(
   );
 
   onProgress?.({ stage: "transcribing", fraction: null, note: "Sending the audio" });
+
+  if (gemini) {
+    const segments = await transcribeWithGemini(audio, {
+      base: geminiBase(options.baseUrl),
+      model,
+      apiKey,
+      language: language && language !== "auto" ? language : undefined,
+      signal,
+      onProgress: (fraction) =>
+        onProgress?.({ stage: "transcribing", fraction, note: "Sending the audio" }),
+    });
+    if (segments.length === 0) {
+      throw new Error("No speech was recognised in that clip.");
+    }
+    await load();
+    return {
+      transcript: transcriptFrom(segments, language ?? "auto"),
+      audio,
+      audioOffset: 0,
+    };
+  }
 
   const form = new FormData();
   form.append("file", new Blob([wavFrom(audio)], { type: "audio/wav" }), "audio.wav");
@@ -592,6 +619,85 @@ function wavFrom(samples: Float32Array, sampleRate = TARGET_SAMPLE_RATE): ArrayB
     view.setInt16(44 + i * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
   }
   return buffer;
+}
+
+/**
+ * Gemini's native route (APP-74): the clip in pieces, each cut where the
+ * audio is quietest near the thirty-second mark, each answered with JSON
+ * segments that are shifted back into clip time. Two pieces in flight at
+ * a time -- enough to hide the round trip, few enough to stay clear of
+ * the per-minute request limit on a free key.
+ */
+async function transcribeWithGemini(
+  audio: Float32Array,
+  opts: {
+    base: string;
+    model: string;
+    apiKey: string;
+    language?: string;
+    signal?: AbortSignal;
+    onProgress?: (fraction: number) => void;
+  },
+): Promise<Segment[]> {
+  const rate = TARGET_SAMPLE_RATE;
+  const total = audio.length / rate;
+  const quietest = (around: number, slack: number) => {
+    // The quietest 100 ms window within `slack` seconds of `around`.
+    const win = Math.floor(rate / 10);
+    const from = Math.max(0, Math.floor((around - slack) * rate));
+    const to = Math.min(audio.length - win, Math.floor((around + slack) * rate));
+    let best = around;
+    let bestEnergy = Infinity;
+    for (let i = from; i <= to; i += win / 2) {
+      let e = 0;
+      for (let j = i; j < i + win; j += 1) e += audio[j] * audio[j];
+      if (e < bestEnergy) {
+        bestEnergy = e;
+        best = (i + win / 2) / rate;
+      }
+    }
+    return best;
+  };
+  const pieces = geminiChunkPlan(total, undefined, quietest);
+  const results: Segment[][] = new Array(pieces.length);
+  let done = 0;
+  const run = async (index: number) => {
+    const piece = pieces[index];
+    const slice = audio.subarray(Math.floor(piece.start * rate), Math.floor(piece.end * rate));
+    const { url, init } = geminiRequest(
+      opts.base,
+      opts.model,
+      opts.apiKey,
+      base64Of(wavFrom(slice)),
+      opts.language,
+    );
+    const response = await fetch(url, { ...init, signal: opts.signal });
+    const raw = await response.text();
+    if (!response.ok) throw remoteError(response.status, raw, opts.model);
+    results[index] = parseGeminiSegments(raw, piece.start, piece.end - piece.start).map((seg) => ({
+      ...seg,
+      text: readable(seg.text),
+    }));
+    done += 1;
+    opts.onProgress?.(done / pieces.length);
+  };
+  const queue = pieces.map((_, i) => i);
+  const workers = Array.from({ length: Math.min(2, queue.length) }, async () => {
+    while (queue.length) await run(queue.shift()!);
+  });
+  await Promise.all(workers);
+  return results.flat().filter((seg) => seg.text);
+}
+
+/** Base64 of a buffer, in pieces small enough for `btoa`. */
+function base64Of(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const step = 0x8000;
+  for (let i = 0; i < bytes.length; i += step) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + step));
+  }
+  return btoa(binary);
 }
 
 /**
