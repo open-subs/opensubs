@@ -280,7 +280,17 @@ def sitemap():
     page, and a set that disagrees with itself is worse than one that is
     only in one place -- so both are generated from the same table.
     """
+    # The stylesheet is for people, not for crawlers, and it is not
+    # optional decoration (APP-69). Once this sitemap started carrying
+    # hreflang alternates it gained elements in the XHTML namespace, and
+    # Chromium then declines to apply its built-in XML pretty-printer:
+    # it treats the document as renderable markup and lays the text out,
+    # so every URL, date and priority runs together in one paragraph.
+    # The file is still valid and Bing still accepts it -- what was
+    # missing was any instruction for how to display it. public/sitemap.xsl
+    # supplies one, and no sitemap parser reads the instruction.
     out = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            'xmlns:xhtml="http://www.w3.org/1999/xhtml">']
     for page, (_, lastmod, changefreq, priority) in PAGES.items():
