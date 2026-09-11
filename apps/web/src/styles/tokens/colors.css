@@ -199,7 +199,7 @@
   --text-strong:var(--color-font);
   --text-body:var(--gray-800);
   --text-muted:var(--gray-600);
-  --text-faint:var(--gray-500);
+  --text-faint:color-mix(in oklab, var(--gray-500) 30%, var(--gray-600));
   --text-inverse:var(--white);
   --text-brand:var(--green-700);
   --text-link:var(--color-font);
@@ -254,7 +254,7 @@
   --text-strong:var(--white);
   --text-body:var(--white-70);
   --text-muted:var(--white-60);
-  --text-faint:var(--white-40);
+  --text-faint:var(--white-50);
   --text-inverse:var(--black);
   --text-brand:var(--green);
   --text-link:var(--white);
@@ -291,7 +291,7 @@
     --text-strong:var(--white);
     --text-body:var(--white-70);
     --text-muted:var(--white-60);
-    --text-faint:var(--white-40);
+    --text-faint:var(--white-50);
     --text-inverse:var(--black);
     --text-brand:var(--green);
     --text-link:var(--white);
