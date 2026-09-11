@@ -129,6 +129,12 @@ const zhHant: Record<string, string> = {
   "Generate for {price}": "生成，{price}",
   "Re-generate for {price}": "重新生成，{price}",
   "Exporting {clip} of {total}.": "正在匯出 {total} 中的 {clip}。",
+  "Discard them": "捨棄它們",
+  "Keep them anyway": "仍然保留",
+  "These subtitles were made for {old}, not for {now}.": "這些字幕是為 {old} 製作的，不是為 {now}。",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "它們的時間軸屬於另一個影片，因此在這裡匯出或燒錄都不會對上。",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」只把語音寫成文字，不給出時間，所以做不了字幕。請選 whisper-1，或 Groq 上的 Whisper 模型。",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "這段影片有 {length}，而這個服務單次大約只收 {minutes} 分鐘。請在「裁切與尺寸」裡裁短，或改用沒有限制的「在本機」。",
 };
 
 export default zhHant;

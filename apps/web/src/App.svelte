@@ -56,8 +56,12 @@
     ASR_ENGINES,
     opensubsAsrConfigured,
     ASR_MODELS,
+    REMOTE_MODELS,
     asrSupport,
+    hasKnownUploadLimit,
+    lacksTimestamps,
     loudnessFor,
+    remoteUploadSeconds,
     transcribeLocally,
     transcribeRemotely,
     type AsrSupport,
@@ -158,6 +162,25 @@
    * if they then abandoned the sign-in.
    */
   let restored = $state<SavedWork | null>(null);
+  /**
+   * Which video the subtitles on screen were made for (APP-72).
+   *
+   * `null` when they belong to no video -- an .srt opened before any video
+   * was loaded, which is a real way people use this and must not be
+   * treated as a mismatch.
+   */
+  let cuesVideo = $state<string | null>(null);
+  /**
+   * The previous video's name, while its subtitles are still on screen
+   * after a replace.
+   *
+   * Kept rather than cleared. Reaching a transcription costs a model
+   * download and minutes of waiting, and somebody who replaces the video
+   * by accident -- or deliberately, to re-cut the same content -- would
+   * lose all of it to a silent tidy-up. So the subtitles stay and the
+   * mismatch is stated, with discarding one click away.
+   */
+  let staleCues = $state<string | null>(null);
   let subtitleError = $state<string | null>(null);
   let selectedCue = $state<number | null>(null);
 
@@ -254,6 +277,41 @@
   const asrEngineOption = $derived(
     ASR_ENGINES.find((e) => e.id === asrEngine) ?? ASR_ENGINES[0],
   );
+
+  /**
+   * Said before the button, not after the upload (APP-70, APP-71).
+   *
+   * Both of these were previously found out by the service: the user
+   * pressed Generate, waited through a decode that on a fourteen-minute
+   * video takes over a minute, and got a truncated JSON body back. Both
+   * are knowable from what is already on screen -- the model is in a field
+   * and the length came off the container when the video loaded -- so
+   * there is no reason for either to cost a minute first.
+   *
+   * asr.ts refuses these as well. This is not the guard; it is the part
+   * that means the guard is never reached.
+   */
+  const asrRouteWarning = $derived.by(() => {
+    if (asrEngine === "local" || asrEngine === "opensubs") return "";
+    const model = asrRemoteModel.trim() || asrEngineOption.defaultModel || "";
+    if (lacksTimestamps(model)) {
+      return t(
+        "\u201c{model}\u201d writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.",
+        { model },
+      );
+    }
+    const base = asrBaseUrl.trim() || asrEngineOption.defaultBaseUrl || "";
+    if (!hasVideo || !hasKnownUploadLimit(base)) return "";
+    const span = (trimEnd ?? videoDuration) - (trimStart ?? 0);
+    const limit = remoteUploadSeconds();
+    if (span > limit) {
+      return t(
+        "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use \u201cOn this device\u201d, which has no limit.",
+        { length: formatDuration(span), minutes: Math.floor(limit / 60) },
+      );
+    }
+    return "";
+  });
   let asrModel = $state(ASR_MODELS[1].id);
   /**
    * Whether the model choice is still the one we picked, not the user's.
@@ -786,6 +844,13 @@
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     clearBurned();
 
+    // Before videoName is overwritten, and only when the subtitles on
+    // screen were actually made for a different video (APP-72). Exporting
+    // them against this one would produce a file whose timings belong to
+    // footage that is no longer here.
+    staleCues =
+      cues.length > 0 && cuesVideo !== null && cuesVideo !== file.name ? cuesVideo : null;
+
     videoFile = file;
     videoUrl = URL.createObjectURL(file);
     videoName = file.name;
@@ -972,6 +1037,10 @@
   function resumeWork() {
     if (!restored) return;
     cues = restored.cues;
+    cuesVideo = restored.videoName || null;
+    staleCues = videoName && restored.videoName && restored.videoName !== videoName
+      ? restored.videoName
+      : null;
     loudness = restored.loudness;
     selectedStyle = restored.selectedStyle;
     wordEffect = restored.wordEffect;
@@ -1077,6 +1146,10 @@
       subtitleEncoding = decoded.encoding;
       subtitleEncodingCertain = decoded.certain;
       cues = readSubtitles(decoded.text);
+      // Opened deliberately for whatever is loaded now, so this is the
+      // video they belong to -- or none, if no video is open yet.
+      cuesVideo = videoName || null;
+      staleCues = null;
       // A file's words are not tied to any moment in this audio.
       loudness = [];
       wordEffect = "none";
@@ -1085,6 +1158,8 @@
       bilingual = false;
     } catch (e) {
       cues = [];
+      cuesVideo = null;
+      staleCues = null;
       subtitleError = String(e);
     }
   }
@@ -1263,6 +1338,10 @@
         if (match) sourceLanguage = match.code;
       }
       cues = segment(transcript);
+      // Made from this video's own audio, so there is no doubt whose they
+      // are and nothing left over to warn about.
+      cuesVideo = videoName || null;
+      staleCues = null;
       // One file, one script. Whisper has a single `<|zh|>` and writes
       // whichever script it feels like behind it -- measured on a team
       // clip, six changes and 132 Traditional characters inside one set
@@ -1684,14 +1763,30 @@
       </label>
       <label class="field field-wide">
         <span class="field-label">{t("Model")}</span>
+        <!--
+          A datalist, not a <select> (APP-71). The column beside this one
+          says the route works with "any server of your own", and a closed
+          list would make that untrue for every self-hosted endpoint. This
+          suggests the four models known to return timings while leaving
+          the field exactly as free as it was.
+        -->
         <input
           class="input oa-mono"
           type="text"
+          list="asr-remote-models"
           placeholder={asrEngineOption.defaultModel}
           bind:value={asrRemoteModel}
         />
+        <datalist id="asr-remote-models">
+          {#each REMOTE_MODELS as m (m.id)}
+            <option value={m.id}>{m.note}</option>
+          {/each}
+        </datalist>
       </label>
     </div>
+    {#if asrRouteWarning}
+      <p class="field-error">{asrRouteWarning}</p>
+    {/if}
   {/if}
   <p class="oa-caption card-intro">
     {#if !hasVideo}
@@ -2134,6 +2229,47 @@
       <p class="field-error">{subtitleError}</p>
     {/if}
   </section>
+
+  {#if staleCues}
+    <!--
+      APP-72. Replacing the video left the previous video's subtitles on
+      screen, and exporting them here produces a file whose timings belong
+      to footage that is no longer loaded. Stated rather than silently
+      cleared: a transcription costs a model download and minutes of
+      waiting, and the same replace is also how somebody re-cuts the same
+      content on purpose.
+    -->
+    <div class="banner banner-warning">
+      <Icon name="alert-triangle" />
+      <div class="banner-body">
+        <p>
+          {t("These subtitles were made for {old}, not for {now}.", {
+            old: staleCues,
+            now: videoName,
+          })}
+          {t("Their timings belong to the other video, so exporting or burning them here will not line up.")}
+        </p>
+        <div class="banner-actions">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => { cues = []; cuesVideo = null; staleCues = null; sourceCues = null;
+                             bilingual = false; loudness = []; selectedCue = null;
+                             subtitleBytes = null; }}
+          >
+            {t("Discard them")}
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => { cuesVideo = videoName || null; staleCues = null; }}
+          >
+            {t("Keep them anyway")}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if hasCues}
     {#if spokenNames.length > 1}

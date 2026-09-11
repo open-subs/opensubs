@@ -129,6 +129,12 @@ const zhHans: Record<string, string> = {
   "Generate for {price}": "生成，{price}",
   "Re-generate for {price}": "重新生成，{price}",
   "Exporting {clip} of {total}.": "正在导出 {total} 中的 {clip}。",
+  "Discard them": "丢弃它们",
+  "Keep them anyway": "仍然保留",
+  "These subtitles were made for {old}, not for {now}.": "这些字幕是为 {old} 制作的，不是为 {now}。",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "它们的时间轴属于另一个视频，因此在这里导出或压制都不会对上。",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」只把语音写成文字，不给出时间，所以做不了字幕。请选 whisper-1，或 Groq 上的 Whisper 模型。",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "这段片子有 {length}，而这个服务单次大约只收 {minutes} 分钟。请在「剪辑与尺寸」里裁短，或改用没有限制的「在本机」。",
 };
 
 export default zhHans;

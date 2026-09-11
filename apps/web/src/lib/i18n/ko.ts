@@ -129,6 +129,12 @@ const ko: Record<string, string> = {
   "Generate for {price}": "{price}에 생성",
   "Re-generate for {price}": "{price}에 재생성",
   "Exporting {clip} of {total}.": "{total} 중 {clip}을(를) 내보내는 중입니다.",
+  "Discard them": "버리기",
+  "Keep them anyway": "그래도 유지",
+  "These subtitles were made for {old}, not for {now}.": "이 자막은 {now}가 아니라 {old}를 위해 만들어졌습니다.",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "타이밍이 다른 영상의 것이라, 여기서 내보내거나 구워 넣어도 맞지 않습니다.",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」은(는) 말을 글로 옮기지만 시간을 매기지 않아 자막을 만들 수 없습니다. whisper-1 또는 Groq의 Whisper 모델을 고르세요.",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "이 클립은 {length}인데, 이 서비스는 한 번에 약 {minutes}분까지만 받습니다. ‘자르기와 크기’에서 줄이거나, 제한이 없는 ‘이 기기에서’를 쓰세요.",
 };
 
 export default ko;

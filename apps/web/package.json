@@ -25,7 +25,8 @@
     "test:i18n-live": "node e2e/i18n-live.mjs",
     "test:vad": "node e2e/vad.mjs",
     "test:labels": "node --experimental-strip-types e2e/labels.mjs",
-    "test:site-i18n": "python3 scripts/build-locale-pages.py --check --strict"
+    "test:site-i18n": "python3 scripts/build-locale-pages.py --check --strict",
+    "test:remote": "node --experimental-strip-types e2e/remote.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

@@ -129,6 +129,12 @@ const ja: Record<string, string> = {
   "Generate for {price}": "{price} で生成",
   "Re-generate for {price}": "{price} で再生成",
   "Exporting {clip} of {total}.": "{total} のうち {clip} を書き出し中です。",
+  "Discard them": "破棄する",
+  "Keep them anyway": "このまま残す",
+  "These subtitles were made for {old}, not for {now}.": "この字幕は {now} ではなく {old} のために作られたものです。",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "タイミングは別の動画のものなので、ここで書き出しても焼き込んでも合いません。",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」は音声を文字にしますが時間を付けないので、字幕は作れません。whisper-1 か、Groq の Whisper モデルを選んでください。",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "このクリップは {length} ですが、このサービスが一度に受け取れるのは約 {minutes} 分です。「クリップとサイズ」で切り詰めるか、制限のない「この端末で」をお使いください。",
 };
 
 export default ja;

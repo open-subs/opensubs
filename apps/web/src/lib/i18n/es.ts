@@ -129,6 +129,12 @@ const es: Record<string, string> = {
   "Generate for {price}": "Generar por {price}",
   "Re-generate for {price}": "Generar de nuevo por {price}",
   "Exporting {clip} of {total}.": "Exportando {clip} de {total}.",
+  "Discard them": "Descartarlos",
+  "Keep them anyway": "Conservarlos igualmente",
+  "These subtitles were made for {old}, not for {now}.": "Estos subtítulos se hicieron para {old}, no para {now}.",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "Sus tiempos son los del otro vídeo, así que exportarlos o incrustarlos aquí no cuadrará.",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "«{model}» escribe lo que se dice pero no lo temporiza, así que no puede hacer subtítulos. Elige whisper-1, o un modelo Whisper en Groq.",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "Este clip dura {length} y este servicio acepta unos {minutes} minutos de una vez. Recórtalo en «Recorte y tamaño», o usa «En este dispositivo», que no tiene límite.",
 };
 
 export default es;
