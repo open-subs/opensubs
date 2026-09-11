@@ -31,9 +31,15 @@ import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
 import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
+import {
+  TARGET_SAMPLE_RATE,
+  hasKnownUploadLimit,
+  lacksTimestamps,
+  remoteError,
+  remoteUploadSeconds,
+} from "./remote";
 
 /** Whisper's native input rate. Anything else is resampled to it. */
-const TARGET_SAMPLE_RATE = 16_000;
 
 /** Matches `subs_tier::Cost`; the badges come from one vocabulary. */
 export type Cost = "free" | "free-or-own-key" | "own-key" | "paid";
@@ -455,6 +461,42 @@ export async function transcribeRemotely(
     : (options.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
   const model = options.remoteModel || "whisper-1";
 
+  // Both checks happen before `extractAudio`, and that is the point of
+  // them (APP-70). Decoding a fourteen-minute video takes over a minute,
+  // and both of these failures were previously discovered by the service
+  // after that minute had been spent -- so the user waited, and then got
+  // a truncated JSON body for their trouble.
+  if (lacksTimestamps(model)) {
+    throw new Error(
+      `\u201c${model}\u201d transcribes speech but does not time it, so it cannot ` +
+        "produce subtitles. Use whisper-1, or one of the Whisper models on Groq.",
+    );
+  }
+  if (!options.hosted && hasKnownUploadLimit(base)) {
+    // Metadata only -- mediabunny reads the container's duration without
+    // decoding a frame, which is why this can run first.
+    const probe = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+    let span = 0;
+    try {
+      const duration = await probe.computeDuration();
+      const from = Math.max(0, start ?? 0);
+      const to = end != null && end > from ? Math.min(end, duration) : duration;
+      span = Math.max(0, to - from);
+    } catch {
+      // Unreadable here means unreadable in extractAudio too, which
+      // reports it far better than a guard would.
+      span = 0;
+    }
+    const limit = remoteUploadSeconds();
+    if (span > limit) {
+      throw new Error(
+        `That clip is ${Math.round(span / 60)} minutes long, and this service ` +
+          `accepts about ${Math.floor(limit / 60)} minutes at a time. Trim it under ` +
+          "Clip & size, or use \u201cOn this device\u201d, which has no limit.",
+      );
+    }
+  }
+
   onProgress?.({ stage: "audio", fraction: 0, note: "Reading the audio" });
   const audio = await extractAudio(
     file,
@@ -494,12 +536,7 @@ export async function transcribeRemotely(
   });
 
   const raw = await response.text();
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("That transcription service rejected the key.");
-    }
-    throw new Error(`The transcription service returned ${response.status}: ${raw.slice(0, 200)}`);
-  }
+  if (!response.ok) throw remoteError(response.status, raw, model);
 
   let parsed: { segments?: { start: number; end: number; text: string }[]; text?: string };
   try {
@@ -1695,3 +1732,15 @@ function readable(text: string): string {
 function whisperCode(code: string): string {
   return code.split("-")[0].toLowerCase();
 }
+
+// The bring-your-own-key route's own vocabulary lives in ./remote, which
+// is importable without the engine or the demuxer behind it -- so its
+// rules can be tested directly. Re-exported here because every call site
+// already imports this module.
+export {
+  REMOTE_MODELS,
+  REMOTE_UPLOAD_LIMIT_BYTES,
+  hasKnownUploadLimit,
+  lacksTimestamps,
+  remoteUploadSeconds,
+} from "./remote";

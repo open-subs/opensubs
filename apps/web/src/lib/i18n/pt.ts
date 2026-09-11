@@ -129,6 +129,12 @@ const pt: Record<string, string> = {
   "Generate for {price}": "Gerar por {price}",
   "Re-generate for {price}": "Gerar de novo por {price}",
   "Exporting {clip} of {total}.": "Exportando {clip} de {total}.",
+  "Discard them": "Descartar",
+  "Keep them anyway": "Manter mesmo assim",
+  "These subtitles were made for {old}, not for {now}.": "Estas legendas foram feitas para {old}, não para {now}.",
+  "Their timings belong to the other video, so exporting or burning them here will not line up.": "Os tempos são os do outro vídeo, então exportá-las ou queimá-las aqui não vai bater.",
+  "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "“{model}” escreve a fala mas não a temporiza, então não consegue fazer legendas. Escolha whisper-1, ou um modelo Whisper no Groq.",
+  "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "Este clipe tem {length} e este serviço aceita cerca de {minutes} minutos de cada vez. Corte-o em “Recorte e tamanho”, ou use “Neste dispositivo”, que não tem limite.",
 };
 
 export default pt;
