@@ -116,10 +116,25 @@
     color: var(--text-body);
   }
 
+  /* One column for the whole page — the suite's, not this page's own. The
+     header used to cap at 66rem and the brand sat 32px inside the hero's
+     first word; every site in the suite now runs 1200 with 48px gutters.
+     Prose blocks keep their own max-widths, which is what carries
+     readability at this width. */
+  :root {
+    --container-max: 1200px;
+    --gutter-page-lg: 48px;
+    --header-height: 64px;
+  }
+
   .wrap {
-    max-width: 66rem;
+    max-width: var(--container-max);
     margin: 0 auto;
-    padding: 0 var(--space-6);
+    padding-inline: var(--gutter-page-lg);
+  }
+
+  @media (max-width: 900px) {
+    .wrap { padding-inline: var(--space-6); }
   }
 
   /* --- header --- */
@@ -136,8 +151,8 @@
   .site-header .wrap {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    height: 4rem;
+    gap: 32px;
+    height: var(--header-height);
   }
 
   /* The family wordmark. Every product in the suite uses this shape: a
@@ -174,12 +189,35 @@
   .brand-word .muted { color: var(--text-muted); }
   .brand-word .dot { color: var(--app-opensubs); }
 
-  .site-header nav {
-    margin-left: auto;
+  /* Three zones: brand, tabs, actions. The tabs sat on the right with
+     `margin-left: auto`, pressed against the app link and the account icon,
+     so the bar had a wordmark at one end and everything else jammed at the
+     other. `flex: 1` on the tabs holds them beside the brand and pushes the
+     actions to the edge. */
+  .site-header .site-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-5);
+    flex: 1;
+    gap: 24px;
   }
+
+  .site-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  /* `:not(.site-btn)`: the quiet-link colour must not reach the one solid
+     button in this row. It outranks `.site-btn-primary` on specificity, so the
+     label rendered grey on green at 2.69:1 — under AA, on the single control
+     the bar exists for. */
+  .site-header .header-actions > a:not(.site-btn) {
+    color: var(--text-muted);
+    text-decoration: none;
+    font: var(--type-ui);
+  }
+
+  .site-header .header-actions > a:not(.site-btn):hover { color: var(--text-strong); }
 
   .site-header nav a {
     color: var(--text-muted);
@@ -189,9 +227,36 @@
 
   .site-header nav a:hover { color: var(--text-strong); }
 
-  @media (max-width: 40rem) {
-    .site-header nav a.hide-sm { display: none; }
-    .site-header nav .site-btn.hide-sm { display: none; }
+  /* Below 760px the tabs move to a second row rather than disappearing.
+     `hide-sm` took away all five, leaving a phone with a wordmark, one link
+     and no way to reach "Pricing" or "Downloads". */
+  @media (max-width: 760px) {
+    .site-header .wrap {
+      flex-wrap: wrap;
+      height: auto;
+      padding-block: 10px;
+      gap: 0 16px;
+    }
+    .site-header .site-nav {
+      order: 3;
+      flex-basis: 100%;
+      gap: 18px;
+      padding-block: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      margin-inline: calc(var(--space-6) * -1);
+      padding-inline: var(--space-6);
+    }
+    .site-header .site-nav::-webkit-scrollbar { display: none; }
+    .site-header .site-nav a { white-space: nowrap; }
+    .site-header .header-actions { margin-left: auto; }
+  }
+
+  /* Anchor targets have to clear the sticky bar, or every tab lands with its
+     own heading tucked underneath it. */
+  section, .hero { scroll-margin-top: 5.5rem; }
+  @media (max-width: 760px) {
+    section, .hero { scroll-margin-top: 7.5rem; }
   }
 
   /* The language picker. Two of them, in fact: the home page and this one
@@ -254,6 +319,11 @@
   }
 
   .site-btn-primary:hover { background: var(--brand-strong); }
+
+  /* Header scale. A page-sized button in a 64px bar is what makes a header
+     look like a toolbar, and this bar's one solid control was a text link
+     indistinguishable from the tabs beside it. */
+  .site-btn-sm { padding: 0 var(--space-4); height: 34px; }
 
   .site-btn-secondary {
     border-color: var(--border-strong);
@@ -438,7 +508,9 @@
   }
 
   .tag-free { background: var(--brand-soft); color: var(--text-brand); }
-  .tag-paid { background: color-mix(in oklab, var(--blue) 20%, transparent); color: var(--blue); }
+  /* 2.29:1 in blue on its own tint. The tint is what marks this row as paid;
+     the word takes a colour that can be read. */
+  .tag-paid { background: color-mix(in oklab, var(--blue) 20%, transparent); color: var(--text-strong); }
 
   /* --- pricing --- */
 
@@ -537,18 +609,20 @@
       </span>
       <span class="brand-word" translate="no"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
     </a>
-    <nav>
-      <a class="hide-sm" href="#how">How it works</a>
-      <a class="hide-sm" href="/#privacy">Privacy</a>
-      <a class="hide-sm" href="/#pricing">Pricing</a>
-      <a class="hide-sm" href="/#downloads">Downloads</a>
-      <a class="hide-sm" href="/styles">Styles</a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="#how">How it works</a>
+      <a href="/#privacy">Privacy</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#downloads">Downloads</a>
+      <a href="/styles">Styles</a>
+    </nav>
+    <div class="header-actions">
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
-      <a href="/#app">Open the app</a>
+      <a class="site-btn site-btn-primary site-btn-sm" href="/#app">Open the app</a>
       <div id="language"></div>
       <div id="account"></div>
-    </nav>
+    </div>
   </div>
 </header>
 

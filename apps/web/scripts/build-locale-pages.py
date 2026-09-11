@@ -41,7 +41,13 @@ sys.path.insert(0, HERE)
 import site_i18n as S  # noqa: E402
 
 WEB = os.path.dirname(HERE)
-DIST = os.path.join(WEB, "dist")
+# Where the pages to translate are, and where the 32 locale pages go.
+#
+# `SITE_ROOT` points this at the composed site — the product page from the
+# private site repo with the app inside it — instead of the app's own `dist/`.
+# After the website moved out, `dist/index.html` is a bare shell, and this
+# script would faithfully generate thirty-two translated copies of it.
+DIST = os.environ.get("SITE_ROOT") or os.path.join(WEB, "dist")
 CATALOGUES = os.path.join(HERE, "site-i18n")
 
 ORIGIN = "https://opensubs.app"
