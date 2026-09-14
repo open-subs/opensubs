@@ -235,11 +235,15 @@ mod tests {
     }
 
     #[test]
-    fn a_boxed_preset_carries_a_visible_box_and_no_competing_outline() {
-        for s in advanced_presets() {
+    fn a_boxed_preset_carries_a_visible_box_colour() {
+        // Both packs: the free `Boxed` had the same problem as `Podcast` and
+        // `Reel Box` (APP-83) and this used to look only at this one.
+        // `outline` is not read for a box -- the ASS writer pads the box from
+        // the type size -- so it stays 0 rather than implying it does anything.
+        for s in crate::all_presets() {
             if s.border_style == BorderStyle::OpaqueBox {
                 assert!(s.back_color.a > 0, "{}: invisible box", s.name);
-                assert_eq!(s.outline, 0.0, "{}: outline fights the box", s.name);
+                assert_eq!(s.outline, 0.0, "{}: outline is unused by a box", s.name);
             }
         }
     }
