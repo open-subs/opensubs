@@ -1,4 +1,4 @@
-use crate::{Rgba, StyleTemplate};
+use crate::{BorderStyle, Rgba, StyleTemplate};
 use std::fmt::Write as _;
 use subs_subtitle::{fmt_ass, join_tokens, Cue};
 
@@ -148,6 +148,40 @@ pub fn to_ass(cues: &[Cue], style: &StyleTemplate, play_res: (u32, u32)) -> Stri
     to_ass_emphasised(cues, style, play_res, &[], 0.0)
 }
 
+/// How far an opaque box reaches past its text, as a share of the size the
+/// text is set at, so the box keeps its proportions at any size and any
+/// bilingual scale.
+const BOX_PADDING_EM: f64 = 0.2;
+
+/// The colour libass draws in the border slot.
+///
+/// For `OpaqueBox` that slot is the box. libass, like VSFilter before it,
+/// paints BorderStyle=3's box in OutlineColour and pads it by Outline, and
+/// uses BackColour only for the shadow. The template calls the box colour
+/// `back_color`, which is how every other reader of it treats the field --
+/// the /styles page, the style tiles -- so the translation happens here
+/// rather than in the presets. Writing the fields across verbatim is what
+/// left Boxed, Podcast and Reel Box with no box at all (APP-83).
+fn border_colour(style: &StyleTemplate) -> Rgba {
+    match style.border_style {
+        BorderStyle::OpaqueBox => style.back_color,
+        BorderStyle::OutlineShadow => style.outline_color,
+    }
+}
+
+/// The border width for text set at `px`, which is `scale` of the style's
+/// own size.
+///
+/// An outline scales with the type. A box's width is its padding, and it
+/// has to be above zero: libass draws no box at all for BorderStyle=3 with
+/// Outline=0.
+fn border_width(style: &StyleTemplate, px: f64, scale: f64) -> f64 {
+    match style.border_style {
+        BorderStyle::OpaqueBox => (px * BOX_PADDING_EM * 100.0).round() / 100.0,
+        BorderStyle::OutlineShadow => style.outline * scale,
+    }
+}
+
 /// The `[Script Info]`, `[V4+ Styles]` and `[Events]` preamble, plus the
 /// resolved font size in pixels that every inline `\fs` override is
 /// relative to.
@@ -184,12 +218,12 @@ MarginV,Encoding\n",
         font_size,
         style.primary.to_ass(),
         style.primary.to_ass(),
-        style.outline_color.to_ass(),
+        border_colour(style).to_ass(),
         style.back_color.to_ass(),
         bold,
         italic,
         style.border_style.ass_value(),
-        style.outline,
+        border_width(style, font_size as f64, 1.0),
         style.shadow,
         style.alignment,
         margin_v,
@@ -437,7 +471,7 @@ pub fn to_ass_bilingual_emphasised(
             EffectOn::Bottom => (&bottom[i].lines, &cue.lines, bottom_scale, top_scale),
         };
         let px = scaled_size(font_size, lit_scale);
-        let border = style.outline * lit_scale;
+        let border = border_width(style, px as f64, lit_scale);
         let plain = escaped_body(&one_line(lit));
         // The per-word sizes are relative to this language's size, not the
         // document's, or the supporting line's loudest word would come back
@@ -479,7 +513,7 @@ pub fn to_ass_bilingual_emphasised(
 /// merely smaller.
 fn sized(lines: &[String], font_size: i64, scale: f64, style: &StyleTemplate) -> String {
     let px = scaled_size(font_size, scale);
-    let border = style.outline * scale;
+    let border = border_width(style, px as f64, scale);
     format!(
         "{{\\fs{px}\\bord{border:.2}}}{}",
         escaped_body(&one_line(lines))
@@ -501,10 +535,10 @@ fn sized_after_effects(
     style: &StyleTemplate,
 ) -> String {
     let px = scaled_size(font_size, scale);
-    let border = style.outline * scale;
+    let border = border_width(style, px as f64, scale);
     format!(
         "{{\\fs{px}\\bord{border:.2}\\blur0\\3c{}}}{}",
-        style.outline_color.to_ass(),
+        border_colour(style).to_ass(),
         escaped_body(&one_line(lines))
     )
 }
@@ -723,11 +757,11 @@ fn karaoke_events(
     let base = scaled_size(font_size, scale);
     let active_size = (size * (1.0 + strength)).round() as i64;
     // Both derived from the font size so a 4K burn glows like a 720p one.
-    let border = style.outline * scale;
+    let border = border_width(style, size, scale);
     let active_border = border + glow * size * 0.06;
     let blur = glow * size * 0.08;
     let accent_ass = accent.to_ass();
-    let outline_ass = style.outline_color.to_ass();
+    let outline_ass = border_colour(style).to_ass();
 
     let plain = escaped_body(&cue.lines);
     let parts = pieces(&plain);
@@ -1395,6 +1429,121 @@ mod tests {
         let mut s = style();
         s.border_style = BorderStyle::OpaqueBox;
         assert!(to_ass(&cues(), &s, (1280, 720)).contains(",3,"));
+    }
+
+    /// Shaped like the shipped `Podcast` and `Reel Box`: the box colour in
+    /// `back_color`, no outline.
+    fn boxed() -> StyleTemplate {
+        StyleTemplate {
+            border_style: BorderStyle::OpaqueBox,
+            outline: 0.0,
+            back_color: Rgba {
+                r: 12,
+                g: 12,
+                b: 16,
+                a: 178,
+            },
+            ..style()
+        }
+    }
+
+    /// One named field of the document's `Style:` line.
+    fn style_field(ass: &str, name: &str) -> String {
+        let names = ass
+            .lines()
+            .find_map(|l| l.strip_prefix("Format: Name,"))
+            .expect("styles format line");
+        let values = ass
+            .lines()
+            .find_map(|l| l.strip_prefix("Style: "))
+            .expect("style line");
+        std::iter::once("Name")
+            .chain(names.split(','))
+            .zip(values.split(','))
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v.to_string())
+            .unwrap_or_else(|| panic!("no {name} in {values}"))
+    }
+
+    /// Every `\bord` value and every `\3c` colour in a document's events.
+    fn overrides(ass: &str) -> (Vec<f64>, Vec<String>) {
+        let events: Vec<&str> = ass.lines().filter(|l| l.starts_with("Dialogue:")).collect();
+        let mut borders = Vec::new();
+        let mut colours = Vec::new();
+        for event in events {
+            for (i, _) in event.match_indices("\\bord") {
+                let rest = &event[i + 5..];
+                let end = rest
+                    .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+                    .unwrap_or(rest.len());
+                borders.push(rest[..end].parse().expect("numeric \\bord"));
+            }
+            for (i, _) in event.match_indices("\\3c") {
+                let rest = &event[i + 3..];
+                colours.push(rest[..rest.find(['\\', '}']).unwrap_or(rest.len())].to_string());
+            }
+        }
+        (borders, colours)
+    }
+
+    #[test]
+    fn an_opaque_box_is_coloured_and_sized_where_libass_reads_them() {
+        // APP-83. For BorderStyle=3 libass paints the box in OutlineColour
+        // and pads it by Outline; BackColour is only the shadow. Copying the
+        // template's fields straight across left Outline=0, and libass draws
+        // no box at all for that.
+        let s = boxed();
+        let out = to_ass(&cues(), &s, (1280, 720));
+        assert_eq!(style_field(&out, "OutlineColour"), s.back_color.to_ass());
+        let pad: f64 = style_field(&out, "Outline").parse().unwrap();
+        assert!(pad > 0.0, "Outline={pad} draws no box");
+    }
+
+    #[test]
+    fn an_outline_style_keeps_its_own_outline_in_the_header() {
+        let s = style();
+        let out = to_ass(&cues(), &s, (1280, 720));
+        assert_eq!(style_field(&out, "OutlineColour"), s.outline_color.to_ass());
+        assert_eq!(style_field(&out, "Outline"), "2");
+    }
+
+    #[test]
+    fn no_inline_override_takes_the_box_away_again() {
+        // `\bord` and `\3c` restate the border mid-line in the bilingual and
+        // karaoke writers. In box mode those are the box's padding and
+        // colour, so an override carrying the outline's values would draw
+        // the box in the plain export and remove it in these.
+        let s = boxed();
+        let accent = Rgba {
+            r: 255,
+            g: 214,
+            b: 10,
+            a: 255,
+        };
+        let docs = [
+            to_ass_bilingual(&cues(), &cues(), &s, (1280, 720), 1.0, 0.7),
+            to_ass_karaoke(&cues(), &s, (1280, 720), 0.3, 0.0, accent),
+            to_ass_bilingual_karaoke(
+                &cues(),
+                &cues(),
+                &s,
+                (1280, 720),
+                1.0,
+                0.7,
+                EffectOn::Top,
+                0.3,
+                0.0,
+                accent,
+            ),
+        ];
+        for doc in &docs {
+            let (borders, colours) = overrides(doc);
+            assert!(!borders.is_empty(), "no \\bord to check in:\n{doc}");
+            assert!(borders.iter().all(|b| *b > 0.0), "a zero \\bord: {borders:?}");
+            for c in colours.iter().filter(|c| **c != accent.to_ass()) {
+                assert_eq!(*c, s.back_color.to_ass(), "box recoloured in:\n{doc}");
+            }
+        }
     }
 
     fn emphasis_cue(text: &str) -> Vec<Cue> {
