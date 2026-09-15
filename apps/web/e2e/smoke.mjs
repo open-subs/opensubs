@@ -1062,6 +1062,75 @@ if (FIXTURE) {
   const warned = (await page.textContent("body")).includes("empty rectangles");
   check("unsupported characters are called out before burning", warned);
 
+  console.log("Japanese and Traditional glyphs");
+  {
+    // APP-84. The CJK font was Noto Sans SC's Simplified slice and nothing
+    // else, so 択 in 選択, 労 in 労働 and 閘 in 閘門 burned in as empty
+    // rectangles -- 7.3% of real Japanese subtitle lines -- and the warning
+    // told people to delete words their language cannot do without.
+    //
+    // First the reporter's own repro line, then the whole of the two tables
+    // she asked for regression against, decoded from their legacy encodings
+    // so there is no character list to keep in sync with anything.
+    const importSrt = async (name, lines) => {
+      const body = lines
+        .map((text, i) => `${i + 1}\n00:00:${String(i).padStart(2, "0")},000 --> 00:00:${String(i).padStart(2, "0")},900\n${text}\n`)
+        .join("\n");
+      await page.setInputFiles('input[accept=".srt,.vtt,text/vtt"]', {
+        name,
+        mimeType: "text/plain",
+        buffer: Buffer.from(body),
+      });
+      await page.waitForSelector(".cue");
+      await page.waitForTimeout(1500);
+      const banners = await page.locator(".banner-danger").allTextContents();
+      const banner = banners.find((t) => t.includes("No bundled font can draw"));
+      const listed = banner
+        ? (await page.locator(".banner-danger .oa-mono").first().textContent()).split(/\s+/).filter(Boolean)
+        : [];
+      return listed;
+    };
+
+    const repro = await importSrt("app-84.srt", ["選択 峠 枠 労働 麺 拡大 閘門 犧牲"]);
+    check(
+      "Japanese and Traditional characters in everyday words are drawable",
+      repro.length === 0,
+      `still reported: ${repro.join(" ")}`,
+    );
+
+    const decode = (encoding, codes) => {
+      const decoder = new TextDecoder(encoding);
+      let out = "";
+      for (const [lead, trail] of codes) {
+        const c = decoder.decode(Uint8Array.of(lead, trail));
+        if ([...c].length === 1 && c !== "�") out += c;
+      }
+      return out;
+    };
+    const jisLevel1 = [];
+    for (let lead = 0xb0; lead <= 0xcf; lead++) {
+      for (let trail = 0xa1; trail <= 0xfe; trail++) jisLevel1.push([lead, trail]);
+    }
+    const big5Common = [];
+    for (let code = 0xa440; code <= 0xc67e; code++) {
+      const trail = code & 0xff;
+      if ((trail >= 0x40 && trail <= 0x7e) || (trail >= 0xa1 && trail <= 0xfe)) big5Common.push([code >> 8, trail]);
+    }
+    const chars = decode("euc-jp", jisLevel1) + decode("big5", big5Common);
+    const lines = [];
+    for (let i = 0; i < chars.length; i += 400) lines.push([...chars].slice(i, i + 400).join(""));
+    // Eight Big5 common characters are in no slice of Noto Sans SC, JP or TC,
+    // and scripts/make-fonts.py lists the same eight. Anything else here is a
+    // regression in the font.
+    const unavailable = new Set([..."姅杗歜穋觼詨跦鑤"]);
+    const listed = await importSrt("jis-big5.srt", lines);
+    check(
+      "all of JIS level 1 and Big5 common is drawable, bar the eight no source has",
+      listed.every((c) => unavailable.has(c)),
+      `${[...chars].length} characters; unexpectedly reported: ${listed.filter((c) => !unavailable.has(c)).join(" ")}`,
+    );
+  }
+
   console.log("Chinese subtitle files");
   {
     // Two separate ways Chinese subtitles were broken, both of which

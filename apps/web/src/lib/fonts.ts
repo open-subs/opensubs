@@ -10,7 +10,7 @@
 //
 // So each non-Latin script we offer as a translation target gets a font,
 // and it is fetched **only when the text actually needs it**. A user
-// subtitling in English never downloads the 1.1 MB of Chinese.
+// subtitling in English never downloads the 2 MB of Chinese and Japanese.
 
 import cjkUrl from "../assets/fonts/opensubs-cjk.woff2?url";
 import hangulUrl from "../assets/fonts/opensubs-hangul.woff2?url";
@@ -93,6 +93,8 @@ export const SCRIPT_FONTS: ScriptFont[] = [
     family: "opensubs cjk",
     url: cjkUrl,
     key: "cjk",
+    // Simplified, Traditional and Japanese from one file: see build_cjk() in
+    // scripts/make-fonts.py for why they are merged rather than three fonts.
     label: "Chinese and Japanese",
   },
   {
