@@ -183,6 +183,59 @@ for (const distance of [1, 2, 3, 4]) {
   ok("and no cue is left empty", out.every((p) => p.length > 0), JSON.stringify(out));
 }
 
+// --- the alignment budget is in characters, not units (APP-53, round 3) ---
+//
+// The reach was a count of units against a budget measured in characters.
+// In Chinese a unit is a character, so every reported case behaved and this
+// went unseen; in a language with spaces a unit is a whole word, and a
+// fifty-character piece bought a reach of twelve words. The split then
+// landed wherever the nearest comma was rather than where the audio was.
+//
+// Measured against the proportional split, in characters, because that is
+// the drift a viewer sees between the words on screen and the words spoken.
+{
+  const drift = (text, aChars) => {
+    const out = splitAt(text, aChars);
+    return Math.abs(out[0].length - aChars);
+  };
+  const english =
+    "The brain is adaptive, like plastic and clay it can be shaped by what happens to you every day.";
+  // The comma sits 23 characters before the proportional split. It must not
+  // drag the break there: that was 4 words on screen against 12 of audio.
+  ok(
+    "a distant comma does not drag an English split",
+    drift(english, 45) <= 12,
+    `drift ${drift(english, 45)} chars, got 「${splitAt(english, 45)[0]}」`,
+  );
+  const worst = [];
+  for (let a = 10; a <= 80; a += 5) worst.push(drift(english, a));
+  ok(
+    "no English split drifts more than a short word from proportional",
+    Math.max(...worst) <= 12,
+    `worst ${Math.max(...worst)} chars`,
+  );
+  // The same sentence in Chinese still snaps to its comma, unchanged.
+  const chinese = "大脑是适应性的，就像塑料和黏土一样可以被塑形。";
+  ok(
+    "a Chinese split still snaps to a comma within reach",
+    splitAt(chinese, 9)[0].endsWith("，"),
+    `got 「${splitAt(chinese, 9)[0]}」`,
+  );
+}
+
+{
+  // thea's #13->#14: the full stop is the last character of the translation,
+  // four ahead of the split. Taking it would leave the final cue empty, so
+  // the break stays put -- correct, and the reason it can never align.
+  const out = spread("变得更容易大脑去旅行这条途径。", ["a".repeat(47), "b".repeat(50), "c".repeat(38)]);
+  eq("a sentence-final stop is not stolen from the last cue", out, [
+    "变得更容易",
+    "大脑去旅行这",
+    "条途径。",
+  ]);
+  ok("and no cue in that group is empty", out.every((p) => p.length > 0), JSON.stringify(out));
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
