@@ -97,7 +97,7 @@ const ENDS_A_SENTENCE = /[。！？.!?…]/;
 const PUNCTUATION_REACH = 0.25;
 
 /**
- * ...and never less than this many units.
+ * ...and never less than this many characters.
  *
  * The measured misses were three and four characters away from the split
  * on pieces short enough that a quarter of them was two. Four is the
@@ -241,7 +241,19 @@ export function spread(translated: string, sources: string[]): string[] {
     // both directions are searched and the nearer boundary wins; a tie
     // goes forward, because ending a line *on* its punctuation reads
     // better than ending just before it.
-    const reach = Math.max(MIN_REACH, Math.round(piece.length * PUNCTUATION_REACH));
+    // The budget is in characters, and so is the stepping below, because
+    // what a move costs is the drift between the words on screen and the
+    // words being spoken -- and that is measured in text, not in units.
+    //
+    // APP-53, third round. This was a count of *units* against a budget
+    // measured in *characters*. For Chinese the two are the same thing, so
+    // every reported case behaved; for a language with spaces a unit is a
+    // whole word, and a 50-character piece bought a reach of twelve words.
+    // An English translation of "The brain is adaptive, like plastic and
+    // clay it can be shaped..." put four words in the first cue where the
+    // audio held twelve, and the rest in the second. Every language the app
+    // translates into except Chinese, Japanese and Thai has spaces.
+    const budget = Math.max(MIN_REACH, Math.round(piece.length * PUNCTUATION_REACH));
 
     // A full stop is a better place to end a subtitle than a comma, so
     // the whole reach is searched for one before a comma is considered at
@@ -250,14 +262,21 @@ export function spread(translated: string, sources: string[]): string[] {
     // 的自然灾害之一。 became 的自然灾害之一。转眼之间， on the first try
     // at searching forwards.
     const find = (isBoundary: (u: string | undefined) => boolean) => {
-      for (let step = 1; step <= reach; step += 1) {
-        // Forward: take `step` more units, if they are there and are not
-        // owed to a later cue.
-        if (at + step - 1 < Math.min(limit, units.length) && isBoundary(units[at + step - 1])) {
+      let ahead = 0;
+      let behind = 0;
+      for (let step = 1; step <= units.length; step += 1) {
+        // Forward: take `step` more units, if they are there, are not owed
+        // to a later cue, and the text they add is still within budget.
+        const forward = units[at + step - 1];
+        ahead += forward?.length ?? 0;
+        if (ahead <= budget && at + step - 1 < Math.min(limit, units.length) && isBoundary(forward)) {
           return step;
         }
         // Backward: give `step` units back, keeping at least one.
-        if (at - step > started && isBoundary(units[at - step - 1])) return -step;
+        const back = units[at - step];
+        behind += back?.length ?? 0;
+        if (behind <= budget && at - step > started && isBoundary(units[at - step - 1])) return -step;
+        if (ahead > budget && behind > budget) break;
       }
       return 0;
     };
