@@ -1,5 +1,6 @@
 use crate::{BorderStyle, Rgba, StyleTemplate};
 use std::fmt::Write as _;
+use subs_subtitle::width::is_cjk_spacing;
 use subs_subtitle::{fmt_ass, join_tokens, Cue};
 
 /// U+2060 WORD JOINER: invisible, zero-width, carries no joining or
@@ -42,6 +43,174 @@ fn escape_dialogue_text(line: &str) -> String {
         }
     }
     out
+}
+
+/// A line break this writer chose, held as one character until the event
+/// text is finished and then written out as `\N`.
+///
+/// Not `\N` straight away, because everything between here and the output
+/// counts words -- loudness emphasis matches one level to each word, and
+/// karaoke steps through them -- and [`pieces`] reads `\N` as the end of a
+/// word. A break placed inside a Chinese sentence, which is a single word,
+/// would turn one word into two and silently switch both effects off. A
+/// private-use character is part of the word it sits in until
+/// [`finish_breaks`] turns it into the break libass needs.
+const FIT_BREAK: char = '\u{E0B0}';
+
+/// Characters a line may not begin with.
+///
+/// Closing punctuation and small kana belong to the character before them.
+/// A line opening on `，` or `。` reads as if the break were a mistake --
+/// which in Chinese and Japanese typography it would be.
+const NO_LINE_START: &str = "，。、！？：；）」』】〉》〕］｝”’…‥ー々ゝゞぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ,.!?;:)]}%";
+
+/// Characters a line may not end with: the opening half of a pair.
+const NO_LINE_END: &str = "（「『【〈《〔［｛“‘([{";
+
+/// Hangul, which is written with spaces between words.
+fn is_hangul(c: char) -> bool {
+    matches!(c as u32, 0x1100..=0x11FF | 0x3130..=0x318F | 0xAC00..=0xD7AF)
+}
+
+/// Whether libass could never break between `a` and `b` on its own.
+///
+/// `WrapStyle: 0` wraps at spaces and nowhere else, so a Chinese or Japanese
+/// sentence -- which has none -- is laid out on one line however wide the
+/// frame is (APP-90). Korean is excluded on purpose: it puts spaces between
+/// words, libass already wraps it there, and splitting a word between two
+/// syllables would be worse than the wrap it gets today.
+fn unspaced_boundary(a: char, b: char) -> bool {
+    is_cjk_spacing(a) && is_cjk_spacing(b) && !is_hangul(a) && !is_hangul(b)
+}
+
+/// How far one ideograph advances, as a share of the ASS font size.
+///
+/// Not 1.0. libass sizes a face so its *line height* -- ascender plus
+/// descender -- equals the font size, and CJK faces carry generous line
+/// metrics: the one this app ships (`opensubs-cjk`) is 1.448 em tall and
+/// sets each ideograph on 1 em, so an ideograph advances 0.691 of the size.
+/// Measured on a burned 360x640 frame: 28.5 px per character at size 42.
+/// PingFang, which the desktop build finds through fontconfig, comes out
+/// the same. Estimating a full em wrapped Shorts at 6 characters where 12
+/// fit, and spent five lines of picture on a two-line sentence.
+///
+/// A hair over the measured value, so a face with slightly tighter line
+/// metrics still does not clip. The first cut, 0.72 with a 6% margin on
+/// top, stacked two safeties and set Shorts on four lines where three fit
+/// with room to spare.
+const CJK_ADVANCE: f64 = 0.70;
+
+/// Estimated advance of one character, in pixels, at font size `px`.
+///
+/// Latin is an average, and only has to be close: a line containing it has
+/// spaces, and libass does the wrapping there.
+fn advance(c: char, px: f64) -> f64 {
+    if c == ' ' {
+        0.25 * px
+    } else if is_cjk_spacing(c) {
+        CJK_ADVANCE * px
+    } else {
+        0.45 * px
+    }
+}
+
+/// How wide a line of text may be, in PlayRes pixels, for text set at `px`.
+///
+/// The frame less the style's side margins (20 each, written by
+/// [`document_header`]) and the border on both sides, with 3% kept back:
+/// glyph advances vary a little between faces, and a subtitle that is a
+/// character too wide loses that character off both edges.
+fn line_room(style: &StyleTemplate, play_res: (u32, u32), px: f64, scale: f64) -> f64 {
+    let border = border_width(style, px, scale);
+    (f64::from(play_res.0) - 40.0 - 2.0 * border).max(px) * 0.97
+}
+
+/// Mark where a line of Chinese or Japanese has to break to fit the frame.
+///
+/// APP-90. A vertical 360x640 video burned a 28-character Chinese cue on a
+/// single line about twice the width of the frame, and the characters past
+/// either edge were simply gone. English of the same length wrapped onto
+/// four lines, because it has spaces for libass to break at.
+///
+/// So this places breaks only where libass cannot -- between two unspaced
+/// characters -- and leaves every space to libass, which measures the real
+/// glyphs. The lines are balanced rather than filled greedily, so a cue
+/// comes out 10 / 10 / 8 rather than 13 / 13 / 2, and no line starts on
+/// closing punctuation or ends on opening punctuation.
+///
+/// It depends on the frame, which the cue does not know: the same cue fits
+/// on one line of a 1920-wide landscape video. That is why it lives here,
+/// where the frame is known, and not in the segmenter.
+fn fit_lines(lines: &[String], room: f64, px: f64) -> Vec<String> {
+    lines.iter().map(|line| fit_line(line, room, px)).collect()
+}
+
+fn fit_line(line: &str, room: f64, px: f64) -> String {
+    // A break character arriving in the text itself would be turned into a
+    // real line break at the end. Nothing legitimate uses it.
+    let chars: Vec<char> = line.chars().filter(|&c| c != FIT_BREAK).collect();
+    let widths: Vec<f64> = chars.iter().map(|&c| advance(c, px)).collect();
+    let total: f64 = widths.iter().sum();
+    if total <= room || chars.len() < 2 || px <= 0.0 {
+        return chars.into_iter().collect();
+    }
+
+    // As many lines as the text needs, each aiming at an equal share of
+    // what is *left* -- recomputed after every break, which is what makes a
+    // 29-character cue come out 7 / 7 / 8 / 7 rather than 8 / 8 / 8 / 5 or
+    // 7 / 7 / 7 / 7 / 1. Half a character of slack lets a share that falls
+    // between two characters round up instead of spilling a line.
+    let mut lines_left = (total / room).ceil().max(1.0);
+    let share = |remaining: f64, lines: f64| (remaining / lines + 0.5 * CJK_ADVANCE * px).min(room);
+    let mut limit = share(total, lines_left);
+
+    let mut breaks = Vec::new();
+    let mut line_start = 0.0; // running width at the start of the current line
+    let mut last_break = 0usize;
+    let mut candidate: Option<(usize, f64)> = None;
+    let mut running = 0.0;
+    for i in 0..chars.len() {
+        if i > last_break
+            && unspaced_boundary(chars[i - 1], chars[i])
+            && !NO_LINE_START.contains(chars[i])
+            && !NO_LINE_END.contains(chars[i - 1])
+        {
+            candidate = Some((i, running));
+        }
+        if running + widths[i] - line_start > limit {
+            if let Some((at, width_there)) = candidate.take() {
+                breaks.push(at);
+                last_break = at;
+                line_start = width_there;
+                lines_left = (lines_left - 1.0).max(1.0);
+                limit = share(total - width_there, lines_left);
+            }
+        }
+        running += widths[i];
+    }
+
+    let mut out = String::with_capacity(line.len() + breaks.len() * 3);
+    let mut next = breaks.iter().peekable();
+    for (i, c) in chars.into_iter().enumerate() {
+        if next.peek() == Some(&&i) {
+            out.push(FIT_BREAK);
+            next.next();
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Turn the breaks [`fit_lines`] placed into the `\N` libass reads.
+///
+/// Called once on each finished document, after every effect has counted
+/// its words.
+fn finish_breaks(doc: String) -> String {
+    if doc.contains(FIT_BREAK) {
+        doc.replace(FIT_BREAK, "\\N")
+    } else {
+        doc
+    }
 }
 
 /// Make a string safe to place in a comma-delimited `Style:` field.
@@ -272,6 +441,7 @@ pub fn to_ass_emphasised(
     let (out, font_size) = document_header(style, play_res);
     let mut out = out;
     let strength = strength.clamp(0.0, MAX_EMPHASIS_STRENGTH);
+    let room = line_room(style, play_res, font_size as f64, 1.0);
 
     for (i, c) in cues.iter().enumerate() {
         // Escape each line *before* joining: the `\N` separators added here
@@ -279,7 +449,7 @@ pub fn to_ass_emphasised(
         //
         // ASS is line-oriented: a literal newline inside Dialogue would end
         // the event and corrupt the file. \N is the in-band line break.
-        let plain = escaped_body(&c.lines);
+        let plain = escaped_body(&fit_lines(&c.lines, room, font_size as f64));
 
         let text = match emphasis.get(i) {
             Some(levels) if strength > 0.0 => {
@@ -296,7 +466,7 @@ pub fn to_ass_emphasised(
         );
     }
 
-    out
+    finish_breaks(out)
 }
 
 /// How small the supporting line of a bilingual subtitle may be set.
@@ -342,8 +512,8 @@ pub fn to_ass_bilingual(
     for (i, cue) in top.iter().enumerate() {
         let text = format!(
             "{}\\N{}",
-            sized(&cue.lines, font_size, top_scale, style),
-            sized(&bottom[i].lines, font_size, bottom_scale, style),
+            sized(&cue.lines, font_size, top_scale, style, play_res),
+            sized(&bottom[i].lines, font_size, bottom_scale, style, play_res),
         );
         let _ = writeln!(
             out,
@@ -354,7 +524,7 @@ pub fn to_ass_bilingual(
         );
     }
 
-    out
+    finish_breaks(out)
 }
 
 /// Which half of a bilingual cue carries the word effect.
@@ -415,10 +585,11 @@ pub fn to_ass_bilingual_karaoke(
             end: cue.end,
             lines: one_line(lit),
         };
-        let quiet = sized_after_effects(still, font_size, still_scale, style);
+        let quiet = sized_after_effects(still, font_size, still_scale, style, play_res);
 
-        for (start, end, text) in
-            karaoke_events(&spoken, style, font_size, strength, glow, accent, lit_scale)
+        for (start, end, text) in karaoke_events(
+            &spoken, style, play_res, font_size, strength, glow, accent, lit_scale,
+        )
         {
             let body = match effect_on {
                 EffectOn::Top => format!("{text}\\N{quiet}"),
@@ -434,7 +605,7 @@ pub fn to_ass_bilingual_karaoke(
         }
     }
 
-    out
+    finish_breaks(out)
 }
 
 /// Loudness emphasis on one language of a bilingual cue.
@@ -472,7 +643,8 @@ pub fn to_ass_bilingual_emphasised(
         };
         let px = scaled_size(font_size, lit_scale);
         let border = border_width(style, px as f64, lit_scale);
-        let plain = escaped_body(&one_line(lit));
+        let room = line_room(style, play_res, px as f64, lit_scale);
+        let plain = escaped_body(&fit_lines(&one_line(lit), room, px as f64));
         // The per-word sizes are relative to this language's size, not the
         // document's, or the supporting line's loudest word would come back
         // up to the size the whole thing was scaled down from.
@@ -483,7 +655,7 @@ pub fn to_ass_bilingual_emphasised(
             _ => plain,
         };
         let lit_text = format!("{{\\fs{px}\\bord{border:.2}}}{body}");
-        let still_text = sized(still, font_size, still_scale, style);
+        let still_text = sized(still, font_size, still_scale, style, play_res);
         let text = match effect_on {
             EffectOn::Top => format!("{lit_text}\\N{still_text}"),
             EffectOn::Bottom => format!("{still_text}\\N{lit_text}"),
@@ -497,7 +669,7 @@ pub fn to_ass_bilingual_emphasised(
         );
     }
 
-    out
+    finish_breaks(out)
 }
 
 /// One language's lines, escaped and prefixed with its size override.
@@ -511,12 +683,19 @@ pub fn to_ass_bilingual_emphasised(
 /// borders with PlayRes, not with an inline `\fs`, so a line set at 70%
 /// with the full-size outline reads as noticeably heavier rather than
 /// merely smaller.
-fn sized(lines: &[String], font_size: i64, scale: f64, style: &StyleTemplate) -> String {
+fn sized(
+    lines: &[String],
+    font_size: i64,
+    scale: f64,
+    style: &StyleTemplate,
+    play_res: (u32, u32),
+) -> String {
     let px = scaled_size(font_size, scale);
     let border = border_width(style, px as f64, scale);
+    let room = line_room(style, play_res, px as f64, scale);
     format!(
         "{{\\fs{px}\\bord{border:.2}}}{}",
-        escaped_body(&one_line(lines))
+        escaped_body(&fit_lines(&one_line(lines), room, px as f64))
     )
 }
 
@@ -533,13 +712,15 @@ fn sized_after_effects(
     font_size: i64,
     scale: f64,
     style: &StyleTemplate,
+    play_res: (u32, u32),
 ) -> String {
     let px = scaled_size(font_size, scale);
     let border = border_width(style, px as f64, scale);
+    let room = line_room(style, play_res, px as f64, scale);
     format!(
         "{{\\fs{px}\\bord{border:.2}\\blur0\\3c{}}}{}",
         border_colour(style).to_ass(),
-        escaped_body(&one_line(lines))
+        escaped_body(&fit_lines(&one_line(lines), room, px as f64))
     )
 }
 
@@ -660,15 +841,28 @@ fn beats(word: &str) -> Vec<&str> {
     }
     let mut out = Vec::new();
     let mut run_start: Option<usize> = None;
+    // A fitted line break is not a beat. It is carried on the front of the
+    // character after it, so it lands in the same place in every event and
+    // never becomes a moment where nothing on screen is lit.
+    let mut carried: Option<usize> = None;
     for (i, c) in word.char_indices() {
-        if is_cjk(c) {
+        if c == FIT_BREAK {
             if let Some(start) = run_start.take() {
                 out.push(&word[start..i]);
             }
-            out.push(&word[i..i + c.len_utf8()]);
+            carried.get_or_insert(i);
+        } else if is_cjk(c) {
+            if let Some(start) = run_start.take() {
+                out.push(&word[start..i]);
+            }
+            let from = carried.take().unwrap_or(i);
+            out.push(&word[from..i + c.len_utf8()]);
         } else if run_start.is_none() {
-            run_start = Some(i);
+            run_start = Some(carried.take().unwrap_or(i));
         }
+    }
+    if let Some(start) = carried {
+        run_start.get_or_insert(start);
     }
     if let Some(start) = run_start {
         out.push(&word[start..]);
@@ -715,7 +909,8 @@ pub fn to_ass_karaoke(
 ) -> String {
     let (mut out, font_size) = document_header(style, play_res);
     for cue in cues {
-        for (start, end, text) in karaoke_events(cue, style, font_size, strength, glow, accent, 1.0)
+        for (start, end, text) in
+            karaoke_events(cue, style, play_res, font_size, strength, glow, accent, 1.0)
         {
             let _ = writeln!(
                 out,
@@ -726,7 +921,7 @@ pub fn to_ass_karaoke(
             );
         }
     }
-    out
+    finish_breaks(out)
 }
 
 /// One cue's karaoke events: a span of time, and the line to draw over it.
@@ -741,9 +936,11 @@ pub fn to_ass_karaoke(
 /// glow, the blur -- so a supporting line pulses in proportion instead of
 /// punching up to full size on every beat and out-shouting the language it
 /// is supporting.
+#[allow(clippy::too_many_arguments)]
 fn karaoke_events(
     cue: &Cue,
     style: &StyleTemplate,
+    play_res: (u32, u32),
     font_size: i64,
     strength: f64,
     glow: f64,
@@ -763,7 +960,10 @@ fn karaoke_events(
     let accent_ass = accent.to_ass();
     let outline_ass = border_colour(style).to_ass();
 
-    let plain = escaped_body(&cue.lines);
+    // Fitted before the beats are counted, so a break inside a Chinese line
+    // travels with the character after it rather than becoming a beat.
+    let room = line_room(style, play_res, size, scale);
+    let plain = escaped_body(&fit_lines(&cue.lines, room, size));
     let parts = pieces(&plain);
 
     // Flatten to the list of beats in reading order, and remember which
@@ -795,7 +995,7 @@ fn karaoke_events(
     let widths: Vec<f64> = per_word
         .iter()
         .flatten()
-        .map(|b| b.chars().count().max(1) as f64)
+        .map(|b| b.chars().filter(|&c| c != FIT_BREAK).count().max(1) as f64)
         .collect();
     let total: f64 = widths.iter().sum();
     let span = (cue.end - cue.start).max(0.001);
@@ -1789,5 +1989,139 @@ mod tests {
             ACCENT,
         );
         assert_eq!(wild, capped, "out-of-range values must clamp, not run away");
+    }
+
+    // --- APP-90: Chinese and Japanese fitted to the frame ------------------
+    //
+    // thea's reproduction: a 360x640 video and one 28-character Chinese cue.
+    // Burned, it was a single line twice the frame's width with the ends cut
+    // off, while English of the same length wrapped onto four lines.
+
+    const LONG_ZH: &str = "我们今天要介绍的是一个可以在浏览器里直接生成字幕的免费工具";
+    const VERTICAL: (u32, u32) = (360, 640);
+
+    /// The text of the first Dialogue event, split at its line breaks.
+    fn rendered_lines(doc: &str) -> Vec<String> {
+        let event = dialogue(doc)[0];
+        let text = event.splitn(10, ',').nth(9).unwrap();
+        text.split("\\N").map(str::to_string).collect()
+    }
+
+    fn room_for(play_res: (u32, u32)) -> f64 {
+        let st = style();
+        let px = (st.size_pct / 100.0 * f64::from(play_res.1)).round();
+        line_room(&st, play_res, px, 1.0) / (CJK_ADVANCE * px) // in ideographs
+    }
+
+    #[test]
+    fn a_long_chinese_cue_is_broken_to_fit_a_vertical_frame() {
+        let doc = to_ass(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL);
+        let lines = rendered_lines(&doc);
+        assert!(lines.len() >= 2, "still one line: {lines:?}");
+        let fits = room_for(VERTICAL);
+        for line in &lines {
+            assert!(
+                (line.chars().count() as f64) <= fits,
+                "{} characters where {fits:.1} fit: {line}",
+                line.chars().count()
+            );
+        }
+        assert_eq!(lines.concat(), LONG_ZH, "fitting must not lose or add text");
+    }
+
+    #[test]
+    fn fitted_lines_are_balanced_rather_than_filled() {
+        let doc = to_ass(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL);
+        let counts: Vec<usize> = rendered_lines(&doc).iter().map(|l| l.chars().count()).collect();
+        let (lo, hi) = (counts.iter().min().unwrap(), counts.iter().max().unwrap());
+        assert!(hi - lo <= 2, "unbalanced lines: {counts:?}");
+    }
+
+    #[test]
+    fn the_same_cue_on_a_wide_frame_is_left_on_one_line() {
+        let doc = to_ass(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), (1920, 1080));
+        assert_eq!(rendered_lines(&doc), vec![LONG_ZH.to_string()]);
+    }
+
+    #[test]
+    fn english_is_left_for_libass_to_wrap() {
+        // It has spaces, and libass already breaks at them measuring the
+        // real glyphs -- which is why English was never cut off.
+        let text = "Today we are introducing a free tool that makes subtitles right in your browser";
+        let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), VERTICAL);
+        assert_eq!(rendered_lines(&doc), vec![text.to_string()]);
+    }
+
+    #[test]
+    fn korean_is_not_split_between_syllables() {
+        let text = "오늘은 브라우저에서 바로 자막을 만들어 주는 무료 도구를 소개하겠습니다";
+        let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), VERTICAL);
+        assert_eq!(rendered_lines(&doc), vec![text.to_string()]);
+    }
+
+    #[test]
+    fn no_fitted_line_starts_on_closing_punctuation() {
+        let text = "我们今天，要介绍的是，一个可以在浏览器里，直接生成字幕的，免费工具。真的很好用。";
+        for width in [300u32, 330, 360, 390, 420] {
+            let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), (width, 640));
+            let lines = rendered_lines(&doc);
+            for line in lines.iter().skip(1) {
+                let first = line.chars().next().unwrap();
+                assert!(!NO_LINE_START.contains(first), "{width}px: a line starts with {first}: {lines:?}");
+            }
+            assert_eq!(lines.concat(), text);
+        }
+    }
+
+    #[test]
+    fn japanese_is_fitted_too() {
+        let text = "今日はブラウザの中で直接字幕を作れる無料のツールを紹介します";
+        let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), VERTICAL);
+        assert!(rendered_lines(&doc).len() >= 2);
+    }
+
+    #[test]
+    fn a_break_character_in_the_text_cannot_inject_a_line_break() {
+        let doc = to_ass(&[cue(1.0, 4.0, &["短\u{E0B0}句"])], &style(), VERTICAL);
+        assert_eq!(rendered_lines(&doc), vec!["短句".to_string()]);
+        assert!(!doc.contains('\u{E0B0}'));
+    }
+
+    #[test]
+    fn karaoke_still_lights_every_character_once_when_fitted() {
+        let wide = to_ass_karaoke(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), (1920, 1080), 0.3, 0.5, ACCENT);
+        let narrow = to_ass_karaoke(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL, 0.3, 0.5, ACCENT);
+        assert_eq!(
+            dialogue(&wide).len(),
+            dialogue(&narrow).len(),
+            "a fitted break must not become a beat of its own"
+        );
+        assert_eq!(dialogue(&narrow).len(), LONG_ZH.chars().count());
+        // And every beat breaks the line in the same places, or the text
+        // would jump between lines as the highlight moves.
+        let shape: Vec<usize> = dialogue(&narrow).iter().map(|e| e.matches("\\N").count()).collect();
+        assert!(shape.iter().all(|n| *n == shape[0] && *n >= 1), "{shape:?}");
+        assert!(!narrow.contains('\u{E0B0}'));
+    }
+
+    #[test]
+    fn loudness_emphasis_survives_fitting() {
+        // A Chinese sentence is one whitespace word, so one level. A break
+        // counted as a word boundary would make that two, and the effect
+        // would silently switch off.
+        let doc = to_ass_emphasised(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL, &[vec![1.0]], 0.5);
+        let event = dialogue(&doc)[0];
+        assert!(event.contains("\\fs"), "emphasis was dropped: {event}");
+        assert!(event.contains("\\N"), "no break: {event}");
+    }
+
+    #[test]
+    fn a_bilingual_translation_is_fitted_under_its_own_size() {
+        let top = [cue(1.0, 4.0, &["Today we introduce a free tool that makes subtitles"])];
+        let bottom = [cue(1.0, 4.0, &[LONG_ZH])];
+        let doc = to_ass_bilingual(&top, &bottom, &style(), VERTICAL, 0.7, 1.0);
+        // One separator between the languages, and more inside the Chinese.
+        assert!(dialogue(&doc)[0].matches("\\N").count() >= 2, "{}", dialogue(&doc)[0]);
+        assert!(!doc.contains('\u{E0B0}'));
     }
 }
