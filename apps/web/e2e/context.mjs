@@ -236,6 +236,62 @@ for (const distance of [1, 2, 3, 4]) {
   ok("and no cue in that group is empty", out.every((p) => p.length > 0), JSON.stringify(out));
 }
 
+// --- a split already on a comma stays there (APP-53, round 4) ---------
+//
+// thea's #4 -> #5, from app_en2.srt on ELpfYCZa87g, Chrome's translation to
+// Simplified Chinese. The ideal split ends #4 on the comma, because
+// "它是适应性的，就像" is "It is adaptable, like" -- the last words of #4's
+// own audio. A full stop seven characters back used to win whenever it was
+// inside the reach, however close the comma was, including when the split
+// had landed exactly on it.
+{
+  const S4 = "not true. The brain can and does change throughout our lives. It is adaptable, like";
+  const S5 = "plastic, and neuroscientists call this neuroplasticity.";
+  const T45 = "大脑可以而且确实在我们的生活中发生变化。它是适应性的，就像塑料和神经科学家称之为神经可塑性。";
+
+  const two = spread(T45, [S4, S5]);
+  ok("the reported pair ends #4 on its comma", two[0].endsWith("它是适应性的，") && two[1].startsWith("就像塑料"),
+    `「${two[0]}」 | 「${two[1]}」`);
+
+  // With the cue before it in the group -- #4 opens with "not true.", so
+  // #3 is always part of this group in the real file. This shape put the
+  // split exactly on the comma and then moved it seven characters back.
+  const three = spread("一二三。" + T45, ["x".repeat(10), S4, S5]);
+  ok("a split that lands on the comma is not dragged back to a full stop",
+    three[1].endsWith("它是适应性的，") && three[2].startsWith("就像塑料"),
+    `「${three[1]}」 | 「${three[2]}」`);
+
+  // Every shape of the unseen #3 that is as dense as its neighbours and
+  // agrees with what the report showed at the #3/#4 boundary. Before this
+  // round 895 of 2,346 ended #4 on 变化。; the rest are the full stop
+  // winning a genuine near-tie, which is the rule working.
+  const ratio = T45.length / (S4.length + S5.length);
+  const filler = "一二三四五六七八九十甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥天地玄黄宇宙洪荒日月盈昃辰宿列张";
+  let shapes = 0;
+  let onComma = 0;
+  for (let s3 = 8; s3 <= 160; s3 += 1) {
+    for (let l3 = 3; l3 <= 55; l3 += 1) {
+      const r = l3 / s3;
+      if (r < ratio * 0.7 || r > ratio * 1.3) continue;
+      const out = spread(filler.slice(0, l3 - 1) + "。" + T45, ["x".repeat(s3), S4, S5]);
+      if (!(out[0].endsWith("。") && out[1].startsWith("大脑可以"))) continue;
+      shapes += 1;
+      if (out[1].endsWith("，") && out[2].startsWith("就像")) onComma += 1;
+    }
+  }
+  ok("across realistic shapes of #3, #4 almost always ends on its comma",
+    shapes > 2000 && onComma / shapes > 0.98, `${onComma} of ${shapes}`);
+}
+
+{
+  // Distance, not sentences. Already on a comma with a full stop seven
+  // back: stay. The margin that still lets a full stop win is pinned by
+  // "a full stop beats a nearer comma" above -- one against four.
+  const out = splitAt("甲乙丙丁戊己庚。辛壬癸，子丑寅卯辰巳午未", 12);
+  ok("a comma the split is already on beats a full stop seven back", out[0].endsWith("，"),
+    `「${out[0]}」 | 「${out[1]}」`);
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);

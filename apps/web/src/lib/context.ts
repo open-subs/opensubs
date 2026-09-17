@@ -105,6 +105,29 @@ const PUNCTUATION_REACH = 0.25;
  */
 const MIN_REACH = 4;
 
+/**
+ * How much farther a full stop may be than the nearest comma and still
+ * be preferred to it, in characters.
+ *
+ * APP-53, fourth round. A full stop used to win outright whenever one was
+ * within reach, however close the comma. The measured case:
+ *
+ *     …发生变化。它是适应性的，| 就像塑料和…   the split lands on the comma
+ *
+ * with the full stop seven characters back and still inside the reach, so
+ * the line was dragged back to 变化。 and "它是适应性的，就像" -- which is
+ * "It is adaptable, like", the last words of *that* cue's audio -- opened
+ * the next cue instead. Seven characters of drift were paid to avoid a
+ * comma that cost none.
+ *
+ * The preference exists for near-ties, which is where it was learned, and
+ * the suite pins the widest of them: a comma one character off losing to
+ * a full stop four off (e2e/context.mjs, "a full stop beats a nearer
+ * comma"). Three characters of slack keeps exactly that and stops a full
+ * stop winning from across the line.
+ */
+const SENTENCE_SLACK = 3;
+
 /** Scripts that do not put spaces between words. */
 const UNSPACED = /[\u3000-\u303f\u3040-\u9fff\uf900-\ufaff\uff00-\uffef\u0e00-\u0e7f]/;
 
@@ -261,7 +284,13 @@ export function spread(translated: string, sources: string[]): string[] {
     // full stop three away and the line ends mid-sentence -- which is how
     // 的自然灾害之一。 became 的自然灾害之一。转眼之间， on the first try
     // at searching forwards.
+    //
+    // Each search reports how far it went in characters as well as in
+    // units, because the two passes are compared on drift, not on steps.
     const find = (isBoundary: (u: string | undefined) => boolean) => {
+      // Already there: the proportional split has landed on a boundary,
+      // and any move away from it is drift bought for nothing.
+      if (at > started && isBoundary(units[at - 1])) return { step: 0, cost: 0 };
       let ahead = 0;
       let behind = 0;
       for (let step = 1; step <= units.length; step += 1) {
@@ -270,18 +299,24 @@ export function spread(translated: string, sources: string[]): string[] {
         const forward = units[at + step - 1];
         ahead += forward?.length ?? 0;
         if (ahead <= budget && at + step - 1 < Math.min(limit, units.length) && isBoundary(forward)) {
-          return step;
+          return { step, cost: ahead };
         }
         // Backward: give `step` units back, keeping at least one.
         const back = units[at - step];
         behind += back?.length ?? 0;
-        if (behind <= budget && at - step > started && isBoundary(units[at - step - 1])) return -step;
+        if (behind <= budget && at - step > started && isBoundary(units[at - step - 1])) {
+          return { step: -step, cost: behind };
+        }
         if (ahead > budget && behind > budget) break;
       }
-      return 0;
+      return null;
     };
     const is = (re: RegExp) => (u: string | undefined) => !!u && re.test(u);
-    const move = find(is(ENDS_A_SENTENCE)) || find(is(BREAKS_WELL));
+    const sentence = find(is(ENDS_A_SENTENCE));
+    const nearest = find(is(BREAKS_WELL));
+    const chosen =
+      sentence && (!nearest || sentence.cost <= nearest.cost + SENTENCE_SLACK) ? sentence : nearest;
+    const move = chosen?.step ?? 0;
     for (let n = 0; n < Math.abs(move); n += 1) {
       if (move > 0) {
         piece += units[at];
