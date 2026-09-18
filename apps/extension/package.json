@@ -1,6 +1,6 @@
 {
   "name": "opensubs-extension",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Subtitles for whatever is playing in the tab, generated on your own machine",
   "type": "module",
   "private": true,

@@ -2219,7 +2219,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opensubs"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde_json",
  "subs-asr",
@@ -2233,7 +2233,7 @@ dependencies = [
 
 [[package]]
 name = "opensubs-desktop"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "dirs",
  "reqwest",
@@ -3400,7 +3400,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "subs-asr"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3409,14 +3409,14 @@ dependencies = [
 
 [[package]]
 name = "subs-credits"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "subs-media"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3425,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "subs-pipeline"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "subs-asr",
  "subs-media",
@@ -3437,7 +3437,7 @@ dependencies = [
 
 [[package]]
 name = "subs-qa"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde_json",
  "subs-media",
@@ -3445,7 +3445,7 @@ dependencies = [
 
 [[package]]
 name = "subs-style"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3454,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "subs-subtitle"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "proptest",
  "serde",
@@ -3466,14 +3466,14 @@ dependencies = [
 
 [[package]]
 name = "subs-tier"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "subs-translate"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "reqwest",
  "serde",
@@ -3485,7 +3485,7 @@ dependencies = [
 
 [[package]]
 name = "subs-wasm"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "console_error_panic_hook",
  "serde",
