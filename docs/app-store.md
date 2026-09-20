@@ -12,9 +12,119 @@ decision.
 
 ## What is ready
 
-In-app purchase through StoreKit, end to end on the client side, and the
-SQL the server needs. What is not done is anything that requires this
-machine to build or this account to have an app record — see below.
+Everything except the build itself and the things only a person may press.
+Each line below was checked against Apple or the live server, not assumed.
+
+**Signing and identity**
+
+- Xcode's licence is accepted (`xcodebuild -checkFirstLaunchStatus` exits 0;
+  it exits 69 when it is not, which is what `archive.sh` tests — the notice
+  goes to the terminal rather than to stdout, so grepping for it finds
+  nothing and sails past the one thing in the way).
+- `Apple Distribution: DE JIAN KOH (JY2NWT5QFV)` is in the login keychain.
+- App ID `app.opensubs.mobile` is registered, with the **In-App Purchase**
+  capability. Without that the profile is still valid and StoreKit finds no
+  products at runtime.
+- The `OpenSubs App Store` provisioning profile is cut and installed in
+  `~/Library/MobileDevice/Provisioning Profiles`, expiring 2027-09-20.
+
+`apps/mobile/scripts/asc.py` does all three from the App Store Connect API
+key, so none of it is a click in Xcode's Accounts pane on one particular
+Mac:
+
+```sh
+set -a; . ~/.config/opensubs-apple/env; set +a
+./scripts/asc.py setup         # cert, app id, profile
+./scripts/asc.py show-iaps     # what App Store Connect holds
+```
+
+**The app record and the two consumables**
+
+`OpenSubs` exists in App Store Connect — iOS, SKU `opensubs-ios`, primary
+language en-US, bundle id `app.opensubs.mobile`. The record itself is the
+one step the API refuses:
+
+```
+POST /v1/apps → 403
+  The resource 'apps' does not allow 'CREATE'.
+  Allowed operations are: GET_COLLECTION, GET_INSTANCE, UPDATE
+```
+
+so it was made through the website. Everything after it is `asc.py
+ensure-iaps`: both consumables exist, carry their en-US name and
+description, are priced from Apple's own price points at **$4.99** and
+**$19.99**, and have a review note saying what a credit is for.
+
+They read `MISSING_METADATA`, and the missing thing is the **App Store
+review screenshot** — one image per product, showing where the purchase
+appears. It cannot be produced from a script: the panel only renders for a
+signed-in account inside the shell, so it wants a real run of the app.
+That is the last piece of IAP metadata and it is needed at submission, not
+before.
+
+**The iOS floor is set, and measured**
+
+`IPHONEOS_DEPLOYMENT_TARGET` and the Podfile's `IOS_MIN` are **26.0**. See
+`docs/mobile.md`: the engine does not run on iOS 17 at all, it runs on
+26.0, 26.5 and 27.0, and iOS 18 is untestable here because Xcode 27 offers
+no iOS 18 simulator runtime to download. The app builds and runs on the
+26.0 simulator at that floor.
+
+**The accounts server**
+
+Deployed and answering. `/v1/payments/packages` reports
+`"apple_iap":true`, and the rail was proved end to end from a throwaway
+Nostr account signing in from the app's own origin:
+
+```
+challenge  200  CORS capacitor://localhost
+signed in  200  CORS capacitor://localhost
+redeem     400  receipt verification: receipt is malformed: a JWS has
+                exactly three dot-separated parts
+webhook    400  notification verification: … three dot-separated parts
+```
+
+A 404 would mean the route is absent and a 401 would prove only that
+something is listening. A *parse* error from the verifier is the answer
+that separates a configured rail from a compiled one.
+
+What that took, all three of which were missing:
+
+- **The image predated the Apple routes.** Rebuilt from the monorepo and
+  restarted with `deploy/run.sh prod`; the previous image is kept as
+  `openapps-server:rollback-apple-<timestamp>`.
+- **`[apple_iap]` in `config/prod-base.toml`**, not in `prod.env`:
+  `OPENAPPS_APPLE_IAP_ENVIRONMENT` can only override a section that already
+  exists. `environment = "production"`, and Apple's root certificate is
+  **inline** as `root_certificates_pem` rather than
+  `root_certificates_file`, because the container mounts that one file and
+  nothing else from `config/` — a path there names a file the server cannot
+  see, and the failure would arrive only when somebody first paid.
+- **`capacitor://localhost` in `OPENAPPS_SERVER_ALLOWED_ORIGINS`.** The app
+  is served from that scheme, so it is the `Origin` on every call it makes.
+  Without it sign-in, balance and redeem all fail before any purchase code
+  runs, as CORS, looking nothing like a purchase bug.
+
+And the rows, which decide what a pack is *worth* (App Store Connect
+decides what it *costs*):
+
+```
+apple  opensubs_credits_1000  opensubs  app.opensubs.mobile  1000   499
+apple  opensubs_credits_5000  opensubs  app.opensubs.mobile  5000  1999
+```
+
+499 and 1999, not 500 and 2000: the web packages are $5 and $20, and Apple
+has no such price points — the nearest tiers are $4.99 and $19.99. The row
+should say what the customer is actually charged, or the ledger and the
+receipt disagree by a cent for ever.
+
+The ids are prefixed on purpose. The server looks a product up by
+`(platform, product_id)` alone, so a bare `credits_1000` is already
+openpdfedit's row: the lookup would succeed, resolve to
+`com.openpdfedit.app`, and then fail verification against our bundle — a
+confusing failure a long way from its cause.
+
+**The client**
 
 - `apps/mobile/ios/scripts/archive.sh` — stage the web app, archive,
   export, validate with Apple, upload. Modelled on openpdfedit's, with
@@ -25,51 +135,31 @@ machine to build or this account to have an app record — see below.
 - `apps/mobile/ios/ExportOptions.plist` — App Store method, automatic
   signing, export-only so no accidental upload can consume a build
   number.
-- The Xcode project states `DEVELOPMENT_TEAM = JY2NWT5QFV` and
-  `MARKETING_VERSION = 1.0.0`, matching the `v1.0.0` release.
 - Credentials live in `~/.config/opensubs-apple/env`, chmod 600, outside
-  every git working tree. The app-specific password authenticates
-  `altool`; it is not the Apple ID password and cannot sign in to the
-  account.
+  every git working tree: the Apple ID (the account holder, read back from
+  the API rather than assumed), an app-specific password for `altool`, the
+  team id, and the App Store Connect API key id and issuer. The `.p8`
+  itself is in `~/.appstoreconnect/private_keys/`, where `altool` and
+  `notarytool` also look; Apple allows it to be downloaded once, so that
+  file is the only copy.
 
 Build numbers are minutes-since-2020: monotonic, stateless, and unique
 per upload. Apple never releases a build number back, so a duplicate
 costs a round trip to discover.
 
-## What has to happen first, and by whom
+## What is left, and who does it
 
-**1. Accept Xcode's licence.** Every build tool on this machine refuses
-to run until then — `xcodebuild`, `simctl`, and through them CocoaPods
-and `cap sync`:
-
-```sh
-sudo xcodebuild -license
-```
-
-It needs a password and a scroll through the agreement, so it cannot be
-scripted. The licence notice is written straight to the terminal rather
-than to stdout, which is why `archive.sh` tests the exit status (69)
-instead of grepping for the message — grepping finds nothing and sails
-past the one thing in the way.
-
-**2. An iOS distribution certificate.** The keychain holds a *Developer
-ID Application* certificate, which signs Mac apps distributed outside the
-App Store. It cannot sign an iOS App Store build. Xcode → Settings →
-Accounts → Manage Certificates → **+** → Apple Distribution, signed in to
-the Apple ID that holds team `JY2NWT5QFV`.
-
-**3. An App Store Connect record** for bundle id `app.opensubs.mobile`,
-created by hand. `altool` uploads a build *to* an app; it cannot create
-one.
-
-**4. A minimum iOS version that works.** The project says **14.0** and
-that is known to be wrong: `docs/mobile.md` measured iOS 17 failing
-outright — ONNX Runtime cannot even build its execution plan — while iOS
-26 transcribes at 6.1x realtime. Everything between is untested, because
-only those two simulator runtimes were installed. Shipping 14.0 means an
-app that opens and cannot transcribe for anyone below the real floor,
-which is both a bad app and a guideline 2.1 rejection. Test 18 through 25
-and set the floor to the lowest that works.
+1. **Archive and upload.** `cd apps/mobile/ios && ./scripts/archive.sh
+   --validate`, then `--upload`. Nothing in this repository does it
+   unprompted.
+2. **A review screenshot for each consumable.** See above; it needs the app
+   running, signed in.
+3. **Install the TestFlight build on a real device.** Every number in
+   `docs/mobile.md` is from a simulator with no GPU adapter.
+4. **Decide how the chain gets its first end-to-end run** — see Sandbox,
+   below. This is a decision, not an oversight.
+5. **Screenshots, App Privacy answers, export compliance, review notes,
+   and the submit button.** All of it a person's, by hand.
 
 ## The two guidelines that decide this submission
 
@@ -115,61 +205,14 @@ The related trap is 3.1.3(b): an account made elsewhere may be *used* in
 the app, and the app may not *tell* anyone where to make one. The
 sign-in element is fine. A "sign up on our website" link is not.
 
-### What the server needs
+### Server Notifications V2
 
-The rail already exists in `openapps-server` — Apple receipt
-verification, `app_iap_products`, and the refund webhook — and is
-documented in openpdfedit's `docs/PRODUCTION.md` §3b. OpenSubs needs its
-own rows, and its own product ids:
-
-```sql
--- /var/lib/docker/volumes/openapps-prod-data/_data/openapps.db
-INSERT INTO app_iap_products
-  (platform, product_id, app_id, bundle_id, credits, usd_price, created_at)
-VALUES
-  ('apple', 'opensubs_credits_1000', 'opensubs', 'app.opensubs.mobile', 1000,  499, unixepoch()),
-  ('apple', 'opensubs_credits_5000', 'opensubs', 'app.opensubs.mobile', 5000, 1999, unixepoch());
-```
-
-499 and 1999, not 500 and 2000: the web packages are $5 and $20, and Apple
-has no such price points -- the nearest tiers are $4.99 and $19.99. The
-row should say what the customer is actually charged, or the ledger and
-the receipt disagree by a cent for ever.
-
-The ids are prefixed on purpose. The server looks a product up by
-`(platform, product_id)` alone, so a bare `credits_1000` is already
-openpdfedit's row: the lookup would succeed, resolve to
-`com.openpdfedit.app`, and then fail verification against our bundle —
-a confusing failure a long way from its cause.
-
-Three places have to agree, and each decides something different: App
-Store Connect decides what a pack *costs*, this table decides what it is
-*worth*, and `OpenSubsStore.productIdentifiers` decides what to ask
-about.
-
-Also set the Server Notifications V2 URL in App Store Connect to
-`https://auth.opensubs.app/v1/webhooks/apple`. Without it a refund is
-never clawed back: Apple refunds the customer and the credits stay spent.
-
-Three things about the deployment this needs, all of them checked
-against the live server rather than assumed:
-
-- **The rail is not deployed yet.** `/v1/payments/apple/redeem` answers
-  404 there while `/v1/payments/stripe/checkout` answers 401, so the
-  running image predates the Apple routes. The container is
-  `openapps-prod` from `openapps-server:prod`; it has to be rebuilt from
-  the monorepo and restarted before any of this can work.
-- **The root certificate has to be inside the container.** The config
-  mount is a single file -- `/opt/openapps/config/prod-base.toml` at
-  `/etc/openapps/base.toml` -- so a `root_certificates_file` pointing at
-  `/opt/openapps/config/apple-root-ca-g3.pem` names a path the server
-  cannot see. Either mount the PEM as well or use
-  `root_certificates_pem` inline.
-- **`capacitor://localhost` is not an allowed origin.** The app is served
-  from that scheme, and the allow-list on the running container names
-  the web hostnames only. Without it the app cannot sign in, read a
-  balance or redeem anything -- the failure is CORS, arrives before any
-  of the purchase code runs, and looks nothing like a purchase bug.
+One thing on the server side is still unset: the **App Store Server
+Notifications V2 URL** in App Store Connect, which should be
+`https://auth.opensubs.app/v1/webhooks/apple`. It is set on the app record
+rather than through the API used above, and it cannot be set until the app
+has a build. Without it a refund is never clawed back: Apple refunds the
+customer and the credits stay spent.
 
 ### Sandbox, and where it can be tested
 
@@ -178,20 +221,23 @@ receipt from the other environment on purpose -- a sandbox receipt
 verifies against Apple's real certificates exactly as a paid one does,
 so only that check separates a tester from an unlimited credit printer.
 
-That means production cannot credit a TestFlight test. Either point the
-app at a second deployment configured `environment = "sandbox"` for the
-test, or accept that the first end-to-end run of the chain happens on
-the first real purchase. The first is the reason to have a staging
-accounts server; the second is a decision, not an accident, and should
-be made deliberately.
+The live server is now configured `environment = "production"`, so it
+cannot credit a TestFlight test — deliberately. Either point the app at a
+second deployment configured `environment = "sandbox"` for the test, or
+accept that the first end-to-end run of the chain happens on the first
+real purchase. The first is the reason to have a staging accounts server;
+the second is a decision, not an accident, and should be made
+deliberately.
 
-## Order of operations, once the above is settled
+## Order of operations
 
-1. `sudo xcodebuild -license`, then the Apple Distribution certificate.
-2. Create the app record in App Store Connect.
-3. Create the two consumables in App Store Connect —
-   `opensubs_credits_1000` and `opensubs_credits_5000` — and insert the
-   rows above on the accounts server.
+Struck through in effect — steps 1 to 4 are done, and what is left is the
+list under "What is left, and who does it" above. Kept because the order
+matters if any of it has to be redone:
+
+1. Xcode licence, then the Apple Distribution certificate.
+2. The app record in App Store Connect.
+3. The two consumables, and the `app_iap_products` rows on the server.
 4. Test the iOS floor on simulators; set `IPHONEOS_DEPLOYMENT_TARGET`.
 5. `cd apps/mobile/ios && ./scripts/archive.sh --validate`, then
    `--upload`.

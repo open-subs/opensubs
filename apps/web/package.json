@@ -28,7 +28,8 @@
     "test:site-i18n": "SITE_SOURCE=${SITE_SOURCE:-../../../opensubs-website} python3 scripts/build-locale-pages.py --check --strict",
     "test:remote": "node --experimental-strip-types e2e/remote.mjs",
     "build:locales": "python3 scripts/build-locale-pages.py --strict",
-    "test:iap": "node --experimental-strip-types e2e/iap.mjs"
+    "test:iap": "node --experimental-strip-types e2e/iap.mjs",
+    "test:engine": "node e2e/enginecheck/serve.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
