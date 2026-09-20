@@ -1,16 +1,28 @@
-// Build the web app into the shape the app shell wants.
+// Stage apps/web's build as the shell's www/.
 //
-// The site and the app are one bundle on the desktop -- the tool sits in
-// the hero of opensubs.app and the marketing runs below it. In an app
-// shell the marketing is dead weight and the "open the app" links point at
-// the page they are already on, so the staging step keeps the tool and
-// drops the page around it.
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// This used to do a great deal more. When the site and the app were one
+// document, dist/ held the marketing page, thirty-two translated copies of
+// it and a privacy page, and staging meant carving the app out of all
+// that. The site moved to its own repository (open-subs/opensubs-website),
+// so dist/ is now the app and two SEO pages -- and most of the carving had
+// nothing left to carve. It stayed behind anyway and failed the build on a
+// privacy page that no longer exists, which is why no mobile build has run
+// since the split.
+//
+// What is left is the part that was never about the site: copying the
+// build in, dropping the two pages that are not the app, and refusing to
+// stage a directory that is missing the pieces the shell needs.
+//
+// The copy that says "browser" is no longer rewritten here. It lives in
+// the app's own components now rather than in a page this script could
+// edit, so the app decides it at runtime from Capacitor -- see
+// inNativeShell() in apps/web/src/lib/native.ts. A build-time rewrite of a
+// minified bundle would be a string search through machine output.
+import { cpSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const root = dirname(here);
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const dist = join(root, "..", "web", "dist");
 const www = join(root, "www");
 
@@ -22,182 +34,58 @@ if (!existsSync(dist)) {
 rmSync(www, { recursive: true, force: true });
 cpSync(dist, www, { recursive: true });
 
-// The site's other pages are reachable only from the marketing nav, which
-// the shell does not show. Shipping them would put a privacy page and a
-// how-to article inside the app binary for no one to open.
-// privacy.html stays. The footer links to it, both stores require a
-// reachable privacy policy, and deleting it left that link 404ing inside
-// the app -- which is exactly the sort of thing a reviewer clicks.
-for (const page of ["burn-subtitles-into-video.html", "styles.html", "sitemap.xml", "robots.txt", "llms.txt", "og-image.png"]) {
+// The two SEO pages are Vite entry points, so they are built rather than
+// copied and land here with everything else. They are marketing, they are
+// reachable from nothing inside the shell, and a store app that ships a
+// page pointing at GitHub releases is a rejection on both platforms.
+for (const page of ["burn-subtitles-into-video.html", "styles.html", "sitemap.xsl", "robots.txt", "llms.txt", "og-image.png"]) {
   rmSync(join(www, page), { force: true });
 }
 
-// The site ships one translated document per language under /<locale>/
-// (web/scripts/build-locale-pages.py). Those are for a crawler and for a
-// URL somebody can share; inside the binary they are a megabyte of HTML
-// with no way to reach it. The app translates itself at runtime from the
-// same catalogues, so nothing is lost by dropping them.
+// Test clips, served for the e2e suite to fetch. Nineteen megabytes of
+// sample video inside an app binary, reachable from nothing.
+rmSync(join(www, "testmedia"), { recursive: true, force: true });
+
+// A locale build may have been run against this dist. Its output belongs
+// to the site rather than the app -- the app translates itself at runtime
+// from the same catalogues -- and the alternates ring inside those pages
+// is what a language picker reads to decide that changing language means
+// *navigating*, which inside a shell means leaving the app with no address
+// bar to come back from.
 const LOCALES = ["zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"];
 for (const locale of LOCALES) {
   rmSync(join(www, locale), { recursive: true, force: true });
   rmSync(join(www, `${locale}.html`), { force: true });
 }
 
-// ...and the alternates ring goes with them, from every page that is
-// left. The ring is what a language picker reads to decide whether
-// changing language means navigating to another document -- the Svelte
-// one in src/lib/i18n/index.svelte.ts, and the plain <select> on
-// privacy.html. Left in place, picking a language inside the app would
-// open opensubs.app/de -- leaving the app, on a phone, with no address
-// bar to come back from.
-const RING = /\s*<link rel="alternate" hreflang="[^"]*" href="[^"]*" \/>/g;
-let ringsFound = 0;
-for (const page of ["index.html", "privacy.html"]) {
-  const file = join(www, page);
-  const before = readFileSync(file, "utf8");
-  ringsFound += (before.match(/<link rel="alternate" hreflang=/g) ?? []).length;
-  writeFileSync(file, before.replace(RING, ""));
-}
-if (ringsFound === 0) {
-  console.error("stage: no hreflang ring in the built pages -- did the locale build run?");
-  console.error("stage: run `npm run build` in apps/web (not `vite build`).");
-  process.exit(1);
-}
-
-const index = join(www, "index.html");
-let html = readFileSync(index, "utf8");
-
-// A phone has no room for a marketing page under the tool, and the app
-// shell has no address bar to explain where you are. The sections are
-// named, so they are removed by name rather than by a shape-matching
-// regex that silently matches nothing when the markup moves.
-// "downloads" is not only marketing here. It links to GitHub releases for
-// the desktop app and the extension, and a store app that points users at
-// installers outside the store is a rejection on both platforms.
-const MARKETING = ["how", "downloads", "privacy", "pricing", "faq"];
-let dropped = 0;
-for (const id of MARKETING) {
-  const open = html.indexOf(`<section id="${id}"`);
-  if (open === -1) continue;
-  // Sections here do not nest, so the next </section> closes this one.
-  const close = html.indexOf("</section>", open);
-  if (close === -1) continue;
-  html = html.slice(0, open) + html.slice(close + "</section>".length);
-  dropped += 1;
-}
-if (dropped !== MARKETING.length) {
-  // Loud, because the failure mode is a marketing page shipped inside an
-  // app binary and nobody noticing until review.
-  console.error(`stage: expected ${MARKETING.length} marketing sections, removed ${dropped}.`);
-  console.error("stage: the site's markup changed -- update MARKETING in this script.");
-  process.exit(1);
-}
-
-// The nav links that pointed at them, and the "open the app" call to
-// action, which in the app is a link to the screen you are looking at.
-for (const id of [...MARKETING, "app"]) {
-  html = html.replace(new RegExp(`<a\\b[^>]*href="#${id}"[^>]*>[\\s\\S]*?</a>`, "g"), "");
-}
-
-// The site's own copy says "in your browser", which is true of the site
-// and false of the thing the reader is holding. Rewritten rather than
-// rewritten-around: an app store listing whose first screenshot says
-// "browser" reads as a web page someone wrapped, which is exactly the
-// impression to avoid.
-//
-// Each replacement asserts, so a copy change upstream fails the build
-// instead of silently shipping the wrong words to three stores.
-const COPY = [
-  [
-    "<title>Free AI Subtitle Generator &mdash; In Your Browser | OpenSubs</title>",
-    "<title>OpenSubs &mdash; subtitle any video, on your device</title>",
-  ],
-  [
-    "Free AI subtitle generator that runs in your browser",
-    "Subtitles for any video, made on your device",
-  ],
-  [
-    "all inside your browser. The video file never\n      leaves your machine, because there is nowhere for it to go.",
-    "all on your device. The video file never\n      leaves it, because there is nowhere for it to go.",
-  ],
-  [
-    // The static skeleton, which is what shows before Svelte mounts. The
-    // mounted app decides this at runtime from the pointer type.
-    "Drop a video here, or choose one",
-    "Choose a video",
-  ],
-  [
-    "entirely in your browser. The video never leaves your machine.",
-    "entirely on your device. The video never leaves it.",
-  ],
+// What the shell actually needs, checked rather than assumed. The failure
+// this prevents is quiet: Capacitor serves whatever is in www/, so a
+// missing bundle is a white screen on a device and nothing at all here.
+const must = [
+  ["index.html", "the page Capacitor loads"],
+  ["assets", "the app bundle"],
+  ["ort", "the ONNX Runtime files the recogniser fetches"],
+  ["vad", "the voice-detection model"],
 ];
-COPY.push([
-  "Whisper runs here, in your browser, and writes",
-  "Whisper runs here, on your device, and writes",
-]);
-// og:title and twitter:title, which are share-card metadata for a web
-// page. Harmless in an app and wrong, so they say the same as <title>.
-COPY.push([
-  "Free AI Subtitle Generator \u2014 In Your Browser | OpenSubs",
-  "OpenSubs \u2014 subtitle any video, on your device",
-]);
-
-const missed = [];
-for (const [from, to] of COPY) {
-  if (!html.includes(from)) { missed.push(from); continue; }
-  html = html.split(from).join(to);
-}
-if (missed.length) {
-  console.error("stage: the site's copy changed -- these strings were not found:");
-  for (const m of missed) console.error(`  ${JSON.stringify(m)}`);
-  console.error("stage: update COPY in this script so the app does not ship the site's wording.");
+const missing = must.filter(([name]) => !existsSync(join(www, name)));
+if (missing.length > 0) {
+  console.error("stage: the staged directory is missing:");
+  for (const [name, why] of missing) console.error(`  ${name} -- ${why}`);
   process.exit(1);
 }
 
-// The footer's link to GitHub *releases* goes too, for the same reason as
-// the downloads section: it offers installers from outside the store. The
-// link to the source stays -- the AGPL wants the source offered, and an
-// open-source app linking its repository is ordinary.
-// The nav and footer links to /styles, which the app payload does not
-// carry -- the dead-link check below would catch the footer one, and the
-// nav one it would not, because it points at an extensionless path.
-html = html.replace(/<a[^>]*href="\/styles"[^>]*>[\s\S]*?<\/a>\s*/g, "");
-
-const releasesLink = /<a href="https:\/\/github\.com\/[^"]*\/releases"[^>]*>[\s\S]*?<\/a>\s*/g;
-if (!releasesLink.test(html)) {
-  console.error("stage: no releases link found in the footer -- has it moved?");
-  process.exit(1);
-}
-releasesLink.lastIndex = 0;
-html = html.replace(releasesLink, "");
-
-// Structured data is search-engine markup for a web page. Inside an app
-// binary it is dead weight that also describes the wrong product -- it
-// names an operating system of "Any browser with WebAssembly".
-const ld = /<script type="application\/ld\+json">[\s\S]*?<\/script>/g;
-const before = html.length;
-html = html.replace(ld, "");
-if (html.length === before) {
-  console.error("stage: no JSON-LD block found -- the site's <head> changed.");
+const bundles = readdirSync(join(www, "assets")).filter((f) => /^main-.*\.js$/.test(f));
+if (bundles.length !== 1) {
+  console.error(`stage: expected exactly one main bundle in assets/, found ${bundles.length}`);
   process.exit(1);
 }
 
-// Nothing visible or machine-readable in the shipped app should claim the
-// product runs in a browser. Checked rather than hoped for.
-const stray = html.match(/.{0,50}(browser|your machine|Drop a video).{0,50}/gi) ?? [];
-if (stray.length) {
-  console.error(`stage: ${stray.length} phrase(s) that do not belong in an app survive:`);
-  for (const m of stray.slice(0, 6)) console.error(`  ...${m.replace(/\s+/g, " ")}...`);
-  process.exit(1);
-}
+const size = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).reduce((total, entry) => {
+    const path = join(dir, entry.name);
+    return total + (entry.isDirectory() ? size(path) : statSync(path).size);
+  }, 0);
 
-// Every same-origin page this links to has to still be in the payload.
-const linked = [...html.matchAll(/href="\/([A-Za-z0-9._-]+\.html)"/g)].map((m) => m[1]);
-const gone = linked.filter((f) => !existsSync(join(www, f)));
-if (gone.length) {
-  console.error(`stage: the page links to files this build removed: ${gone.join(", ")}`);
-  process.exit(1);
-}
-
-writeFileSync(index, html);
-console.log(`stage: www/ ready (${html.length} bytes of index.html)`);
+console.log(
+  `stage: www/ ready -- ${bundles[0]}, ${(size(www) / 1024 / 1024).toFixed(1)} MB`,
+);

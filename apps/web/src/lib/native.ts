@@ -60,9 +60,23 @@ export interface NativeStore {
 
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
+/**
+ * Whether the app is running inside a native shell of any kind.
+ *
+ * Used for copy as well as for capability: several lines in the interface
+ * say "browser", which is true of the page and reads as a wrapped website
+ * to somebody holding a phone -- and reads worse still in a store
+ * screenshot. Decided at runtime rather than rewritten into the bundle at
+ * build time, which is what the staging script used to do back when that
+ * copy lived in a page it could edit.
+ */
+export function inNativeShell(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
 /** Whether this is the iOS/iPadOS shell rather than a browser. */
 export function onApple(): boolean {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+  return inNativeShell() && Capacitor.getPlatform() === "ios";
 }
 
 // Registered once, at module load. `registerPlugin` only builds a proxy --
