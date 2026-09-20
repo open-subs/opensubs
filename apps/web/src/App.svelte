@@ -23,7 +23,7 @@
     NotSignedIn,
   } from "./lib/account";
   import AppleCredits from "./lib/AppleCredits.svelte";
-  import { appleStore, mustUseInAppPurchase } from "./lib/native";
+  import { appleStore, inNativeShell, mustUseInAppPurchase } from "./lib/native";
   import {
     saveWork,
     loadWork,
@@ -1798,7 +1798,7 @@
         ? ", on the GPU"
         : ""}. The audio is never uploaded; only the model is downloaded, once.
       {#if asr?.device === "wasm"}
-        This browser has no WebGPU, so it runs on the CPU and needs the
+        {inNativeShell() ? "This device" : "This browser"} has no WebGPU, so it runs on the CPU and needs the
         larger full-precision model &mdash; slower, and roughly four times
         the download.
       {/if}
@@ -1806,7 +1806,7 @@
       Only the trimmed span is uploaded, so shortening the clip lowers
       the price by the same proportion.
     {:else}
-      The browser can only run models up to about 250&nbsp;MB. A hosted
+      {inNativeShell() ? "This device" : "The browser"} can only run models up to about 250&nbsp;MB. A hosted
       endpoint can run the full-size one, which is markedly better on
       accents, noise and proper nouns &mdash; and far faster on a long
       recording. Works with OpenAI, Groq, or any server of your own.

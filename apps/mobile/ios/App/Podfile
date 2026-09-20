@@ -1,6 +1,11 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '14.0'
+# The one place the floor is written for CocoaPods. It has to match
+# IPHONEOS_DEPLOYMENT_TARGET in App.xcodeproj -- Xcode refuses a build
+# where the app targets an older iOS than the pods it links.
+IOS_MIN = '15.0'
+
+platform :ios, IOS_MIN
 use_frameworks!
 
 # workaround to avoid Xcode caching of Pods that requires
@@ -21,4 +26,15 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # Capacitor's helper only ever *raises to* 14.0 -- it leaves anything
+  # already at or above that alone, so every pod stayed on 14.0 while the
+  # app moved to 15.0, and Xcode 27 refuses both: its own minimum is 15.0.
+  # Pinning them here keeps the pods on whatever floor the app chooses,
+  # including the next time it moves.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = IOS_MIN
+    end
+  end
 end
