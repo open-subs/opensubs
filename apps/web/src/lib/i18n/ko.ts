@@ -135,6 +135,14 @@ const ko: Record<string, string> = {
   "Their timings belong to the other video, so exporting or burning them here will not line up.": "타이밍이 다른 영상의 것이라, 여기서 내보내거나 구워 넣어도 맞지 않습니다.",
   "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」은(는) 말을 글로 옮기지만 시간을 매기지 않아 자막을 만들 수 없습니다. whisper-1 또는 Groq의 Whisper 모델을 고르세요.",
   "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "이 클립은 {length}인데, 이 서비스는 한 번에 약 {minutes}분까지만 받습니다. ‘자르기와 크기’에서 줄이거나, 제한이 없는 ‘이 기기에서’를 쓰세요.",
+  "{credits} credits added.": "{credits} 크레딧이 추가되었습니다.",
+  "{credits} credits from an earlier purchase have been added.": "이전 구매의 {credits} 크레딧이 추가되었습니다.",
+  "That purchase needs approval. The credits arrive once it is given.": "이 구매는 승인이 필요합니다. 승인되면 크레딧이 들어옵니다.",
+  "Paid. The credits will be added as soon as you are back online.": "결제는 끝났습니다. 다시 온라인이 되면 크레딧이 추가됩니다.",
+  "Sign in again to finish adding these credits.": "이 크레딧 추가를 마치려면 다시 로그인하세요.",
+  "The App Store purchase could not be completed.": "App Store 구매를 완료하지 못했습니다.",
+  "Purchasing…": "구매 중…",
+  "Loading the credit packs…": "크레딧 팩을 불러오는 중…",
 };
 
 export default ko;

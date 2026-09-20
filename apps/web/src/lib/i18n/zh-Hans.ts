@@ -135,6 +135,14 @@ const zhHans: Record<string, string> = {
   "Their timings belong to the other video, so exporting or burning them here will not line up.": "它们的时间轴属于另一个视频，因此在这里导出或压制都不会对上。",
   "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」只把语音写成文字，不给出时间，所以做不了字幕。请选 whisper-1，或 Groq 上的 Whisper 模型。",
   "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "这段片子有 {length}，而这个服务单次大约只收 {minutes} 分钟。请在「剪辑与尺寸」里裁短，或改用没有限制的「在本机」。",
+  "{credits} credits added.": "已添加 {credits} 点数。",
+  "{credits} credits from an earlier purchase have been added.": "已补上此前一次购买的 {credits} 点数。",
+  "That purchase needs approval. The credits arrive once it is given.": "这笔购买需要批准。批准后点数就会到账。",
+  "Paid. The credits will be added as soon as you are back online.": "已付款。等你重新联网，点数就会加上。",
+  "Sign in again to finish adding these credits.": "请重新登录以完成这笔点数的入账。",
+  "The App Store purchase could not be completed.": "这次 App Store 购买没有完成。",
+  "Purchasing…": "购买中…",
+  "Loading the credit packs…": "正在载入点数套餐…",
 };
 
 export default zhHans;

@@ -135,6 +135,14 @@ const ja: Record<string, string> = {
   "Their timings belong to the other video, so exporting or burning them here will not line up.": "タイミングは別の動画のものなので、ここで書き出しても焼き込んでも合いません。",
   "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "「{model}」は音声を文字にしますが時間を付けないので、字幕は作れません。whisper-1 か、Groq の Whisper モデルを選んでください。",
   "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "このクリップは {length} ですが、このサービスが一度に受け取れるのは約 {minutes} 分です。「クリップとサイズ」で切り詰めるか、制限のない「この端末で」をお使いください。",
+  "{credits} credits added.": "{credits} クレジットを追加しました。",
+  "{credits} credits from an earlier purchase have been added.": "以前の購入分 {credits} クレジットを追加しました。",
+  "That purchase needs approval. The credits arrive once it is given.": "この購入には承認が必要です。承認されるとクレジットが届きます。",
+  "Paid. The credits will be added as soon as you are back online.": "支払いは完了しています。オンラインに戻り次第、クレジットが追加されます。",
+  "Sign in again to finish adding these credits.": "このクレジットの追加を終えるには、もう一度サインインしてください。",
+  "The App Store purchase could not be completed.": "App Store での購入を完了できませんでした。",
+  "Purchasing…": "購入中…",
+  "Loading the credit packs…": "クレジットパックを読み込んでいます…",
 };
 
 export default ja;

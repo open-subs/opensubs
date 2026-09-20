@@ -135,6 +135,14 @@ const pt: Record<string, string> = {
   "Their timings belong to the other video, so exporting or burning them here will not line up.": "Os tempos são os do outro vídeo, então exportá-las ou queimá-las aqui não vai bater.",
   "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "“{model}” escreve a fala mas não a temporiza, então não consegue fazer legendas. Escolha whisper-1, ou um modelo Whisper no Groq.",
   "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "Este clipe tem {length} e este serviço aceita cerca de {minutes} minutos de cada vez. Corte-o em “Recorte e tamanho”, ou use “Neste dispositivo”, que não tem limite.",
+  "{credits} credits added.": "{credits} créditos adicionados.",
+  "{credits} credits from an earlier purchase have been added.": "{credits} créditos de uma compra anterior foram adicionados.",
+  "That purchase needs approval. The credits arrive once it is given.": "Essa compra precisa de aprovação. Os créditos chegam assim que for dada.",
+  "Paid. The credits will be added as soon as you are back online.": "Pago. Os créditos serão adicionados assim que você voltar a ficar online.",
+  "Sign in again to finish adding these credits.": "Entre novamente para concluir a adição destes créditos.",
+  "The App Store purchase could not be completed.": "Não foi possível concluir a compra na App Store.",
+  "Purchasing…": "Comprando…",
+  "Loading the credit packs…": "Carregando os pacotes de créditos…",
 };
 
 export default pt;
