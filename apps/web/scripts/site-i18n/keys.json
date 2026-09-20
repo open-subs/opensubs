@@ -117,7 +117,6 @@
  "It is read through an object URL and decoded by your browser. There is no upload endpoint in this product, so a footage leak is not something we have to promise against &mdash; it is not possible.",
  "It runs OpenAI's Whisper locally — ONNX weights driven by transformers.js, on WebGPU where the machine has it and on WebAssembly otherwise. Three model sizes are offered: Tiny (English only, about 40 MB), Base (about 80 MB) and Small (about 250 MB). The model downloads once and is then cached by the browser; only the model is fetched, never the audio. The spoken language is detected every four seconds rather than once per file, so a video that switches between two languages comes out as one subtitle file containing both.",
  "It runs Whisper locally &mdash; ONNX weights driven by transformers.js, on WebGPU where available and on WebAssembly otherwise. The model is downloaded once, from 40&nbsp;MB to 250&nbsp;MB depending on which you pick, and then cached by the browser. Only the model is fetched; the audio stays on your machine.",
- "It stays on your device. No upload, no account.",
  "It stays on your machine. No upload, no account.",
  "Language",
  "Last updated August 29, 2026",
