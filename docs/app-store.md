@@ -123,12 +123,18 @@ documented in openpdfedit's `docs/PRODUCTION.md` §3b. OpenSubs needs its
 own rows, and its own product ids:
 
 ```sql
+-- /var/lib/docker/volumes/openapps-prod-data/_data/openapps.db
 INSERT INTO app_iap_products
   (platform, product_id, app_id, bundle_id, credits, usd_price, created_at)
 VALUES
-  ('apple', 'opensubs_credits_1000', 'opensubs', 'app.opensubs.mobile', 1000,  500, unixepoch()),
-  ('apple', 'opensubs_credits_5000', 'opensubs', 'app.opensubs.mobile', 5000, 2000, unixepoch());
+  ('apple', 'opensubs_credits_1000', 'opensubs', 'app.opensubs.mobile', 1000,  499, unixepoch()),
+  ('apple', 'opensubs_credits_5000', 'opensubs', 'app.opensubs.mobile', 5000, 1999, unixepoch());
 ```
+
+499 and 1999, not 500 and 2000: the web packages are $5 and $20, and Apple
+has no such price points -- the nearest tiers are $4.99 and $19.99. The
+row should say what the customer is actually charged, or the ledger and
+the receipt disagree by a cent for ever.
 
 The ids are prefixed on purpose. The server looks a product up by
 `(platform, product_id)` alone, so a bare `credits_1000` is already
@@ -141,9 +147,43 @@ Store Connect decides what a pack *costs*, this table decides what it is
 *worth*, and `OpenSubsStore.productIdentifiers` decides what to ask
 about.
 
-Also set the Server Notifications URL in App Store Connect to the
-accounts server's Apple webhook. Without it a refund is never clawed
-back: Apple refunds the customer and the credits stay spent.
+Also set the Server Notifications V2 URL in App Store Connect to
+`https://auth.opensubs.app/v1/webhooks/apple`. Without it a refund is
+never clawed back: Apple refunds the customer and the credits stay spent.
+
+Three things about the deployment this needs, all of them checked
+against the live server rather than assumed:
+
+- **The rail is not deployed yet.** `/v1/payments/apple/redeem` answers
+  404 there while `/v1/payments/stripe/checkout` answers 401, so the
+  running image predates the Apple routes. The container is
+  `openapps-prod` from `openapps-server:prod`; it has to be rebuilt from
+  the monorepo and restarted before any of this can work.
+- **The root certificate has to be inside the container.** The config
+  mount is a single file -- `/opt/openapps/config/prod-base.toml` at
+  `/etc/openapps/base.toml` -- so a `root_certificates_file` pointing at
+  `/opt/openapps/config/apple-root-ca-g3.pem` names a path the server
+  cannot see. Either mount the PEM as well or use
+  `root_certificates_pem` inline.
+- **`capacitor://localhost` is not an allowed origin.** The app is served
+  from that scheme, and the allow-list on the running container names
+  the web hostnames only. Without it the app cannot sign in, read a
+  balance or redeem anything -- the failure is CORS, arrives before any
+  of the purchase code runs, and looks nothing like a purchase bug.
+
+### Sandbox, and where it can be tested
+
+A TestFlight purchase is a *sandbox* purchase. The server refuses a
+receipt from the other environment on purpose -- a sandbox receipt
+verifies against Apple's real certificates exactly as a paid one does,
+so only that check separates a tester from an unlimited credit printer.
+
+That means production cannot credit a TestFlight test. Either point the
+app at a second deployment configured `environment = "sandbox"` for the
+test, or accept that the first end-to-end run of the chain happens on
+the first real purchase. The first is the reason to have a staging
+accounts server; the second is a decision, not an accident, and should
+be made deliberately.
 
 ## Order of operations, once the above is settled
 
