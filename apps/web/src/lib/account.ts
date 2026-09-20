@@ -219,3 +219,28 @@ export function jobKey(lines: string[], target: string): string {
   }
   return `${APP_ID}-translate-${hash.toString(16)}-${lines.length}`;
 }
+
+/**
+ * The account, as `src/lib/iap.ts` needs it.
+ *
+ * That module deliberately imports nothing at runtime -- it is the one
+ * place where the order "redeem, then finish" is enforced, and being
+ * importable on its own is what lets a test drive it against a fake
+ * StoreKit and a fake server. This adapter is the seam.
+ */
+export function iapSession(): import("./iap").Session {
+  return {
+    authUrl: AUTH_URL,
+    token: () => account().session?.accessToken ?? undefined,
+    signedIn,
+    refresh: async () => {
+      if (!signedIn()) return false;
+      try {
+        await account().credits.balance();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}

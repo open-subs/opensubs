@@ -22,6 +22,8 @@
     InsufficientCredits,
     NotSignedIn,
   } from "./lib/account";
+  import AppleCredits from "./lib/AppleCredits.svelte";
+  import { appleStore, mustUseInAppPurchase } from "./lib/native";
   import {
     saveWork,
     loadWork,
@@ -1924,7 +1926,20 @@
         <span class="oa-caption">{empty}</span>
       {/if}
       <span class="credit-actions">
-        <openapps-buy return-to="none"></openapps-buy>
+        <!--
+          Inside the iOS shell credits are Apple's to sell. Guideline 3.1.1
+          requires in-app purchase for digital content used in the app, so
+          the card checkout is not merely redundant here -- it is the thing
+          that must not be rendered. `mustUseInAppPurchase()` is true for
+          the whole shell, including a build whose StoreKit plugin is
+          missing: then neither way to buy is offered, which is correct.
+          Offering the card one would be a removable app.
+        -->
+        {#if !mustUseInAppPurchase()}
+          <openapps-buy return-to="none"></openapps-buy>
+        {:else if appleStore()}
+          <AppleCredits store={appleStore()!} oncredited={() => void refreshBalance()} />
+        {/if}
         <openapps-signout></openapps-signout>
       </span>
     {:else}

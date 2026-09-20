@@ -12,6 +12,10 @@ decision.
 
 ## What is ready
 
+In-app purchase through StoreKit, end to end on the client side, and the
+SQL the server needs. What is not done is anything that requires this
+machine to build or this account to have an app record — see below.
+
 - `apps/mobile/ios/scripts/archive.sh` — stage the web app, archive,
   export, validate with Apple, upload. Modelled on openpdfedit's, with
   two Capacitor differences: it builds the **workspace** (the Capacitor
@@ -75,45 +79,91 @@ cue segmenter and the libass renderer, all WebAssembly — so it transcribes,
 styles and burns with the network off. Say that in the review notes: a
 reviewer who taps around the first screen sees a web view.
 
-**3.1.1, in-app purchase.** This is the open question, and it is not
-answered yet. Credits are digital content used inside the app, so Apple
-requires them to be sold through in-app purchase. The staged bundle today
-carries `<openapps-buy>` — the card checkout — and `<openapps-login>`,
-and reaches `gateway.opensubs.app` for paid translation. Submitted as it
-stands, that is a rejection.
+**3.1.1, in-app purchase.** Credits are digital content used inside the
+app, so Apple requires them to be sold through the App Store. This is
+built:
 
-Three ways out, and the choice is a product decision:
+- `apps/mobile/ios/App/App/OpenSubsStore.swift` — StoreKit 2, reduced to
+  four calls: `products`, `purchase`, `outstanding`, `finish`. It holds a
+  transaction and finishes nothing on its own.
+- `apps/web/src/lib/native.ts` — the shell as the page sees it. The
+  plugin is asked for by name through Capacitor rather than assumed from
+  the platform, so a TestFlight build made before the plugin existed does
+  not offer a button that throws.
+- `apps/web/src/lib/iap.ts` — the order: pay, redeem on the server, and
+  only then finish. Imports nothing at runtime, which is what lets
+  `apps/web/e2e/iap.mjs` drive it against a fake StoreKit and a fake
+  server; 23 cases, including the ones a real sandbox purchase cannot
+  produce because it succeeds.
+- `apps/web/src/lib/AppleCredits.svelte` — the panel that replaces
+  `<openapps-buy>` inside the shell, and the startup sweep that redeems
+  anything StoreKit still considers owing.
 
-1. **Ship the app free-only.** Hide the paid translation route and the
-   purchase element inside the shell. Everything that made the product —
-   transcription, on-device translation, all twelve styles, burning,
-   every export — is free and runs locally, so the app loses the one
-   feature that costs money and needs no IAP at all. Smallest change,
-   nothing to maintain, no revenue on iOS.
-2. **StoreKit.** What openpdfedit did: the shell sells credits through
-   Apple and the server grants them from the receipt. The server rail
-   already exists — `app_iap_products`, Apple receipt verification and
-   the refund webhook are in `openapps-server` and documented in
-   openpdfedit's `docs/PRODUCTION.md` §3b — so the missing half is the
-   client: a StoreKit purchase in the Capacitor shell, a bridge to the
-   page, and the page swapping its card checkout for it inside the app.
-   Most work; the only option that earns anything on iOS.
-3. **Sign-in only, no selling.** Credits bought on the web may be *used*
-   in the app; the app must neither sell them nor point anyone at where
-   to buy. Cheaper than StoreKit and allowed on its face, but 3.1.3(b) is
-   read narrowly by reviewers outside the reader categories, so it is the
-   option most likely to come back.
+The card checkout is behind `{#if !mustUseInAppPurchase()}` in
+`App.svelte`, and a test asserts there is exactly one of it and that it
+sits behind that guard — the way this breaks is somebody adding a second
+`<openapps-buy>` elsewhere on the page, which looks harmless and takes
+the app down.
+
+**A transaction is finished only after the server grants the credits.**
+StoreKit re-delivers an unfinished transaction on every launch, which is
+what makes a purchase survive a crash or a dead network between paying
+and being credited. Finishing early throws that away and leaves somebody
+charged for credits nobody granted, with no record left to retry from.
+
+The related trap is 3.1.3(b): an account made elsewhere may be *used* in
+the app, and the app may not *tell* anyone where to make one. The
+sign-in element is fine. A "sign up on our website" link is not.
+
+### What the server needs
+
+The rail already exists in `openapps-server` — Apple receipt
+verification, `app_iap_products`, and the refund webhook — and is
+documented in openpdfedit's `docs/PRODUCTION.md` §3b. OpenSubs needs its
+own rows, and its own product ids:
+
+```sql
+INSERT INTO app_iap_products
+  (platform, product_id, app_id, bundle_id, credits, usd_price, created_at)
+VALUES
+  ('apple', 'opensubs_credits_1000', 'opensubs', 'app.opensubs.mobile', 1000,  500, unixepoch()),
+  ('apple', 'opensubs_credits_5000', 'opensubs', 'app.opensubs.mobile', 5000, 2000, unixepoch());
+```
+
+The ids are prefixed on purpose. The server looks a product up by
+`(platform, product_id)` alone, so a bare `credits_1000` is already
+openpdfedit's row: the lookup would succeed, resolve to
+`com.openpdfedit.app`, and then fail verification against our bundle —
+a confusing failure a long way from its cause.
+
+Three places have to agree, and each decides something different: App
+Store Connect decides what a pack *costs*, this table decides what it is
+*worth*, and `OpenSubsStore.productIdentifiers` decides what to ask
+about.
+
+Also set the Server Notifications URL in App Store Connect to the
+accounts server's Apple webhook. Without it a refund is never clawed
+back: Apple refunds the customer and the credits stay spent.
 
 ## Order of operations, once the above is settled
 
 1. `sudo xcodebuild -license`, then the Apple Distribution certificate.
 2. Create the app record in App Store Connect.
-3. Decide the 3.1.1 route and implement it.
+3. Create the two consumables in App Store Connect —
+   `opensubs_credits_1000` and `opensubs_credits_5000` — and insert the
+   rows above on the accounts server.
 4. Test the iOS floor on simulators; set `IPHONEOS_DEPLOYMENT_TARGET`.
 5. `cd apps/mobile/ios && ./scripts/archive.sh --validate`, then
    `--upload`.
 6. The build appears under TestFlight after processing. Install it on a
    real device — every measurement in `docs/mobile.md` is from a
    simulator with no GPU adapter.
-7. Screenshots, App Privacy answers, export-compliance answer, review
+7. **Sandbox-test a real purchase through TestFlight before submitting.**
+   This is the first moment the whole chain runs end to end — StoreKit,
+   the receipt, the server's verifier, the ledger — and the first moment
+   Apple's real certificate chain is parsed by anything of ours. Check
+   both halves of the rule while you are there: the credits appear, and
+   killing the app between paying and being credited still ends with the
+   credits arriving on the next launch.
+8. Screenshots, App Privacy answers, export-compliance answer, review
    notes. Then the submit button, by hand.

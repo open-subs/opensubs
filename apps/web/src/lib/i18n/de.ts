@@ -135,6 +135,14 @@ const de: Record<string, string> = {
   "Their timings belong to the other video, so exporting or burning them here will not line up.": "Ihre Zeiten gehören zum anderen Video, ein Export oder Einbrennen hier passt also nicht.",
   "“{model}” writes out speech but does not time it, so it cannot make subtitles. Pick whisper-1, or a Whisper model on Groq.": "„{model}“ schreibt Sprache mit, zeitet sie aber nicht, kann also keine Untertitel erzeugen. Nehmen Sie whisper-1 oder ein Whisper-Modell auf Groq.",
   "This clip is {length}, and this service takes about {minutes} minutes at a time. Trim it under Clip & size, or use “On this device”, which has no limit.": "Dieser Ausschnitt ist {length} lang, dieser Dienst nimmt etwa {minutes} Minuten am Stück. Kürzen Sie ihn unter „Ausschnitt & Größe“, oder nehmen Sie „Auf diesem Gerät“, das keine Grenze hat.",
+  "{credits} credits added.": "{credits} Credits hinzugefügt.",
+  "{credits} credits from an earlier purchase have been added.": "{credits} Credits aus einem früheren Kauf wurden gutgeschrieben.",
+  "That purchase needs approval. The credits arrive once it is given.": "Dieser Kauf muss bestätigt werden. Die Credits kommen, sobald das geschehen ist.",
+  "Paid. The credits will be added as soon as you are back online.": "Bezahlt. Die Credits werden gutgeschrieben, sobald Sie wieder online sind.",
+  "Sign in again to finish adding these credits.": "Melden Sie sich erneut an, um diese Credits gutschreiben zu lassen.",
+  "The App Store purchase could not be completed.": "Der Kauf im App Store konnte nicht abgeschlossen werden.",
+  "Purchasing…": "Wird gekauft…",
+  "Loading the credit packs…": "Credit-Pakete werden geladen…",
 };
 
 export default de;
