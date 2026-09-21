@@ -89,6 +89,8 @@ const ja: Record<string, string> = {
   "Sending the audio": "音声を送信中",
   "Listening for the language": "言語を判定中",
   "Listening to the audio": "音声を聞き取り中",
+  "Checking for missed lines": "聞き漏らしを確認中",
+  "Checking again for missed lines": "聞き漏らしを再確認中",
   "Loading the speech model": "音声モデルを読み込み中",
   "Downloading the speech model": "音声モデルをダウンロード中",
   "Chrome's built-in translation. Free, private, no key — nothing is uploaded.": "Chrome 内蔵の翻訳。無料でプライベート、キー不要 —— 何もアップロードしません。",

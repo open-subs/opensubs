@@ -32,6 +32,14 @@ import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
 import {
+  MAX_SEGMENT_S,
+  MIN_CHARS_PER_SECOND,
+  fillGaps,
+  loudness,
+  readable,
+  type WhisperChunk,
+} from "./refill";
+import {
   TARGET_SAMPLE_RATE,
   geminiBase,
   geminiChunkPlan,
@@ -362,10 +370,6 @@ async function resample(
 let pipelinePromise: Promise<unknown> | null = null;
 let loadedModelId: string | null = null;
 
-interface WhisperChunk {
-  text: string;
-  timestamp: [number, number | null];
-}
 
 /**
  * Per-word loudness for a set of cues, as RMS normalised across the clip.
@@ -1369,7 +1373,26 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   const kept = splitLong(dropOverlong(segments));
   segments.length = 0;
   segments.push(...kept);
-  await fillGaps(segments, runs, audio, transcriber, englishOnly, signal);
+  await fillGaps(
+    segments,
+    runs,
+    audio,
+    // A second reading is taken exactly as the first was, and only the
+    // language comes from the gap: the refill decides *what* to read again,
+    // this decides *how*.
+    async (slice, language) =>
+      (
+        await transcriber(slice, {
+          return_timestamps: true,
+          chunk_length_s: CHUNK_LENGTH_S,
+          stride_length_s: STRIDE_LENGTH_S,
+          no_repeat_ngram_size: 6,
+          ...(englishOnly ? {} : { language, task: "transcribe" }),
+        })
+      ).chunks ?? [],
+    signal,
+    onProgress,
+  );
   // After the gap filling, never before it. Removing a hallucinated line
   // leaves a gap where it was, and a filler running afterwards would read
   // that same silence again and write the same line straight back in.
@@ -1541,197 +1564,6 @@ const SPLIT_TARGET_S = 5;
  */
 const LEAD_OUT_S = 3;
 
-/** No spoken segment worth one subtitle runs longer than this. */
-const MAX_SEGMENT_S = 12;
-/** Slower than this is not speech, whatever the timestamps claim. */
-const MIN_CHARS_PER_SECOND = 2;
-
-/** A stretch of speech with no subtitle over it is worth looking at again. */
-const GAP_S = 4;
-/** Past this, the gap is not a recogniser slip and re-reading it is not cheap. */
-const MAX_GAP_S = 60;
-/**
- * At most this many second readings, however many gaps there turn out to be.
- *
- * Twelve was not enough once boundaries were placed properly: a file with
- * several language changes has several seams, each seam can leave a gap,
- * and each gap can take more than one round to clear. The budget ran out
- * mid-file and left nineteen seconds unread. Each reading is bounded by
- * `MAX_GAP_S`, so the worst case here is minutes of extra work on a file
- * that is already taking minutes -- against silently dropping speech.
- */
-const MAX_REFILLS = 30;
-/**
- * ...but no more than one re-read per this many seconds of audio.
- *
- * Thirty is right for a four-minute file with two language changes and
- * far too many for one with eight: every seam can leave a gap, every gap
- * costs a full pass, and a fixed budget that is generous for a short file
- * is a way to spend twenty minutes on one that is not much longer.
- */
-const REFILL_SECONDS_EACH = 20;
-/** And at most this many rounds of them, so a stubborn gap cannot loop. */
-const MAX_REFILL_ROUNDS = 4;
-/**
- * How loud a gap must be, against the whole clip, to be worth re-reading.
- *
- * Most gaps are real: silence, music, a held shot. Only the ones with
- * someone talking in them are a failure.
- */
-const GAP_SPEECH_RATIO = 0.15;
-
-/**
- * Transcribe again over any stretch of speech that produced nothing.
- *
- * Whisper's pipeline reconciles overlapping windows by matching their
- * tokens, and when that match goes wrong it does not error -- it drops
- * the span. Measured on the reported footage: twenty seconds of a Chinese
- * interview, between 1:06 and 1:26, simply absent from the subtitles.
- *
- * It is also *chaotic*. Moving where a pass begins by half a second
- * reshuffles every 30-second window inside it, and the same audio then
- * loses a different span, or none. Three runs over the same file: 210
- * seconds covered, then 184, then 201. So this cannot be tuned away by
- * choosing better boundaries; the boundaries are not the fault, and a
- * boundary that happens to avoid it on one file is luck, not a fix.
- *
- * What can be done is to notice. Silence needs no subtitle, so a gap is
- * only suspicious when there is sound in it, and then the span is read
- * again on its own -- where it is the whole input rather than one window
- * among many, and there is nothing to reconcile it with.
- */
-async function fillGaps(
-  segments: Segment[],
-  runs: LanguageRun[],
-  audio: Float32Array,
-  transcriber: (audio: Float32Array, options: Record<string, unknown>) => Promise<{
-    text: string;
-    chunks?: WhisperChunk[];
-  }>,
-  englishOnly: boolean,
-  signal?: AbortSignal,
-): Promise<void> {
-  let energy = 0;
-  for (let i = 0; i < audio.length; i += 16) energy += audio[i] * audio[i];
-  const overall = Math.sqrt(energy / Math.max(1, audio.length / 16));
-  if (!(overall > 0)) return;
-
-  // Re-reading is bounded work. A handful of gaps is a recogniser having a
-  // bad moment, which is worth fixing; dozens of them means something else
-  // is wrong, and grinding through all of them would turn a transcription
-  // that finished badly into one that does not finish.
-  let budget = Math.min(
-    MAX_REFILLS,
-    Math.ceil(audio.length / TARGET_SAMPLE_RATE / REFILL_SECONDS_EACH),
-  );
-
-  // Rounds, because one re-read often does not finish the job.
-  //
-  // Measured on the reported footage: asked for 59.5 to 86.5 seconds --
-  // twenty-seven seconds of interview -- Whisper returned a single chunk
-  // covering the first three, and nonsense at that. Asked for 66.6 to
-  // 86.5, it transcribed the lot correctly. Something in the first
-  // seconds after the speaker changes poisons the window, and stepping
-  // past it is all that is needed. So whatever a re-read leaves uncovered
-  // becomes a gap again, and is read again, until nothing new comes back.
-  for (let round = 0; round < MAX_REFILL_ROUNDS && budget > 0; round += 1) {
-    const found = await fillRound(segments, runs, audio, transcriber, englishOnly, signal, () => budget, (n) => { budget = n; }, overall);
-    if (found.length === 0) break;
-    segments.push(...found);
-    segments.sort((a, b) => a.start - b.start);
-  }
-}
-
-async function fillRound(
-  segments: Segment[],
-  runs: LanguageRun[],
-  audio: Float32Array,
-  transcriber: (audio: Float32Array, options: Record<string, unknown>) => Promise<{
-    text: string;
-    chunks?: WhisperChunk[];
-  }>,
-  englishOnly: boolean,
-  signal: AbortSignal | undefined,
-  getBudget: () => number,
-  setBudget: (n: number) => void,
-  overall: number,
-): Promise<Segment[]> {
-  segments.sort((a, b) => a.start - b.start);
-  const found: Segment[] = [];
-  let budget = getBudget();
-
-  for (const run of runs) {
-    const from = run.from / TARGET_SAMPLE_RATE;
-    const to = run.to / TARGET_SAMPLE_RATE;
-    let cursor = from;
-    const inside = segments.filter((seg) => seg.start >= from - 0.5 && seg.start < to);
-    for (const seg of [...inside, { start: to, end: to, text: "" }]) {
-      const gap = seg.start - cursor;
-      if (
-        budget > 0 &&
-        gap >= GAP_S &&
-        gap <= MAX_GAP_S &&
-        loudness(audio, cursor, seg.start) > overall * GAP_SPEECH_RATIO
-      ) {
-        budget -= 1;
-        if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-        const slice = audio.slice(
-          Math.round(cursor * TARGET_SAMPLE_RATE),
-          Math.round(seg.start * TARGET_SAMPLE_RATE),
-        );
-        const again = await transcriber(slice, {
-          return_timestamps: true,
-          chunk_length_s: CHUNK_LENGTH_S,
-          stride_length_s: STRIDE_LENGTH_S,
-          no_repeat_ngram_size: 6,
-          ...(englishOnly ? {} : { language: run.language, task: "transcribe" }),
-        });
-        for (const chunk of again.chunks ?? []) {
-          const text = readable(chunk.text);
-          const [begin, end] = chunk.timestamp;
-          if (!text || typeof begin !== "number") continue;
-          // A re-read can smear exactly as the first read did, and one
-          // that does must not be kept -- keeping it fills the gap with
-          // nonsense and stops the next round retrying the span. Same
-          // test as `dropOverlong`, applied to what comes back.
-          const covers = (typeof end === "number" && end > begin ? end : begin) - begin;
-          if (covers > MAX_SEGMENT_S && text.length / covers < MIN_CHARS_PER_SECOND) continue;
-          const start = cursor + begin;
-          // Never past the gap it was asked to fill: a refilled span that
-          // ran long would overlap the subtitle that follows it.
-          if (start >= seg.start) continue;
-          found.push({
-            start,
-            end: Math.min(
-              seg.start,
-              cursor + (typeof end === "number" && end > begin ? end : begin + 1),
-            ),
-            text,
-          });
-        }
-      }
-      cursor = Math.max(cursor, seg.end);
-    }
-  }
-
-  setBudget(budget);
-  return found;
-}
-
-/** RMS between two times, in seconds. */
-function loudness(audio: Float32Array, from: number, to: number): number {
-  const a = Math.max(0, Math.round(from * TARGET_SAMPLE_RATE));
-  const b = Math.min(audio.length, Math.round(to * TARGET_SAMPLE_RATE));
-  if (b <= a) return 0;
-  let sum = 0;
-  let n = 0;
-  for (let i = a; i < b; i += 16) {
-    sum += audio[i] * audio[i];
-    n += 1;
-  }
-  return n > 0 ? Math.sqrt(sum / n) : 0;
-}
-
 /**
  * Give back a plausible duration to any segment that came out with none.
  *
@@ -1823,9 +1655,6 @@ const SECONDS_PER_CHAR = 0.06;
  * font can draw it and tells the user to remove an emoji they never typed.
  * It is not content and never was, so it does not survive to the cue.
  */
-function readable(text: string): string {
-  return text.replace(/\uFFFD/g, "").replace(/\s+/g, " ").trim();
-}
 
 /**
  * Turn one of the app's language codes into one Whisper knows.

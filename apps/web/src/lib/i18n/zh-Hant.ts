@@ -89,6 +89,8 @@ const zhHant: Record<string, string> = {
   "Sending the audio": "正在傳送音訊",
   "Listening for the language": "正在辨識語言",
   "Listening to the audio": "正在聽取音訊",
+  "Checking for missed lines": "正在檢查遺漏的字幕",
+  "Checking again for missed lines": "正在再次檢查遺漏的字幕",
   "Loading the speech model": "正在載入語音模型",
   "Downloading the speech model": "正在下載語音模型",
   "Chrome's built-in translation. Free, private, no key — nothing is uploaded.": "Chrome 內建翻譯。免費、私密、無需金鑰 —— 不上傳任何內容。",

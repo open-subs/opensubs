@@ -89,6 +89,8 @@ const pt: Record<string, string> = {
   "Sending the audio": "Enviando o áudio",
   "Listening for the language": "Detectando o idioma",
   "Listening to the audio": "Ouvindo o áudio",
+  "Checking for missed lines": "Procurando falas perdidas",
+  "Checking again for missed lines": "Procurando de novo falas perdidas",
   "Loading the speech model": "Carregando o modelo de voz",
   "Downloading the speech model": "Baixando o modelo de voz",
   "Chrome's built-in translation. Free, private, no key — nothing is uploaded.": "A tradução integrada do Chrome. Grátis, privada, sem chave — nada é enviado.",
