@@ -8,7 +8,7 @@
  * host to reach it.
  */
 
-import { api, tell, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
+import { api, tell, toWire, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
 import { capture, findMedia, recordWindows } from "../lib/capture";
 import { cueAt } from "../lib/seam";
 
@@ -120,7 +120,7 @@ async function begin(next: Settings) {
       stream,
       settings.window,
       async (w) => {
-        const audio = await w.blob.arrayBuffer();
+        const audio = toWire(await w.blob.arrayBuffer());
         await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset });
       },
       () => running,
@@ -142,6 +142,23 @@ function halt() {
   void tell<FromPage>({ kind: "ended" });
 }
 
+// Registered once per page, however many times this file is injected.
+//
+// Every Start injects it again -- the background cannot cheaply tell whether
+// an earlier injection is still alive, and a page that navigated needs a fresh
+// one. Content scripts from one extension share an isolated world, so a flag
+// on it survives between injections. Without the flag a second Start leaves
+// two copies listening: both receive "begin", both record, every window goes
+// to the engine twice, and the engine's one-deep queue drops half of them --
+// which looks exactly like transcription failing to keep up (APP-110).
+const INSTALLED = "__opensubsOverlay";
+const world = globalThis as unknown as Record<string, boolean>;
+if (!world[INSTALLED]) {
+  world[INSTALLED] = true;
+  listen();
+}
+
+function listen() {
 api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
   switch (message.kind) {
     case "begin": void begin(message.settings); break;
@@ -165,3 +182,4 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
 // A page that navigates away (an SPA route change, a next episode) leaves a
 // recorder pointed at a detached element. Stop rather than record silence.
 window.addEventListener("pagehide", halt);
+}

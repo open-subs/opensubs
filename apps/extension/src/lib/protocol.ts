@@ -56,9 +56,25 @@ export type Command =
   | { kind: "state"; tabId?: number }
   | { kind: "cues"; tabId?: number };
 
+/**
+ * One recorded window of audio, as it crosses a message boundary.
+ *
+ * Base64 text, not an ArrayBuffer. Chromium serialises extension messages as
+ * JSON, and JSON has no binary type: an ArrayBuffer handed to
+ * `runtime.sendMessage` arrives on the other side as `{}` -- no error, no
+ * warning, just an empty object where the audio was. The engine then reports
+ * "Input has an unsupported or unrecognizable format", which reads as a codec
+ * problem and is not one (APP-109). Firefox structured-clones messages and
+ * would have carried the buffer fine, so the fault is invisible there.
+ *
+ * Text survives both. It costs a third more bytes on the wire -- about 30 KB
+ * on a 20-second Opus window -- which is nothing next to the model.
+ */
+export type WireAudio = string;
+
 /** Sent by the content script to the background. */
 export type FromPage =
-  | { kind: "window"; audio: ArrayBuffer; mime: string; offset: number }
+  | { kind: "window"; audio: WireAudio; mime: string; offset: number }
   | { kind: "media"; found: boolean; duration: number; reason?: string }
   | { kind: "ended" };
 
@@ -72,7 +88,7 @@ export type ToPage =
 /** Background <-> engine host. */
 export type ToEngine =
   | { kind: "warm"; model: string }
-  | { kind: "transcribe"; audio: ArrayBuffer; mime: string; offset: number; settings: Settings }
+  | { kind: "transcribe"; audio: WireAudio; mime: string; offset: number; settings: Settings }
   | { kind: "release" };
 
 /**
@@ -107,4 +123,29 @@ export async function tell<T>(message: T): Promise<unknown> {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Bytes to base64, in slices.
+ *
+ * `btoa(String.fromCharCode(...bytes))` is the one-line version and it throws
+ * "Maximum call stack size exceeded" on anything over a few hundred kilobytes,
+ * because every byte becomes a function argument. A long window at a high
+ * bitrate gets there. Slicing keeps each call small.
+ */
+export function toWire(buffer: ArrayBuffer): WireAudio {
+  const bytes = new Uint8Array(buffer);
+  let text = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(text);
+}
+
+/** Base64 back to bytes. */
+export function fromWire(audio: WireAudio): Uint8Array {
+  const text = atob(audio);
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i += 1) bytes[i] = text.charCodeAt(i);
+  return bytes;
 }

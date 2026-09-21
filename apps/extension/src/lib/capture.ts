@@ -22,7 +22,16 @@
  * without CORS headers taints the element so `captureStream` throws.
  */
 
-/** Windows are recorded with this much of the previous one repeated. */
+/**
+ * Each window begins this long before the previous one ends.
+ *
+ * A window is cut where the clock says, not between two sentences, so a
+ * sentence often straddles the cut. Whisper drops or garbles the half it
+ * cannot finish; with the overlap the next window hears it whole, and
+ * `seam.ts` keeps the better reading. Measured on a two-minute lecture
+ * before the overlap existed: nine seconds of speech at one seam produced
+ * no subtitle at all (APP-110).
+ */
 export const OVERLAP_S = 3;
 
 export interface Window {
@@ -93,7 +102,13 @@ export function recordWindow(
   at: () => number,
 ): { done: Promise<Window | null>; stop: () => void } {
   const mime = bestContainer();
-  const offset = Math.max(0, at() - OVERLAP_S);
+  // Where recording actually starts. This used to subtract OVERLAP_S, as if
+  // the recorder had started earlier than it had -- but nothing ever started
+  // it earlier, so every window after the first was stamped three seconds
+  // before its own audio, and every subtitle showed three seconds before the
+  // words (APP-110). The overlap is now real, in `recordWindows`, and this is
+  // just the truth.
+  const offset = at();
   const rec = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : undefined);
   const parts: Blob[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -118,12 +133,22 @@ export function recordWindow(
 }
 
 /**
- * Record window after window until stopped.
+ * Record window after window, each overlapping the last, until stopped.
  *
- * `onWindow` is awaited, but only so that a slow consumer cannot be handed
- * two windows at once; it must not be used to throttle capture. Recording
- * has to keep pace with playback or the subtitles fall behind the film for
- * good, which is why the engine drops windows rather than queueing them.
+ * A new window starts every `seconds - OVERLAP_S`, while the previous one is
+ * still recording, so there are briefly two MediaRecorders on the track --
+ * which is allowed, and each still produces a self-contained file.
+ *
+ * `onWindow` is called in order and never twice at once, so a slow consumer
+ * cannot be handed two windows together. It must not be used to throttle
+ * capture: recording has to keep pace with playback or the subtitles fall
+ * behind the film for good, which is why the engine drops windows rather
+ * than queueing them.
+ *
+ * Returns when `running()` turns false or the film ends. On the end, the
+ * windows still recording are closed at once rather than left to run out
+ * their clocks over silence -- the last lines of a film should not wait
+ * twenty seconds after the credits for a timer.
  */
 export async function recordWindows(
   media: HTMLMediaElement,
@@ -134,10 +159,41 @@ export async function recordWindows(
 ): Promise<void> {
   const track = stream.getAudioTracks()[0];
   if (!track) throw new Error("That video has no audio track this extension can read.");
-  while (running()) {
-    const { done } = recordWindow(track, seconds, () => media.currentTime);
-    const got = await done;
-    if (!running()) break;
-    if (got) await onWindow(got);
+
+  const step = Math.max(1, seconds - OVERLAP_S);
+  const live = new Set<() => void>();
+  let delivered: Promise<void> = Promise.resolve();
+  let ended = media.ended;
+  const onEnded = () => { ended = true; };
+  media.addEventListener("ended", onEnded);
+
+  try {
+    while (running() && !ended) {
+      const current = recordWindow(track, seconds, () => media.currentTime);
+      live.add(current.stop);
+      const got = current.done.finally(() => live.delete(current.stop));
+      // In order, one at a time, and not at all once Stop has been pressed.
+      delivered = delivered.then(async () => {
+        const w = await got;
+        if (w && running()) await onWindow(w);
+      });
+      await until(step * 1000, () => !running() || ended);
+    }
+    for (const stop of [...live]) stop();
+    await delivered;
+  } finally {
+    media.removeEventListener("ended", onEnded);
   }
+}
+
+/** Wait `ms`, or less if `early()` turns true first. */
+function until(ms: number, early: () => boolean): Promise<void> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + ms;
+    const tick = () => {
+      if (early() || Date.now() >= deadline) resolve();
+      else setTimeout(tick, Math.min(200, deadline - Date.now()));
+    };
+    tick();
+  });
 }

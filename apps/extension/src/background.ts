@@ -80,21 +80,36 @@ function toEngine(message: ToEngine) {
 
 // --- talking to the page -------------------------------------------------
 
-async function page(tabId: number, message: ToPage) {
+/** Whether the page took the message. */
+async function page(tabId: number, message: ToPage): Promise<boolean> {
   try {
     await api.tabs.sendMessage(tabId, message);
+    return true;
   } catch {
     // The tab navigated or closed mid-flight. Stopping is the right answer
     // to both, and neither deserves an error in the console.
     if (session?.tabId === tabId) session = null;
+    return false;
   }
 }
 
-async function inject(tabId: number) {
+/**
+ * Put the content script in the page, or say why it could not go in.
+ *
+ * This used to swallow every failure on the theory that the only one was
+ * "already injected". There is no such failure -- executeScript runs the file
+ * again, and overlay.ts guards itself against that -- so the catch only ever
+ * hid real ones: a page the browser will not script (the Web Store, a PDF, a
+ * browser page), a permission that was refused, and, in 1.0.1, a content.js
+ * that was a syntax error from its first line (APP-109). Each of those left
+ * the popup saying "Listening" over a page with nothing in it.
+ */
+async function inject(tabId: number): Promise<string | null> {
   try {
     await api.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-  } catch {
-    // Already injected, which is the common case on a second start.
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
   }
 }
 
@@ -134,9 +149,20 @@ async function start(tabId: number, next: Settings) {
   session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: "Starting" } };
   starting ??= startEngine();
   await starting;
-  await inject(tabId);
+  const refused = await inject(tabId);
+  if (refused) {
+    setStatus({ stage: "error", fraction: null, note: `This page cannot be subtitled: ${refused}` });
+    session = null;
+    return;
+  }
   await toEngine({ kind: "warm", model: next.model });
-  await page(tabId, { kind: "begin", settings: next });
+  // Checked, because this is the one message the rest depends on. If the page
+  // did not take it, nothing will ever record -- and saying "Listening" over
+  // that is how 1.0.1 looked to everyone who tried it.
+  if (!(await page(tabId, { kind: "begin", settings: next }))) {
+    setStatus({ stage: "error", fraction: null, note: "The page did not answer. Reload it and press Start again." });
+    return;
+  }
   setStatus({ stage: "listening", fraction: null, note: "Listening" });
 }
 

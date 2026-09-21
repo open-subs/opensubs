@@ -107,6 +107,144 @@ ok(
   ok("past an hour the clock still reads correctly", srt.includes("01:02:05,001"), srt.split("\n")[1]);
 }
 
+// --- a seam where the tail of one line is the head of the next (APP-110) --
+//
+// The three seams below are verbatim from a two-minute lecture captured
+// through the installed extension, once the windows genuinely overlapped.
+// Every one of them came out with the phrase on screen twice.
+
+for (const [name, kept, incoming, keptWant] of [
+  ["a phrase heard at both ends of a seam is shown once",
+    { start: 29.7, end: 35.4, text: "to his pant design, strategically placing them at points of strain, like the corners of pockets" },
+    { start: 34.0, end: 38.0, text: "like the corners of pockets and the base of the fly." },
+    "to his pant design, strategically placing them at points of strain,"],
+  ["a whole sentence repeated at the seam is shown once",
+    { start: 48.0, end: 54.0, text: "He approaches the supplier of his cloth, a dry goods merchant by the name of Levi Strauss." },
+    { start: 51.0, end: 57.3, text: "a dry goods merchant by the name of Levi Strauss. Strauss and Davis begin manufacturing" },
+    "He approaches the supplier of his cloth,"],
+  ["a short phrase repeated at the seam is shown once",
+    { start: 64.2, end: 69.5, text: "It is rumored that the removal of the crotch rivet was due to a complaint from the miners" },
+    { start: 68.0, end: 74.3, text: "from the miners that squatting to near a campfire in their typical underwear-free fashion" },
+    "It is rumored that the removal of the crotch rivet was due to a complaint"],
+]) {
+  const out = stitch([kept], [incoming]);
+  eq(name, out.map((c) => c.text), [keptWant, incoming.text]);
+  ok(`${name}: the lines no longer share the screen`, out[0].end <= out[1].start,
+    `${out[0].end} > ${out[1].start}`);
+}
+
+{
+  // The path the live run found and the cases above do not reach: the new
+  // line is a better reading of the *last* line, so it replaces it -- and it
+  // also repeats the end of the line *before* that. Verbatim from the capture.
+  const out = stitch(
+    [
+      { start: 29.7, end: 35.4, text: "to his pant design, strategically placing them at points of strain, like the corners of pockets" },
+      { start: 35.4, end: 36.9, text: "and the base of the fly." },
+    ],
+    [{ start: 34.0, end: 38.2, text: "like the corners of pockets and the base of the fly." }],
+  );
+  eq("a replacement also settles the seam behind it", out.map((c) => c.text), [
+    "to his pant design, strategically placing them at points of strain,",
+    "like the corners of pockets and the base of the fly.",
+  ]);
+  ok("and those two lines do not share the screen", out[0].end <= out[1].start, `${out[0].end} > ${out[1].start}`);
+}
+
+{
+  // Whatever the path, two lines never overlap on screen.
+  const out = stitch(
+    [{ start: 82.4, end: 87.1, text: "fashion item for both work and play by the 1960s." }, { start: 87.1, end: 89.1, text: "Today, now" }],
+    [{ start: 85.0, end: 87.3, text: "by the 1960s." }, { start: 87.3, end: 91.8, text: "Today, 96% of American consumers own at least one," }],
+  );
+  ok("no two lines share the screen", out.every((c, i) => i === 0 || c.start >= out[i - 1].end),
+    out.map((c) => `${c.start}-${c.end}`).join(" "));
+}
+
+{
+  // Verbatim from the final capture: the windows disagree about where one
+  // line ends and the next begins, by 0.2 s. Clamping alone left
+  // "a dry goods merchant" on screen for 0.2 s.
+  const out = stitch(
+    [{ start: 48.43, end: 52.9, text: "He approaches the supplier of his cloth," }, { start: 50.95, end: 52.9, text: "a dry goods merchant" }],
+    [{ start: 51.15, end: 58.15, text: "by the name of Levi Strauss. Strauss and Davis begin manufacturing pants out of denim" }],
+  );
+  ok("no line is left too brief to read", out.every((c) => c.end - c.start >= 0.8),
+    out.map((c) => `${(c.end - c.start).toFixed(2)}s ${c.text.slice(0, 24)}`).join(" | "));
+  ok("and the words stay, in order", out.map((c) => c.text).join(" ").includes("a dry goods merchant by the name of Levi Strauss"),
+    JSON.stringify(out.map((c) => c.text)));
+  ok("and still no two lines share the screen", out.every((c, i) => i === 0 || c.start >= out[i - 1].end),
+    out.map((c) => `${c.start}-${c.end}`).join(" "));
+}
+
+{
+  // A script with no spaces: the repeat is found by character.
+  const out = stitch(
+    [{ start: 10, end: 16, text: "我们今天要讨论的是气候变化的影响" }],
+    [{ start: 14, end: 20, text: "气候变化的影响非常深远" }],
+  );
+  eq("a repeated phrase in Chinese is shown once", out.map((c) => c.text), ["我们今天要讨论的是", "气候变化的影响非常深远"]);
+}
+
+{
+  // One shared word is not a repeated phrase.
+  const out = stitch(
+    [{ start: 10, end: 16, text: "and then we went home to the" }],
+    [{ start: 15, end: 20, text: "the next morning was cold" }],
+  );
+  eq("a single shared word is left alone", out.map((c) => c.text), ["and then we went home to the", "the next morning was cold"]);
+  ok("but the two lines still do not share the screen", out[0].end <= out[1].start, `${out[0].end} > ${out[1].start}`);
+}
+
+{
+  // A line that is nothing but the repeated phrase disappears entirely.
+  const out = stitch(
+    [{ start: 0, end: 5, text: "Hello." }, { start: 17, end: 20, text: "A young tailor named" }],
+    [{ start: 17.5, end: 22, text: "A young tailor named Jacob Davis notices" }],
+  );
+  eq("a line wholly repeated by the next is not kept", out.map((c) => c.text), ["Hello.", "A young tailor named Jacob Davis notices"]);
+}
+
+// --- audio on the wire (APP-109) -----------------------------------------
+//
+// protocol.ts reaches for the `chrome` global as it loads, which Node does
+// not have. Nothing here calls it; it only has to exist.
+globalThis.chrome ??= {};
+const { toWire, fromWire } = await import("../src/lib/protocol.ts");
+
+{
+  // Chromium carries extension messages as JSON. This is that hop, and it is
+  // the entire fault: the buffer goes in and `{}` comes out, silently.
+  const bytes = new Uint8Array([26, 69, 223, 163, 1, 0, 255, 128]);
+  const lost = JSON.parse(JSON.stringify({ audio: bytes.buffer })).audio;
+  eq("an ArrayBuffer does not survive JSON -- this is the 1.0.1 fault", lost, {});
+
+  const carried = JSON.parse(JSON.stringify({ audio: toWire(bytes.buffer) })).audio;
+  eq("wire text survives JSON byte for byte", [...fromWire(carried)], [...bytes]);
+}
+
+{
+  // Every byte value, including the ones that break naive string encodings.
+  const all = new Uint8Array(256).map((_, i) => i);
+  eq("all 256 byte values round-trip", [...fromWire(toWire(all.buffer))], [...all]);
+}
+
+{
+  // Big enough that the one-line `btoa(String.fromCharCode(...bytes))` throws
+  // "Maximum call stack size exceeded". A long window at a high bitrate.
+  const big = new Uint8Array(3 * 1024 * 1024).map((_, i) => (i * 31) & 255);
+  let back = null;
+  try { back = fromWire(toWire(big.buffer)); } catch (e) { back = e; }
+  ok("a 3 MB window encodes without blowing the stack", back instanceof Uint8Array, String(back));
+  ok("and decodes to the same bytes", back instanceof Uint8Array && back.length === big.length
+    && back.every((v, i) => v === big[i]));
+}
+
+{
+  const empty = new ArrayBuffer(0);
+  eq("an empty window stays empty", [...fromWire(toWire(empty))], []);
+}
+
 // -------------------------------------------------------------------------
 
 console.log(`${pass} passed, ${fails.length} failed`);

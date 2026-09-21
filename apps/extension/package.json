@@ -8,14 +8,15 @@
   "scripts": {
     "sync:ort": "node scripts/sync-ort.mjs",
     "prebuild": "npm run sync:ort",
-    "build": "vite build && node scripts/copy-static.mjs chrome",
-    "build:firefox": "vite build --outDir dist-firefox && node scripts/copy-static.mjs firefox",
+    "build": "vite build && vite build --config vite.content.config.ts && node scripts/copy-static.mjs chrome",
+    "build:firefox": "vite build --outDir dist-firefox && vite build --config vite.content.config.ts --outDir dist-firefox && node scripts/copy-static.mjs firefox",
     "build:all": "npm run build && npm run build:firefox",
     "package": "node scripts/package.mjs",
     "test": "node --experimental-strip-types e2e/unit.mjs",
     "check": "tsc --noEmit",
     "icons": "node scripts/generate-icons.mjs",
-    "test:pipeline": "node e2e/pipeline.mjs"
+    "test:pipeline": "node e2e/pipeline.mjs",
+    "test:installed": "node e2e/installed.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
