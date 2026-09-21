@@ -1,6 +1,6 @@
 {
   "name": "opensubs-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "opensubs desktop app front-end (Svelte 5 + Tauri 2)",
   "type": "module",
   "private": true,
