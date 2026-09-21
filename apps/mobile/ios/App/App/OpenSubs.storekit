@@ -1,0 +1,46 @@
+{
+  "identifier" : "3B7A1C04",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "6814206684",
+      "localizations" : [
+        {
+          "description" : "1,000 credits for transcribing, translating, burning.",
+          "displayName" : "1,000 credits",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "opensubs_credits_1000",
+      "referenceName" : "1,000 credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "6814209866",
+      "localizations" : [
+        {
+          "description" : "5,000 credits for transcribing, translating, burning.",
+          "displayName" : "5,000 credits",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "opensubs_credits_5000",
+      "referenceName" : "5,000 credits",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6814209431",
+    "_developerTeamID" : "JY2NWT5QFV",
+    "_lastSynchronizedDate" : 780000000
+  },
+  "subscriptionGroups" : [ ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

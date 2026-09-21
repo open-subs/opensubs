@@ -12,7 +12,8 @@
     "open:android": "cap open android",
     "run:ios": "cap run ios",
     "run:android": "cap run android",
-    "check": "node scripts/check-engine.mjs"
+    "check": "node scripts/check-engine.mjs",
+    "icon": "node scripts/app-icon.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
