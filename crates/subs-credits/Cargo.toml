@@ -9,7 +9,7 @@
 
 [package]
 name = "subs-credits"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 # Deliberately NOT the workspace's AGPL-3.0.
 #
