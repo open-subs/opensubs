@@ -1,6 +1,6 @@
 {
   "name": "opensubs-mobile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "OpenSubs for iOS, iPadOS and Android -- the web app in a native shell",
   "type": "module",
   "private": true,
