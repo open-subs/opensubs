@@ -16,6 +16,8 @@ profile that ties them together.
     ./scripts/asc.py setup           # all three, in order
     ./scripts/asc.py ensure-iaps     # the consumables, worded and priced
     ./scripts/asc.py show-iaps       # what App Store Connect holds now
+    ./scripts/asc.py upload-screenshots shots/*.png
+    ./scripts/asc.py show-listing    # description, keywords, screenshots
 
 The .p8 is read from ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8,
 where altool and notarytool also look. It is never printed and never copied.
@@ -357,6 +359,103 @@ def show_iaps() -> None:
         print(f"  {a['productId']:26} {a['state']:22} {amount:8} {a['inAppPurchaseType']:12} {locales}")
 
 
+# --- the listing -----------------------------------------------------------
+
+# The two sizes Apple requires of an app that runs on both. Everything else
+# is derived from these by the store, so uploading more sizes buys nothing.
+SCREENSHOT_SETS = {
+    "APP_IPHONE_67": (1320, 2868),       # 6.9", iPhone 17 Pro Max
+    "APP_IPAD_PRO_3GEN_129": (2064, 2752),  # 13", iPad Pro
+}
+
+
+def version_id() -> str:
+    versions = call("GET", f"/apps/{app_record()}/appStoreVersions?limit=10").get("data", [])
+    if not versions:
+        die("the app record has no version to attach anything to")
+    return versions[0]["id"]
+
+
+def localization_id(locale: str = "en-US") -> str:
+    for loc in call("GET", f"/appStoreVersions/{version_id()}"
+                           f"/appStoreVersionLocalizations?limit=50").get("data", []):
+        if loc["attributes"]["locale"] == locale:
+            return loc["id"]
+    die(f"no {locale} localization on this version")
+
+
+def upload_screenshots(paths: list[str]) -> None:
+    """Put each PNG in the set its pixel size belongs to.
+
+    Chosen by measuring the file rather than by an argument, because the one
+    thing that reliably goes wrong here is a 6.9" capture uploaded into the
+    iPad set: Apple accepts the *set* and rejects the *image*, at the end,
+    with a message about dimensions and no mention of which file.
+    """
+    import struct
+
+    loc = localization_id()
+    existing = {s["attributes"]["screenshotDisplayType"]: s["id"]
+                for s in call("GET", f"/appStoreVersionLocalizations/{loc}"
+                                     f"/appScreenshotSets?limit=50").get("data", [])}
+    for path in paths:
+        blob = Path(path).read_bytes()
+        if blob[:8] != b"\x89PNG\r\n\x1a\n":
+            die(f"{path} is not a PNG")
+        width, height = struct.unpack(">II", blob[16:24])
+        display = next((d for d, size in SCREENSHOT_SETS.items() if size == (width, height)), None)
+        if not display:
+            die(f"{path} is {width}x{height}, which is not a size the store asks for: "
+                + ", ".join(f"{w}x{h}" for w, h in SCREENSHOT_SETS.values()))
+
+        set_id = existing.get(display)
+        if not set_id:
+            set_id = call("POST", "/appScreenshotSets", {
+                "data": {"type": "appScreenshotSets",
+                         "attributes": {"screenshotDisplayType": display},
+                         "relationships": {"appStoreVersionLocalization": {
+                             "data": {"type": "appStoreVersionLocalizations", "id": loc}}}},
+            })["data"]["id"]
+            existing[display] = set_id
+
+        reserved = call("POST", "/appScreenshots", {
+            "data": {"type": "appScreenshots",
+                     "attributes": {"fileSize": len(blob), "fileName": Path(path).name},
+                     "relationships": {"appScreenshotSet": {
+                         "data": {"type": "appScreenshotSets", "id": set_id}}}},
+        })["data"]
+        # Apple hands back the URL and headers to PUT to, sometimes in
+        # several parts. Following its instructions rather than assuming one
+        # PUT is what makes this work for a large iPad capture.
+        for op in reserved["attributes"]["uploadOperations"]:
+            part = blob[op["offset"]:op["offset"] + op["length"]]
+            request = urllib.request.Request(op["url"], data=part, method=op["method"])
+            for header in op.get("requestHeaders", []):
+                request.add_header(header["name"], header["value"])
+            with urllib.request.urlopen(request, timeout=300) as response:
+                if response.status >= 300:
+                    die(f"uploading {path} returned {response.status}")
+        import hashlib
+        call("PATCH", f"/appScreenshots/{reserved['id']}", {
+            "data": {"type": "appScreenshots", "id": reserved["id"],
+                     "attributes": {"uploaded": True,
+                                    "sourceFileChecksum": hashlib.md5(blob).hexdigest()}},
+        })
+        print(f"  {Path(path).name}  {width}x{height}  -> {display}")
+
+
+def show_listing() -> None:
+    loc = localization_id()
+    attrs = call("GET", f"/appStoreVersionLocalizations/{loc}")["data"]["attributes"]
+    for key in ("description", "keywords", "promotionalText", "supportUrl", "marketingUrl", "whatsNew"):
+        value = attrs.get(key)
+        print(f"  {key:16} {'-- empty --' if not value else str(value)[:70]}")
+    for s in call("GET", f"/appStoreVersionLocalizations/{loc}/appScreenshotSets?limit=50").get("data", []):
+        shots = call("GET", f"/appScreenshotSets/{s['id']}/appScreenshots?limit=20").get("data", [])
+        states = [x["attributes"].get("assetDeliveryState", {}).get("state") for x in shots]
+        print(f"  {s['attributes']['screenshotDisplayType']:24} {len(shots)} screenshot(s) {states}")
+
+
 def main() -> None:
     commands = {
         "whoami": whoami,
@@ -364,10 +463,12 @@ def main() -> None:
         "ensure-app-id": lambda: print(f"app id record {ensure_app_id()}"),
         "ensure-profile": ensure_profile,
         "ensure-iaps": ensure_iaps,
+        "upload-screenshots": lambda: upload_screenshots(sys.argv[2:]),
+        "show-listing": show_listing,
         "show-iaps": show_iaps,
         "setup": lambda: (ensure_cert(), ensure_app_id(), ensure_profile()),
     }
-    if len(sys.argv) != 2 or sys.argv[1] not in commands:
+    if len(sys.argv) < 2 or sys.argv[1] not in commands:
         print(__doc__)
         raise SystemExit(2)
     commands[sys.argv[1]]()

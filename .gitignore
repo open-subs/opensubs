@@ -27,6 +27,11 @@ test-results/
 # Test media: large, and not ours to redistribute.
 /testdata/fixtures/
 
+# The iOS archive, its export and the .ipa. Hundreds of megabytes, rebuilt
+# by scripts/archive.sh from source every time, and one of them is a signed
+# binary that has no business in a public repository.
+/apps/mobile/ios/.build/
+
 # --- Local state and secrets ---
 .env
 .env.*

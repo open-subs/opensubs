@@ -12,8 +12,18 @@
 	<key>teamID</key>
 	<string>__TEAM_ID__</string>
 
+	<!-- Manual, matching the project. Automatic signing asks Apple for a
+	     *development* profile before it will make a distribution one, and a
+	     development profile needs a registered device -- so on a machine
+	     with no iPhone attached it fails with "your team has no devices",
+	     which reads like an account problem and is not one. -->
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>app.opensubs.mobile</key>
+		<string>OpenSubs App Store</string>
+	</dict>
 
 	<key>stripSwiftSymbols</key>
 	<true/>
