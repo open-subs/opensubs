@@ -50,6 +50,25 @@ const report = (verdict: string, detail: Record<string, unknown>) =>
     }),
   }).catch(() => {});
 
+// ?model= and ?language= pick what is measured; the defaults are the iOS
+// floor check's (the smallest model, English). ?clip= picks the file under
+// public/testmedia. APP-112 measures on Base with the language on auto,
+// because that is the web app's default and the case the report timed.
+const params = new URLSearchParams(location.search);
+const MODEL = params.get("model") ?? ASR_MODELS[0].id;
+const LANGUAGE = params.get("language") ?? undefined;
+const CLIP = params.get("clip") ?? "en.wav";
+
+/**
+ * When the bar last said it was finished, and every stage after it.
+ *
+ * APP-112 is the time between "Listening to the audio · 100%" and the
+ * subtitles appearing -- up to four minutes on a two-minute clip, with the
+ * screen saying nothing. This records that interval directly rather than
+ * inferring it from the total.
+ */
+const timeline: { t: number; stage: string; note: string; fraction: number | null }[] = [];
+
 async function main() {
   const support = await asrSupport();
   say(`support: ${JSON.stringify(support)}`);
@@ -57,17 +76,21 @@ async function main() {
   say(`SharedArrayBuffer: ${typeof SharedArrayBuffer !== "undefined"}`);
   say(`WebGPU: ${"gpu" in navigator}`);
 
-  const wav = await fetch("/testmedia/en.wav").then((r) => r.blob());
-  const file = new File([wav], "en.wav", { type: "audio/wav" });
+  const wav = await fetch(`/testmedia/${CLIP}`).then((r) => r.blob());
+  const file = new File([wav], CLIP, { type: wav.type || "audio/wav" });
   say(`clip: ${file.size} bytes`);
 
   const started = performance.now();
   const result = await transcribeLocally({
     file,
-    model: ASR_MODELS[0].id,
+    model: MODEL,
     start: 0,
     end: null,
-    onProgress: (p) => progress(`  ${p.stage} ${Math.round((p.value ?? 0) * 100)}%`),
+    language: LANGUAGE,
+    onProgress: (p) => {
+      timeline.push({ t: performance.now(), stage: p.stage, note: p.note, fraction: p.fraction ?? null });
+      progress(`  ${p.stage} ${p.note}${p.fraction == null ? "" : " " + Math.round(p.fraction * 100) + "%"}`);
+    },
   });
   const seconds = (performance.now() - started) / 1000;
   const { transcript } = result;
@@ -75,7 +98,19 @@ async function main() {
   const speed = transcript.duration / seconds;
   say(`transcribed ${transcript.duration.toFixed(1)}s of audio in ${seconds.toFixed(1)}s`);
   say(`${speed.toFixed(1)}x realtime, ${transcript.language}: ${text.slice(0, 200)}`);
+  // The last moment the bar showed a finished transcription, and how long
+  // the page then went on working with nothing new to show for it.
+  const done = performance.now();
+  const full = [...timeline].reverse().find((e) => e.stage === "transcribing" && (e.fraction ?? 0) >= 0.999);
+  const after = full ? timeline.filter((e) => e.t > full.t) : [];
+  const silentTail = full ? (done - (after.length ? after[after.length - 1].t : full.t)) / 1000 : null;
+  const tail = full ? (done - full.t) / 1000 : null;
+  say(`model ${MODEL}, language ${LANGUAGE ?? "auto"}`);
+  say(`after the bar reached 100%: ${tail?.toFixed(1)}s, of which ${silentTail?.toFixed(1)}s with no new status`);
+  for (const e of after) say(`    +${((e.t - full!.t) / 1000).toFixed(1)}s  ${e.stage} ${e.note}${e.fraction == null ? "" : " " + Math.round(e.fraction * 100) + "%"}`);
   await report("ok", {
+    model: MODEL, requested: LANGUAGE ?? "auto", tail, silentTail,
+    stagesAfterFull: after.map((e) => ({ at: (e.t - full!.t) / 1000, note: e.note, fraction: e.fraction })),
     seconds, realtime: speed, language: transcript.language,
     segments: transcript.segments.length, words: transcript.words.length, text, support,
   });

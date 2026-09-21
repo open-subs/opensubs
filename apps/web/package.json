@@ -29,7 +29,8 @@
     "test:remote": "node --experimental-strip-types e2e/remote.mjs",
     "build:locales": "python3 scripts/build-locale-pages.py --strict",
     "test:iap": "node --experimental-strip-types e2e/iap.mjs",
-    "test:engine": "node e2e/enginecheck/serve.mjs"
+    "test:engine": "node e2e/enginecheck/serve.mjs",
+    "test:refill": "node --experimental-strip-types e2e/refill.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

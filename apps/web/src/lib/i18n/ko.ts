@@ -89,6 +89,8 @@ const ko: Record<string, string> = {
   "Sending the audio": "오디오를 보내는 중",
   "Listening for the language": "언어를 감지하는 중",
   "Listening to the audio": "오디오를 듣는 중",
+  "Checking for missed lines": "놓친 문장을 확인하는 중",
+  "Checking again for missed lines": "놓친 문장을 다시 확인하는 중",
   "Loading the speech model": "음성 모델을 불러오는 중",
   "Downloading the speech model": "음성 모델을 내려받는 중",
   "Chrome's built-in translation. Free, private, no key — nothing is uploaded.": "Chrome 내장 번역입니다. 무료이고 비공개이며 키가 필요 없습니다 —— 아무것도 업로드하지 않습니다.",

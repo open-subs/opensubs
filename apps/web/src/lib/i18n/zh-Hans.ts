@@ -89,6 +89,8 @@ const zhHans: Record<string, string> = {
   "Sending the audio": "正在发送音频",
   "Listening for the language": "正在识别语言",
   "Listening to the audio": "正在听取音频",
+  "Checking for missed lines": "正在检查漏掉的字幕",
+  "Checking again for missed lines": "正在再次检查漏掉的字幕",
   "Loading the speech model": "正在加载语音模型",
   "Downloading the speech model": "正在下载语音模型",
   "Chrome's built-in translation. Free, private, no key — nothing is uploaded.": "Chrome 内置翻译。免费、私密、无需密钥 —— 不上传任何内容。",
