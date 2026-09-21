@@ -26,7 +26,7 @@
 import { transcribeLocally, asrSupport } from "../../../web/src/lib/asr";
 import { isSignOff } from "../../../web/src/lib/cleanup";
 import { isChinese, toSimplified, wantsTraditional } from "../../../web/src/lib/script";
-import type { Cue, FromEngine, Status, ToEngine } from "../lib/protocol";
+import { fromWire, type Cue, type FromEngine, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
 
 export type Emit = (message: FromEngine) => void;
 
@@ -42,10 +42,10 @@ export interface Engine {
  * MediaRecorder is already a container -- WebM/Opus almost everywhere,
  * MP4/AAC on some builds -- so this is a relabel, not a transcode.
  */
-function asFile(audio: ArrayBuffer, mime: string): File {
+function asFile(audio: WireAudio, mime: string): File {
   const type = mime || "audio/webm";
   const ext = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "m4a" : "webm";
-  return new File([audio], `window.${ext}`, { type });
+  return new File([fromWire(audio)], `window.${ext}`, { type });
 }
 
 /**
@@ -118,11 +118,55 @@ export function createEngine(emit: Emit): Engine {
   let running = false;
   let pending: Extract<ToEngine, { kind: "transcribe" }> | null = null;
   let dropped = 0;
+  /**
+   * The language this capture turned out to be in, once a window has said so.
+   *
+   * On "auto", `transcribeLocally` works out the language before it
+   * transcribes -- it reads the audio every few seconds so that a file which
+   * switches language comes out in both. For a file that is the right call and
+   * it is paid once. A live capture calls it once per *window*, so every
+   * twenty seconds of audio paid for detection again: about fifteen seconds of
+   * "Listening for the language" on top of the transcription, which put each
+   * window at 35-45 seconds against 20 of audio. The engine could never catch
+   * up, and dropped every other window to stay near the film -- half of a
+   * two-minute lecture came out with no subtitles at all (APP-110).
+   *
+   * So the first window that holds real speech in exactly one language names
+   * it, and every window after is transcribed as that language, which skips
+   * detection entirely. Two things keep this from being wrong more often than
+   * it is fast:
+   *
+   *   - it is only taken from a window with words in it. An opening of music,
+   *     silence or applause detects as *something*, and locking a lecture
+   *     into whatever Whisper guessed over the title music would be worse
+   *     than the problem this solves;
+   *   - a window that heard two languages locks nothing, so a bilingual
+   *     capture keeps paying for detection and keeps being right.
+   *
+   * What it gives up: a video in one language that switches to another later
+   * on will be transcribed in the first. Naming the languages in the popup
+   * is the way out of that, as it is for a file.
+   *
+   * Reset by `warm`, which every Start sends: a new capture is a new video.
+   */
+  let heard: string | null = null;
+  /**
+   * The model this engine has already run, so it is not announced again.
+   *
+   * `transcribeLocally` says "Loading the speech model" at the start of every
+   * call, because for a file it usually is. Here the pipeline is cached after
+   * the first window and the "load" is instant -- but the words still flashed
+   * up every twenty seconds, and read as the model being fetched again each
+   * time. That was the first thing APP-110's report blamed, reasonably, from
+   * what the screen said.
+   */
+  let loaded: string | null = null;
 
   const say = (status: Status) => emit({ kind: "status", status });
 
   async function run(message: Extract<ToEngine, { kind: "transcribe" }>) {
     const { audio, mime, offset, settings } = message;
+    const auto = settings.language === "auto";
     try {
       device ??= (await asrSupport()).device;
       const result = await transcribeLocally({
@@ -130,18 +174,21 @@ export function createEngine(emit: Emit): Engine {
         model: settings.model,
         start: 0,
         end: null,
-        language: settings.language === "auto" ? undefined : settings.language,
+        language: auto ? heard ?? undefined : settings.language,
         // One window of many. A window that is all music or all silence
         // must be allowed to come back with nothing in it.
         allowEmpty: true,
-        onProgress: (p) =>
+        onProgress: (p) => {
+          if (p.stage === "model" && loaded === settings.model) return;
           say({
             stage: p.stage === "model" ? "model" : "transcribing",
             fraction: p.fraction,
             note: p.note,
             device,
-          }),
+          });
+        },
       });
+      loaded = settings.model;
       // Back onto the page's timeline. `transcribeLocally` reports seconds
       // from the start of what it was given, and what it was given began
       // at `offset` in the video.
@@ -154,6 +201,9 @@ export function createEngine(emit: Emit): Engine {
         result.transcript.language ?? settings.language,
         settings.language,
       );
+      if (auto && !heard && cues.length > 0 && result.languages?.length === 1) {
+        heard = result.languages[0];
+      }
       emit({ kind: "segments", cues, offset });
     } catch (e) {
       emit({ kind: "failed", message: e instanceof Error ? e.message : String(e) });
@@ -191,6 +241,11 @@ export function createEngine(emit: Emit): Engine {
         return;
       }
       if (message.kind === "warm") {
+        // A Start. Whatever the last capture learned belongs to that video,
+        // and its count of dropped windows belongs to that run -- carried
+        // over, the second video would open "(5 windows skipped)".
+        heard = null;
+        dropped = 0;
         say({ stage: "model", fraction: null, note: "Loading the speech model", device });
       }
     },

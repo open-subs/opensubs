@@ -30,7 +30,7 @@ function singleOrtCopy(): Plugin {
 }
 
 /**
- * Five entry points, each of which has to land at a predictable path
+ * Four entry points, each of which has to land at a predictable path
  * because a manifest names it by file name. Vite's default hashed asset
  * names are exactly wrong here.
  *
@@ -76,9 +76,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background.ts"),
-        content: resolve(__dirname, "src/content/overlay.ts"),
         offscreen: resolve(__dirname, "src/engine/offscreen.ts"),
         popup: resolve(__dirname, "src/popup/popup.ts"),
+        // content.js is not here: it is injected as a classic script and has
+        // to be built as one. See vite.content.config.ts.
       },
       output: {
         format: "es",

@@ -74,4 +74,21 @@ if (missing.length) {
   process.exit(1);
 }
 
-console.log(`copy-static: ${target} -> ${out} (${named.size} named files present)`);
+// content.js is injected with `scripting.executeScript`, which runs a file as
+// a classic script. A top-level `import` or `export` there is a syntax error
+// that rejects the whole file before a line of it runs -- and the extension
+// still says "Listening", because nothing downstream can tell. 1.0.1 shipped
+// exactly that (APP-109). Refuse the build instead.
+const content = join(out, "content.js");
+if (!existsSync(content)) {
+  console.error("copy-static: content.js is missing -- is vite.content.config.ts in the build script?");
+  process.exit(1);
+}
+const source = readFileSync(content, "utf8");
+if (/^\s*(import|export)[\s{*]/m.test(source) || /(^|[;}])\s*import\s*[{*\w]/.test(source.slice(0, 400))) {
+  console.error("copy-static: content.js is an ES module, and executeScript can only inject a classic script.");
+  console.error(`  it opens with: ${source.slice(0, 80)}`);
+  process.exit(1);
+}
+
+console.log(`copy-static: ${target} -> ${out} (${named.size} named files present, content.js is a classic script)`);
