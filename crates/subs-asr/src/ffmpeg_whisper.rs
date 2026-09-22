@@ -36,7 +36,7 @@
 //!    inside parsing.
 
 use crate::{AsrError, AsrOptions, AudioRef, Segment, Transcriber, Transcript, Word};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -86,14 +86,12 @@ impl Transcriber for FfmpegWhisperTranscriber {
         let language = opts.language.as_deref().unwrap_or(&self.default_language);
         let destination = Self::destination_path();
 
-        // `af_whisper`'s options are colon-delimited by ffmpeg's own
-        // avfilter graph parser, independent of any shell -- a model or
-        // destination path containing ':' would be mis-split here. Not
-        // handled: none of this project's paths do.
+        // Both paths are escaped for ffmpeg's filter syntax: see
+        // `filter_path`. Every absolute path on Windows needs it.
         let filter = format!(
             "whisper=model={}:language={language}:format=json:destination={}:queue=3",
-            self.model_path.display(),
-            destination.display(),
+            filter_path(&self.model_path),
+            filter_path(&destination),
         );
 
         let output = Command::new(&self.ffmpeg_bin)
@@ -116,6 +114,31 @@ impl Transcriber for FfmpegWhisperTranscriber {
         let transcript = parse_whisper_jsonl(&raw?, language)?;
         Ok(transcript)
     }
+}
+
+/// A path as the value of a filter option, escaped for both of ffmpeg's
+/// parsers: the graph (`\ ' [ ] , ;`) and then the filter's own
+/// `key=value:...` list (`\ ' : =`), so the option list is escaped first.
+///
+/// Every absolute path on Windows needs this (APP-119). The model lives in
+/// `C:\Users\<name>\.cache\opensubs-models` and the output in the temp
+/// directory, and unescaped the drive colon ended the option while the
+/// backslashes were eaten as escapes: "No option name near
+/// 'Usersycan4.cacheopensubs-models...'" on every Windows machine. The same
+/// function lives in subs-media for the burn's `ass=` paths; the two crates
+/// share no dependency to put it in.
+fn filter_path(path: &Path) -> String {
+    fn escape(text: &str, special: &str) -> String {
+        let mut out = String::with_capacity(text.len());
+        for c in text.chars() {
+            if special.contains(c) {
+                out.push('\\');
+            }
+            out.push(c);
+        }
+        out
+    }
+    escape(&escape(&path.to_string_lossy(), "\\':="), "\\'[],;")
 }
 
 /// One raw line of `af_whisper`'s `format=json` output. Field names match
@@ -262,6 +285,23 @@ pub fn synthesize_words(text: &str, start_ms: f64, end_ms: f64) -> Vec<Word> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// APP-119: the model and output paths from the report, as ffmpeg must
+    /// be handed them. Unescaped, this was "No option name near
+    /// 'Usersycan4.cacheopensubs-models...'" on every Windows machine.
+    #[test]
+    fn windows_paths_are_escaped_for_the_filter() {
+        assert_eq!(
+            filter_path(Path::new(
+                r"C:\Users\ycan4\.cache\opensubs-models\ggml-base.en.bin"
+            )),
+            r"C\\:\\\\Users\\\\ycan4\\\\.cache\\\\opensubs-models\\\\ggml-base.en.bin"
+        );
+        assert_eq!(
+            filter_path(Path::new("/tmp/plain/model.bin")),
+            "/tmp/plain/model.bin"
+        );
+    }
 
     #[test]
     fn empty_input_yields_an_empty_transcript() {
