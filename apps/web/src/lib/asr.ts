@@ -31,6 +31,7 @@ import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
 import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
+import { describeGpu, isIntegratedGpu, type GpuInfo } from "./device";
 import {
   MAX_SEGMENT_S,
   MIN_CHARS_PER_SECOND,
@@ -246,6 +247,15 @@ export interface AsrOptions {
    * the caller nothing.
    */
   allowEmpty?: boolean;
+  /**
+   * Run on the CPU even where WebGPU is available.
+   *
+   * The user's to choose (APP-111): on an integrated Intel GPU the CPU was
+   * measured faster, and on some machines WebGPU is present and misbehaves.
+   * "webgpu" cannot be forced -- where the browser has none, there is only
+   * the CPU -- so anything but "wasm" means "whatever this machine has".
+   */
+  device?: "webgpu" | "wasm";
 }
 
 export interface AsrSupport {
@@ -253,6 +263,14 @@ export interface AsrSupport {
   /** "webgpu" is roughly an order of magnitude faster than "wasm". */
   device: "webgpu" | "wasm";
   reason?: string;
+  /**
+   * An Intel GPU built into the processor. On one of these WebGPU was
+   * measured slower than the CPU for this work (APP-111), so the default
+   * model is chosen differently; see ./device.
+   */
+  integrated?: boolean;
+  /** "intel · gen-12lp", when the adapter says. */
+  gpu?: string;
 }
 
 /**
@@ -268,10 +286,19 @@ export async function asrSupport(): Promise<AsrSupport> {
   if (typeof AudioBuffer === "undefined" || typeof OfflineAudioContext === "undefined") {
     return { ok: false, device: "wasm", reason: "This browser has no Web Audio support." };
   }
-  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+  const gpu = (navigator as Navigator & {
+    gpu?: { requestAdapter(): Promise<{ info?: GpuInfo; requestAdapterInfo?: () => Promise<GpuInfo> } | null> };
+  }).gpu;
   if (gpu) {
     try {
-      if (await gpu.requestAdapter()) return { ok: true, device: "webgpu" };
+      const adapter = await gpu.requestAdapter();
+      if (adapter) {
+        // `info` is the current spelling; `requestAdapterInfo()` is what
+        // Chrome shipped before it and some builds still have only that.
+        let info: GpuInfo | undefined = adapter.info;
+        if (!info && adapter.requestAdapterInfo) info = await adapter.requestAdapterInfo().catch(() => undefined);
+        return { ok: true, device: "webgpu", integrated: isIntegratedGpu(info), gpu: describeGpu(info) };
+      }
     } catch {
       // Fall through to WASM; an adapter request can throw on machines
       // where WebGPU is present but unusable.
@@ -1060,6 +1087,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
 
   const support = await asrSupport();
   if (!support.ok) throw new Error(support.reason ?? "Transcription is not supported here.");
+  const device: "webgpu" | "wasm" = options.device === "wasm" ? "wasm" : support.device;
 
   onProgress?.({ stage: "audio", fraction: 0, note: "Reading the audio" });
   const audio = await extractAudio(
@@ -1132,12 +1160,17 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   const wasm = env.backends?.onnx?.wasm;
   if (wasm) wasm.wasmPaths = new URL("./ort/", document.baseURI).href;
 
-  if (loadedModelId !== model) {
+  // Keyed on the backend as well as the model. The two load different
+  // weights -- quantised on the GPU, full precision on the CPU -- so a
+  // pipeline built for one is not the other, and switching to the CPU must
+  // not quietly go on running the GPU copy already in memory.
+  const wanted = `${model}|${device}`;
+  if (loadedModelId !== wanted) {
     pipelinePromise = null;
-    loadedModelId = model;
+    loadedModelId = wanted;
   }
   pipelinePromise ??= pipeline("automatic-speech-recognition", model, {
-    device: support.device,
+    device,
     // Quantised weights on WebGPU, full precision on WASM -- and this is
     // not a tuning preference, it is a hard constraint.
     //
@@ -1148,7 +1181,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     // works on the developer's machine and breaks for every user without
     // WebGPU, which is a large share of Firefox, Safari and older
     // hardware. `fp32` costs a much bigger download but actually runs.
-    dtype: support.device === "webgpu" ? "q8" : "fp32",
+    dtype: device === "webgpu" ? "q8" : "fp32",
     // The download reports per *file*, and the model is several.
     //
     // Three shapes were tried against a real cold download before this

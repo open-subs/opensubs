@@ -30,7 +30,8 @@
     "build:locales": "python3 scripts/build-locale-pages.py --strict",
     "test:iap": "node --experimental-strip-types e2e/iap.mjs",
     "test:engine": "node e2e/enginecheck/serve.mjs",
-    "test:refill": "node --experimental-strip-types e2e/refill.mjs"
+    "test:refill": "node --experimental-strip-types e2e/refill.mjs",
+    "test:device": "node --experimental-strip-types e2e/device.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

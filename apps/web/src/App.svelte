@@ -68,6 +68,7 @@
     transcribeRemotely,
     type AsrSupport,
   } from "./lib/asr";
+  import { prefersSmallModel } from "./lib/device";
   import {
     PROVIDERS,
     deviceAvailability,
@@ -272,6 +273,19 @@
   let deviceStatus = $state<string | null>(null);
 
   let asr = $state<AsrSupport | null>(null);
+  /**
+   * Where the local model runs, when this machine offers a choice.
+   *
+   * "gpu" follows the machine: WebGPU where there is one. "cpu" is the
+   * user's override (APP-111) -- measured faster than WebGPU on an Intel
+   * integrated GPU, and the way out on a machine where WebGPU is present
+   * and misbehaves. Only offered where WebGPU exists; without it the CPU
+   * is the only way this runs and there is nothing to choose.
+   */
+  let asrBackend = $state<"gpu" | "cpu">("gpu");
+  const asrDevice = $derived<"webgpu" | "wasm">(
+    asr?.device === "webgpu" && asrBackend === "gpu" ? "webgpu" : "wasm",
+  );
   let asrEngine = $state("local");
   let asrKey = $state("");
   let asrBaseUrl = $state("");
@@ -323,6 +337,43 @@
    * for themselves must not have it changed underneath them.
    */
   let modelChosenByUser = $state(false);
+
+  /**
+   * Small where the GPU can carry it, Base everywhere else.
+   *
+   * Decided from the backend that will actually run, so it follows the GPU /
+   * CPU switch as well as the machine, and never over a model the user picked
+   * for themselves.
+   */
+  // APP-32. Small on WebGPU, Base without it.
+  //
+  // Small is plainly the better recogniser on Chinese: on the reported
+  // clip it fixed 抵押区 -> 低压区 and 广网 -> 往往, and 27 differences
+  // in all, nearly every one of them in its favour. So the question is
+  // only what it costs, and that depends entirely on WebGPU.
+  //
+  // Without WebGPU the WASM backend cannot load the quantised weights
+  // at all and pulls the fp32 export instead -- four times the bytes
+  // (see WASM_SIZE_MULTIPLIER). Small would be about a gigabyte before
+  // anybody sees a subtitle. With WebGPU it is ~250 MB and roughly an
+  // order of magnitude faster to run.
+  //
+  // So the machines that can afford Small get it, and the ones that
+  // cannot are not asked to.
+  //
+  // APP-111 refined "can afford". On an Intel Iris Xe, WebGPU is present and
+  // Small was the slowest thing the machine could be asked to do: 517 s for a
+  // 114 s clip, against 250 s for Base on the same GPU and 186 s for Base on
+  // the CPU. An integrated Intel GPU now gets Base; discrete cards and Apple
+  // silicon keep Small. See ./lib/device.
+  function settleDefaultModel() {
+    if (modelChosenByUser || !asr) return;
+    const small = ASR_MODELS.find((m) => m.id.includes("whisper-small"));
+    const base = ASR_MODELS.find((m) => m.id.includes("whisper-base"));
+    const pick = prefersSmallModel({ device: asrDevice, integrated: asr.integrated }) ? small : base;
+    if (pick) asrModel = pick.id;
+  }
+
   /**
    * The language being spoken, or "auto" to let Whisper decide.
    *
@@ -716,25 +767,7 @@
 
     void asrSupport().then((s) => {
       asr = s;
-      // APP-32. Small on WebGPU, Base without it.
-      //
-      // Small is plainly the better recogniser on Chinese: on the reported
-      // clip it fixed 抵押区 -> 低压区 and 广网 -> 往往, and 27 differences
-      // in all, nearly every one of them in its favour. So the question is
-      // only what it costs, and that depends entirely on WebGPU.
-      //
-      // Without WebGPU the WASM backend cannot load the quantised weights
-      // at all and pulls the fp32 export instead -- four times the bytes
-      // (see WASM_SIZE_MULTIPLIER). Small would be about a gigabyte before
-      // anybody sees a subtitle. With WebGPU it is ~250 MB and roughly an
-      // order of magnitude faster to run.
-      //
-      // So the machines that can afford Small get it, and the ones that
-      // cannot are not asked to.
-      if (!modelChosenByUser && s.device === "webgpu") {
-        const small = ASR_MODELS.find((m) => m.id.includes("whisper-small"));
-        if (small) asrModel = small.id;
-      }
+      settleDefaultModel();
     });
 
     void detectionAvailable().then((ok) => {
@@ -1276,6 +1309,7 @@
       const shared = {
         file: videoFile,
         model: asrModel,
+        device: asrDevice,
         language: spokenLanguage,
         secondLanguage,
         start: trim.start,
@@ -1794,10 +1828,12 @@
     {#if !hasVideo}
       Load a video first, or open a subtitle file you already have.
     {:else if asrEngine === "local"}
-      Whisper runs here, on your machine{asr?.device === "webgpu"
+      Whisper runs here, on your machine{asrDevice === "webgpu"
         ? ", on the GPU"
         : ""}. The audio is never uploaded; only the model is downloaded, once.
-      {#if asr?.device === "wasm"}
+      {#if asr?.device === "webgpu" && asrBackend === "cpu"}
+        {t("On the processor it needs the larger full-precision model, about four times the download, and the page may stop responding while it works.")}
+      {:else if asr?.device === "wasm"}
         {inNativeShell() ? "This device" : "This browser"} has no WebGPU, so it runs on the CPU and needs the
         larger full-precision model &mdash; slower, and roughly four times
         the download.
@@ -1853,6 +1889,20 @@
           {/each}
         </select>
       </label>
+      {#if asr?.device === "webgpu"}
+        <label class="field">
+          <span class="field-label">{t("Runs on")}</span>
+          <select
+            class="input"
+            bind:value={asrBackend}
+            disabled={transcribing}
+            onchange={settleDefaultModel}
+          >
+            <option value="gpu">{t("Graphics card (GPU)")}</option>
+            <option value="cpu">{t("Processor (CPU)")}</option>
+          </select>
+        </label>
+      {/if}
     {/if}
     <label class="field field-wide">
       <span class="field-label">{t("Spoken language")}</span>
