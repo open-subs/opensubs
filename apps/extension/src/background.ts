@@ -20,6 +20,7 @@
 import {
   api,
   DEFAULT_SETTINGS,
+  type BeginAnswer,
   type Command,
   type Cue,
   type FromEngine,
@@ -47,9 +48,18 @@ interface Session {
   settings: Settings;
   cues: Cue[];
   status: Status;
+  /** The page's current take; lines from an earlier one are dropped. */
+  take: number;
 }
 
 let session: Session | null = null;
+/**
+ * What went wrong last, kept after the session it ended. A Start that fails
+ * clears the session, and the popup asks for state when it opens -- without
+ * this it would open on nothing, and the reason would have been shown only
+ * to a popup that happened to be open at the time (APP-133).
+ */
+let lastError: Status | null = null;
 /** Set only on Firefox, where the engine is a local object. */
 let local: Engine | null = null;
 let starting: Promise<void> | null = null;
@@ -79,6 +89,16 @@ function toEngine(message: ToEngine) {
 }
 
 // --- talking to the page -------------------------------------------------
+
+/** Send "begin" and read the page's answer; null if it never answered. */
+async function ask(tabId: number, message: ToPage): Promise<BeginAnswer | null> {
+  try {
+    const answer = (await api.tabs.sendMessage(tabId, message)) as BeginAnswer | undefined;
+    return answer && typeof answer.found === "boolean" ? answer : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Whether the page took the message. */
 async function page(tabId: number, message: ToPage): Promise<boolean> {
@@ -115,6 +135,7 @@ async function inject(tabId: number): Promise<string | null> {
 
 function setStatus(status: Status) {
   if (session) session.status = status;
+  lastError = status.stage === "error" ? status : null;
   void api.runtime.sendMessage({ kind: "status", status }).catch(() => undefined);
   if (session) void page(session.tabId, { kind: "status", status });
 }
@@ -124,6 +145,8 @@ function setStatus(status: Status) {
 async function fromEngine(message: FromEngine) {
   if (!session) return;
   if (message.kind === "segments") {
+    // From a video the page has since moved on from (see "switched").
+    if (message.take !== undefined && message.take !== session.take) return;
     session.cues = stitch(session.cues, message.cues);
     await page(session.tabId, { kind: "cues", cues: session.cues });
     setStatus({
@@ -146,7 +169,7 @@ async function fromEngine(message: FromEngine) {
 async function start(tabId: number, next: Settings) {
   if (session && session.tabId !== tabId) await stop(session.tabId);
   await api.storage.local.set({ settings: next });
-  session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: "Starting" } };
+  session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: "Starting" }, take: 0 };
   starting ??= startEngine();
   await starting;
   const refused = await inject(tabId);
@@ -156,13 +179,22 @@ async function start(tabId: number, next: Settings) {
     return;
   }
   await toEngine({ kind: "warm", model: next.model });
-  // Checked, because this is the one message the rest depends on. If the page
-  // did not take it, nothing will ever record -- and saying "Listening" over
-  // that is how 1.0.1 looked to everyone who tried it.
-  if (!(await page(tabId, { kind: "begin", settings: next }))) {
+  // The page answers "begin" once it has found the video and opened its
+  // audio, or with why it could not. Only then is "Listening" true -- set
+  // before, it overwrote the page's "no video" and stayed there (APP-133).
+  // No answer at all is how 1.0.1 looked to everyone who tried it.
+  const answer = await ask(tabId, { kind: "begin", settings: next });
+  if (!answer) {
     setStatus({ stage: "error", fraction: null, note: "The page did not answer. Reload it and press Start again." });
+    session = null;
     return;
   }
+  if (!answer.found) {
+    setStatus({ stage: "error", fraction: null, note: answer.reason });
+    session = null;
+    return;
+  }
+  session.take = 1;
   setStatus({ stage: "listening", fraction: null, note: "Listening" });
 }
 
@@ -201,7 +233,7 @@ api.runtime.onMessage.addListener(
           return respond({
             running: !!session,
             tabId: session?.tabId ?? null,
-            status: session?.status ?? { stage: "idle", fraction: null, note: "" },
+            status: session?.status ?? lastError ?? { stage: "idle", fraction: null, note: "" },
             count: session?.cues.length ?? 0,
             settings: session?.settings ?? (await storedSettings()),
           });
@@ -215,13 +247,35 @@ api.runtime.onMessage.addListener(
 
         // From the page: one recorded window, on its way to the engine.
         case "window":
-          if (session && session.tabId === tabId) {
+          if (session && session.tabId === tabId && message.take === session.take) {
             await toEngine({
               kind: "transcribe",
               audio: message.audio,
               mime: message.mime,
               offset: message.offset,
               settings: session.settings,
+              take: message.take,
+            });
+          }
+          return respond({ ok: true });
+
+        // The video being read ended and another is playing -- an ad gave way
+        // to the film. The ad's lines go, and the film's start clean.
+        case "switched":
+          if (session && session.tabId === tabId) {
+            session.take = message.take;
+            session.cues = [];
+            await page(tabId, { kind: "cues", cues: [] });
+            setStatus({ stage: "listening", fraction: null, note: "Listening (moved to the video now playing)" });
+          }
+          return respond({ ok: true });
+
+        case "finished":
+          if (session && session.tabId === tabId) {
+            setStatus({
+              stage: "listening",
+              fraction: null,
+              note: "The video ended. Save .srt to keep the subtitles, or play another and press Start.",
             });
           }
           return respond({ ok: true });

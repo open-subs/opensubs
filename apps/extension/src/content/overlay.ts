@@ -8,8 +8,8 @@
  * host to reach it.
  */
 
-import { api, blobToWire, tell, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
-import { capture, findMedia, recordWindows } from "../lib/capture";
+import { api, blobToWire, tell, type BeginAnswer, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
+import { findMedia, openAudio, recordWindows, waitForPlaying, whyNoMedia } from "../lib/capture";
 import { cueAt } from "../lib/seam";
 
 const HOST_ID = "opensubs-overlay-host";
@@ -79,57 +79,103 @@ function paint() {
   line.style.fontSize = `calc((1.6vw + 12px) * ${settings?.fontScale ?? 1})`;
 }
 
-async function begin(next: Settings) {
-  settings = next;
-  media = findMedia();
-  if (!media) {
-    await tell<FromPage>({
-      kind: "media", found: false, duration: 0,
-      reason: "No video or audio is playing on this page.",
-    });
-    return;
-  }
-  try {
-    stream = capture(media);
-  } catch {
-    await tell<FromPage>({
-      kind: "media", found: false, duration: 0,
-      // The usual cause by a wide margin, and the browser's own message
-      // ("Failed to execute 'captureStream'") does not say it.
-      reason: "This video is protected or cross-origin, so its audio cannot be read.",
-    });
-    return;
-  }
-  if (!stream.getAudioTracks().length) {
-    await tell<FromPage>({ kind: "media", found: false, duration: 0, reason: "That video has no audio track." });
-    return;
-  }
+/**
+ * How long to wait, when the video being read ends, for another to start:
+ * after an ad the film begins a second or two later, in the same element
+ * with a new source or in another one.
+ */
+const SWITCH_WAIT_MS = 8000;
 
-  await tell<FromPage>({ kind: "media", found: true, duration: media.duration || 0 });
+/** Counts the videos read this session; see FromPage "window". */
+let take = 0;
+
+/**
+ * Find the video, open its audio, and answer -- then record, without making
+ * the answer wait for it. The answer is the reply to "begin" itself, so
+ * nothing the background says afterwards can overwrite it (APP-133).
+ */
+async function begin(next: Settings): Promise<BeginAnswer> {
+  settings = next;
+  const el = findMedia();
+  if (!el) return { found: false, reason: whyNoMedia() };
+  const opened = openAudio(el);
+  if ("reason" in opened) return { found: false, reason: opened.reason };
+
+  media = el;
+  stream = opened.stream;
+  take += 1;
   cues = [];
   running = true;
   if (settings.overlay) {
     ensureOverlay();
     ticker = window.setInterval(paint, 120);
   }
-  media.addEventListener("emptied", halt, { once: true });
+  void record();
+  return { found: true, duration: el.duration || 0 };
+}
 
-  try {
-    await recordWindows(
-      media,
-      stream,
-      settings.window,
-      async (w) => {
-        const audio = await blobToWire(w.blob);
-        await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset });
-      },
-      () => running,
-    );
-  } catch (e) {
-    await tell<FromPage>({
-      kind: "media", found: false, duration: 0,
-      reason: e instanceof Error ? e.message : String(e),
-    });
+/**
+ * Record whatever is playing, for as long as the session runs.
+ *
+ * Starting on an ad was the third case in APP-133: the largest playing video
+ * at Start was a fifteen-second pre-roll, and when it ended the extension
+ * went on saying "Listening" over a film it was not reading. So when the
+ * video being read ends or is replaced, this looks for what is playing now
+ * and moves to it -- a new take, whose lines replace the last one's. If
+ * nothing starts, the video simply finished, and the page says so.
+ */
+async function record() {
+  while (running && media && stream && settings) {
+    const el = media;
+    let replaced = false;
+    const onEmptied = () => { replaced = true; };
+    el.addEventListener("emptied", onEmptied, { once: true });
+    try {
+      const mine = take;
+      await recordWindows(
+        el,
+        stream,
+        settings.window,
+        async (w) => {
+          const audio = await blobToWire(w.blob);
+          await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset, take: mine });
+        },
+        () => running && !replaced,
+      );
+    } catch (e) {
+      await tell<FromPage>({
+        kind: "media", found: false, duration: 0,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+      halt();
+      return;
+    } finally {
+      el.removeEventListener("emptied", onEmptied);
+    }
+    if (!running) return;
+
+    stream.getTracks().forEach((t) => t.stop());
+    stream = null;
+    const next = await waitForPlaying(SWITCH_WAIT_MS);
+    if (!running) return;
+    if (!next) {
+      // Finished, not failed. The overlay stays: lines still queued in the
+      // engine arrive after the video ends, and are there on a replay.
+      await tell<FromPage>({ kind: "finished" });
+      return;
+    }
+    const opened = openAudio(next);
+    if ("reason" in opened) {
+      await tell<FromPage>({ kind: "media", found: false, duration: 0, reason: opened.reason });
+      halt();
+      return;
+    }
+    media = next;
+    stream = opened.stream;
+    take += 1;
+    cues = [];
+    paint();
+    await tell<FromPage>({ kind: "switched", take, duration: next.duration || 0 });
   }
 }
 
@@ -161,7 +207,12 @@ if (!world[INSTALLED]) {
 function listen() {
 api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
   switch (message.kind) {
-    case "begin": void begin(message.settings); break;
+    case "begin":
+      // Answered when the video has been found and opened, not before: see
+      // BeginAnswer.
+      void begin(message.settings).then(respond, (e) =>
+        respond({ found: false, reason: e instanceof Error ? e.message : String(e) } satisfies BeginAnswer));
+      return true;
     case "halt": halt(); break;
     case "cues": cues = message.cues; paint(); break;
     case "status":
