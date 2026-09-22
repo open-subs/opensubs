@@ -301,7 +301,9 @@ mod tests {
     fn burn_argv_points_at_the_generated_ass_and_the_requested_output() {
         let p = plan(&spec(), &info(0));
         let joined = p.burn_argv.join(" ");
-        assert!(joined.contains(&p.ass_path.to_string_lossy().to_string()));
+        // Escaped for the filter (APP-119): on Windows the raw path is not in
+        // the argv at all, and must not be.
+        assert!(joined.contains(&subs_media::filter_path(&p.ass_path)));
         assert!(joined.contains("out.mp4"));
         assert!(joined.contains("-c:a copy"));
     }
@@ -471,12 +473,12 @@ mod tests {
         } else {
             "ffmpeg"
         };
-        // Only assert the fallback name when Homebrew genuinely isn't on
-        // this machine at either real prefix -- otherwise this test would
-        // spuriously fail on a dev box that has ffmpeg installed there.
-        if !PathBuf::from("/opt/homebrew/bin").join(expected).is_file()
-            && !PathBuf::from("/usr/local/bin").join(expected).is_file()
-        {
+        // Only assert the fallback name when no directory ffmpeg_binary
+        // searches has one -- otherwise this test would spuriously fail on a
+        // machine with ffmpeg installed there, as the Windows check's runner
+        // has once winget has put it in its Links directory.
+        let searched = crate::paths::homebrew_dirs().chain(crate::paths::windows_dirs());
+        if crate::paths::first_existing(expected, searched).is_none() {
             assert_eq!(ffmpeg_binary(&vendor), PathBuf::from(expected));
         }
     }

@@ -77,9 +77,13 @@ jobs:
         run: |
           $model = Join-Path $env:USERPROFILE ".cache\opensubs-models\ggml-base.en.bin"
           $dest = Join-Path $env:TEMP "subs-whisper-before.jsonl"
-          & $env:FFMPEG -v error -i "$env:RUNNER_TEMP\en.mp4" -af "whisper=model=${model}:language=en:format=json:destination=${dest}:queue=3" -t 5 -f null - 2>&1 | Select-Object -First 3
-          if ($LASTEXITCODE -eq 0) { throw "the unescaped filter worked -- this check is not reproducing APP-119" }
-          "FAILED AS REPORTED (exit $LASTEXITCODE)"
+          # Captured rather than piped: a pipe loses the exit code.
+          $out = & $env:FFMPEG -v error -i "$env:RUNNER_TEMP\en.mp4" -af "whisper=model=${model}:language=en:format=json:destination=${dest}:queue=3" -t 5 -f null - 2>&1
+          $code = $LASTEXITCODE
+          $out | Select-Object -First 3
+          if ($code -eq 0) { throw "the unescaped filter worked -- this check is not reproducing APP-119" }
+          if (-not ($out -match "No option name near")) { throw "failed, but not the way APP-119 reported" }
+          "FAILED AS REPORTED (exit $code)"
           # The runner fails a step on a nonzero exit code; this one was expected.
           $global:LASTEXITCODE = 0
 
@@ -108,9 +112,14 @@ jobs:
           SUBS_REQUIRE_FFMPEG: "1"
         run: |
           $env:PATH = (Split-Path $env:FFMPEG) + ";" + $env:PATH
+          # Each command checked: pwsh does not stop on a failing native
+          # command, and only the last one's code would reach the runner.
           bash scripts/gen-fixtures.sh
+          if ($LASTEXITCODE -ne 0) { throw "gen-fixtures failed" }
           cargo test --release -p subs-media -p subs-asr -p subs-pipeline --lib
+          if ($LASTEXITCODE -ne 0) { throw "unit tests failed on Windows" }
           cargo test --release -p subs-pipeline --test burn_e2e a_burn_runs_from_a_windows_shaped_path
+          if ($LASTEXITCODE -ne 0) { throw "the Windows-path burn failed" }
 
       - uses: actions/upload-artifact@v4
         if: always()
