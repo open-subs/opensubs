@@ -61,9 +61,14 @@ jobs:
           Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" -OutFile "$dir\ggml-base.en.bin"
           Get-Item "$dir\ggml-base.en.bin"
 
+      # The repository keeps no speech recordings (apps/web's test media is
+      # gitignored), so the speech is whisper.cpp's own sample -- President
+      # Kennedy's inaugural line, public domain, 11 s -- looped to two
+      # minutes. Repetitive, but real English speech throughout.
       - name: Make a two-minute English video
         run: |
-          & $env:FFMPEG -hide_banner -v error -f lavfi -i "color=c=0x1e2836:s=1280x720:r=30" -i apps/web/public/testmedia/en.wav -shortest -c:v libx264 -preset ultrafast -c:a aac "$env:RUNNER_TEMP\en.mp4"
+          Invoke-WebRequest "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav" -OutFile "$env:RUNNER_TEMP\jfk.wav"
+          & $env:FFMPEG -hide_banner -v error -stream_loop 10 -i "$env:RUNNER_TEMP\jfk.wav" -f lavfi -i "color=c=0x1e2836:s=1280x720:r=30" -map 1:v -map 0:a -t 120 -c:v libx264 -preset ultrafast -c:a aac "$env:RUNNER_TEMP\en.mp4"
           Get-Item "$env:RUNNER_TEMP\en.mp4"
 
       # APP-119 as reported: the whisper filter with the paths unescaped,
