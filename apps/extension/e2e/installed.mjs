@@ -62,6 +62,13 @@ const browserName = flag("--browser", "chromium");
 const profileDir = flag("--profile", null);
 // Screenshots of lines on the video, taken after the run -- evidence for a
 // person, not an assertion.
+// "auto" | "gpu" | "cpu", sent only when given, so a build from before the
+// setting existed runs exactly as it did.
+const backendFlag = args.includes("--backend") ? flag("--backend", "auto") : null;
+// Slow the engine's document by this factor (Chromium only), to stand in
+// for a machine that only just keeps up -- APP-110's Iris Xe, which one
+// run kept up and the next dropped windows. 1 is no throttle.
+const throttle = Number(flag("--throttle", "1"));
 const shotsDir = args.includes("--shots") ? resolve(flag("--shots", ".")) : null;
 const warmOnly = args.includes("--warm");
 const speechUntil = args.includes("--speech-until") ? Number(flag("--speech-until", "0")) : null;
@@ -186,6 +193,9 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
         // yes without the prompt; the request itself still has to come from
         // a real click, below.
         "extensions.webextOptionalPermissionPrompts": false,
+        // --ff-webgpu: Firefox with WebGPU on, the APP-121 configuration --
+        // an adapter that exists and says nothing about itself.
+        ...(args.includes("--ff-webgpu") ? { "dom.webgpu.enabled": true, "gfx.webgpu.ignore-blocklist": true } : {}),
       },
     },
   } } });
@@ -274,6 +284,36 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
   };
 }
 
+/**
+ * CPU-throttle the engine's offscreen document through the DevTools
+ * protocol. Playwright does not expose offscreen documents, so this talks to
+ * the browser endpoint directly: find the engine.html target, attach, and
+ * set the throttling rate on that session.
+ */
+async function throttleEngine(rate) {
+  const list = await (await fetch("http://127.0.0.1:9339/json/version")).json();
+  const ws = new WebSocket(list.webSocketDebuggerUrl);
+  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  let id = 0;
+  const waiters = new Map();
+  ws.onmessage = (e) => { const m = JSON.parse(e.data); waiters.get(m.id)?.(m); };
+  const send = (method, params = {}, sessionId) => new Promise((r) => {
+    id += 1; waiters.set(id, r); ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+  });
+  for (let i = 0; i < 50; i += 1) {
+    const { result } = await send("Target.getTargets");
+    const engine = result.targetInfos.find((t) => t.url.endsWith("/engine.html"));
+    if (engine) {
+      const { result: a } = await send("Target.attachToTarget", { targetId: engine.targetId, flatten: true });
+      const r = await send("Emulation.setCPUThrottlingRate", { rate }, a.sessionId);
+      console.log(`${at()}  engine throttled ${rate}x ${r.error ? JSON.stringify(r.error) : "ok"}`);
+      return; // the socket stays open: closing it would end the throttle
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error("no engine.html target to throttle");
+}
+
 let context;
 let extensionBase;
 if (browserName === "firefox") {
@@ -298,6 +338,7 @@ if (browserName === "firefox") {
       `--load-extension=${unpacked}`,
       "--autoplay-policy=no-user-gesture-required",
       "--enable-unsafe-webgpu",
+      ...(throttle > 1 ? ["--remote-debugging-port=9339"] : []),
     ],
   });
 }
@@ -394,8 +435,9 @@ try {
   const startedAt = Date.now();
   const started = await control.evaluate(
     (m) => chrome.runtime.sendMessage(m),
-    { kind: "start", tabId, settings: { model, language, window: windowS, overlay: true, fontScale: 1 } },
+    { kind: "start", tabId, settings: { model, language, window: windowS, overlay: true, fontScale: 1, ...(backendFlag ? { backend: backendFlag } : {}) } },
   );
+  if (throttle > 1) await throttleEngine(throttle);
   console.log(`${at()}  start -> ${JSON.stringify(started)}   (${model}, ${language}, ${windowS}s windows, ${duration.toFixed(1)}s video)`);
 
   // Is there anything in the page listening? This is fault one of APP-109
@@ -423,9 +465,16 @@ try {
   let firstCueAt = null;
   let lastNote = "";
   let seen = 0;
-  const deadline = startedAt + (warmOnly ? 1200 : duration + windowS * 3 + 60) * 1000;
+  // A slow machine now finishes after the video does -- windows wait rather
+  // than being dropped -- so the run ends when lines stop arriving, not at a
+  // fixed time after the video. The deadline is only the backstop.
+  const deadline = startedAt + (warmOnly ? 1200 : duration * 4 + 120) * 1000;
+  let lastCount = 0;
+  let lastChange = Date.now();
   for (;;) {
     const state = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }));
+    if (state.count !== lastCount) { lastCount = state.count; lastChange = Date.now(); }
+    const catchingUp = /catching up|behind/.test(state.status.note ?? "");
     if (state.count > 0 && firstCueAt === null) {
       firstCueAt = (Date.now() - startedAt) / 1000;
       console.log(`${at()}  first subtitle, ${firstCueAt.toFixed(1)}s after Start`);
@@ -445,7 +494,8 @@ try {
     if (ended && warmOnly) {
       // Keep the video going until the model has loaded and heard something.
       await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 0; return v.play(); });
-    } else if (ended && Date.now() > startedAt + (duration + windowS * 2) * 1000) break;
+    } else if (ended && !catchingUp && Date.now() > startedAt + (duration + windowS * 2) * 1000
+      && Date.now() - lastChange > (windowS * 2 + 15) * 1000) break;
     if (Date.now() > deadline) break;
     await new Promise((r) => setTimeout(r, 1000));
   }

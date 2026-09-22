@@ -39,6 +39,11 @@ export interface Settings {
   /** Render cues over the video, as opposed to only collecting them. */
   overlay: boolean;
   fontScale: number;
+  /**
+   * Where the model runs. "auto" is the engine's call (see
+   * engine.ts `startsOnCpu`); "gpu" and "cpu" are the user's.
+   */
+  backend: "auto" | "gpu" | "cpu";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   window: 20,
   overlay: true,
   fontScale: 1,
+  backend: "auto",
 };
 
 /** Sent by the popup; handled by the background. */

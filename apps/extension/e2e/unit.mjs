@@ -258,6 +258,33 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
 
 // -------------------------------------------------------------------------
 
+// --- keeping pace (APP-110, APP-121) --------------------------------------
+{
+  const { startsOnCpu, enqueue, maxWaiting, behindNote } = await import("../src/lib/pace.ts");
+
+  ok("an Intel iGPU runs on the CPU (Chrome, Iris Xe: 14-30 s a window on WebGPU)", startsOnCpu({ integrated: true }));
+  ok("Firefox with an anonymous adapter runs on the CPU", startsOnCpu({ cpuFirst: true }));
+  ok("a discrete card or Apple silicon stays on the GPU", !startsOnCpu({ integrated: false, cpuFirst: false }));
+  ok("no facts at all stays on the GPU", !startsOnCpu({}));
+
+  // The reproduced pattern: the first window waits for the model, and five
+  // more arrive meanwhile. A bound of three dropped one of them.
+  const max = maxWaiting(20);
+  const waiting = [];
+  const dropped = [1, 2, 3, 4, 5].map((w) => enqueue(waiting, w, max));
+  ok("windows recorded while the model loads all wait; none is dropped", dropped.every((d) => !d) && waiting.join() === "1,2,3,4,5",
+    JSON.stringify({ dropped, waiting }));
+  ok("they are read in order", waiting[0] === 1);
+  ok("fifteen minutes of twenty-second windows may wait", max === 45, String(max));
+  ok("the bound is time, not a count: ten-second passes allow twice as many", maxWaiting(10) === 90);
+  const full = Array.from({ length: max }, (_, i) => i);
+  ok("past fifteen minutes behind, the oldest goes and the drop is reported", enqueue(full, "new", max) === true && full[0] === 1 && full.length === max);
+
+  ok("one window waiting just says so", behindNote(1, "onnx-community/whisper-base") === "Transcribing (catching up: 1 window waiting)");
+  ok("falling further behind names the model that keeps up", /Tiny model keeps up/.test(behindNote(3, "onnx-community/whisper-base")));
+  ok("unless it is already the one in use", !/Tiny model/.test(behindNote(3, "onnx-community/whisper-tiny")));
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
