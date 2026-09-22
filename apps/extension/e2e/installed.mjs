@@ -39,7 +39,7 @@
 // on disk is not touched.
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -281,7 +281,6 @@ if (browserName === "firefox") {
   if (!geckoId) throw new Error("the Firefox manifest names no gecko id");
   const uuid = "6f0b5f2e-4a1c-4d6e-9b8a-0c1d2e3f4a5b";
   const profile = profileDir ? resolve(profileDir) : join(work, "profile");
-  const { mkdirSync } = await import("node:fs");
   mkdirSync(profile, { recursive: true });
   context = await firefoxContext({
     geckodriver: flag("--geckodriver", "geckodriver"), profile, geckoId, uuid, unpackedPath: unpacked,
@@ -459,6 +458,7 @@ try {
   // during the first playback mostly catches the gap between them. Seek back
   // to a few lines instead, pause, and photograph each one on the video.
   if (shotsDir) {
+    mkdirSync(shotsDir, { recursive: true });
     // From the SRT rather than the broadcasts, which Firefox does not deliver
     // to the control page.
     const secs = (x) => { const [h, m, r] = x.split(":"); return +h * 3600 + +m * 60 + +r.replace(",", "."); };
