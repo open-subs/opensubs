@@ -18,6 +18,8 @@ const languageEl = $<HTMLSelectElement>("language");
 const windowEl = $<HTMLInputElement>("window");
 const windowOut = $<HTMLOutputElement>("window-out");
 const overlayEl = $<HTMLInputElement>("overlay");
+const backendEl = $<HTMLSelectElement>("backend");
+const backendNote = $<HTMLParagraphElement>("backend-note");
 const statusEl = $<HTMLDivElement>("status");
 const deviceEl = $<HTMLParagraphElement>("device");
 const goEl = $<HTMLButtonElement>("go");
@@ -73,6 +75,7 @@ function readSettings(): Settings {
     window: Number(windowEl.value),
     overlay: overlayEl.checked,
     fontScale: DEFAULT_SETTINGS.fontScale,
+    backend: backendEl.value as Settings["backend"],
   };
 }
 
@@ -81,13 +84,25 @@ function showSettings(s: Settings) {
   languageEl.value = s.language;
   windowEl.value = String(s.window);
   overlayEl.checked = s.overlay;
+  backendEl.value = s.backend ?? DEFAULT_SETTINGS.backend;
   syncNotes();
 }
 
 function syncNotes() {
   windowOut.textContent = `${windowEl.value}s`;
   modelNote.textContent = ASR_MODELS.find((m) => m.id === modelEl.value)?.note ?? "";
+  backendNote.textContent = BACKEND_NOTES[backendEl.value] ?? "";
 }
+
+/**
+ * What each choice means. "Automatic" is the one to leave alone: it uses the
+ * CPU where the GPU was measured to be the slow path (engine.ts startsOnCpu).
+ */
+const BACKEND_NOTES: Record<string, string> = {
+  auto: "Uses the processor on Firefox and on Intel built-in graphics, where it was measured faster; the graphics card elsewhere.",
+  gpu: "Fastest on a dedicated graphics card or Apple silicon. Can fall behind on built-in graphics.",
+  cpu: "Works everywhere. The first run downloads a model about four times larger.",
+};
 
 function showStatus(status: Status, count: number) {
   const idle = status.stage === "idle" || (!status.note && !running);
@@ -101,7 +116,7 @@ function showStatus(status: Status, count: number) {
     deviceEl.textContent =
       status.device === "webgpu"
         ? "Running on the GPU, on this machine."
-        : "Running on the CPU, on this machine. Slower, but it works everywhere.";
+        : "Running on the processor, on this machine.";
   }
   saveEl.disabled = count === 0;
 }
@@ -109,7 +124,7 @@ function showStatus(status: Status, count: number) {
 function setRunning(on: boolean) {
   running = on;
   goEl.textContent = on ? "Stop" : "Start";
-  for (const el of [modelEl, languageEl, windowEl]) el.disabled = on;
+  for (const el of [modelEl, languageEl, windowEl, backendEl]) el.disabled = on;
 }
 
 async function refresh() {
@@ -156,7 +171,7 @@ saveEl.addEventListener("click", async () => {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 });
 
-for (const el of [modelEl, languageEl, windowEl, overlayEl]) {
+for (const el of [modelEl, languageEl, windowEl, overlayEl, backendEl]) {
   el.addEventListener("input", syncNotes);
 }
 

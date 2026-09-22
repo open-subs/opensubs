@@ -23,10 +23,11 @@
  * can: a direct call on Firefox, a message hop on Chromium.
  */
 
-import { transcribeLocally, asrSupport } from "../../../web/src/lib/asr";
+import { transcribeLocally, asrSupport, type AsrSupport } from "../../../web/src/lib/asr";
 import { isSignOff } from "../../../web/src/lib/cleanup";
 import { isChinese, toSimplified, wantsTraditional } from "../../../web/src/lib/script";
-import { fromWire, type Cue, type FromEngine, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
+import { behindNote, enqueue, maxWaiting, startsOnCpu } from "../lib/pace";
+import { fromWire, type Cue, type FromEngine, type Settings, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
 
 export type Emit = (message: FromEngine) => void;
 
@@ -107,16 +108,26 @@ async function settleScript(cues: Cue[], heard: string, chosen: string): Promise
 
 export function createEngine(emit: Emit): Engine {
   let device: "webgpu" | "wasm" | undefined;
+  /** What the browser offers, asked once: it does not change mid-session. */
+  let support: Promise<AsrSupport> | null = null;
   /**
-   * One window at a time, and the queue is one deep on purpose.
+   * One window at a time, with a short queue behind it.
    *
-   * If transcription falls behind capture, the right response is to drop
-   * windows rather than build a backlog: a backlog gets further behind for
-   * the rest of the film, and subtitles that arrive four minutes late are
-   * worse than subtitles with a gap in them.
+   * This used to be one deep on purpose -- a backlog gets further behind for
+   * the rest of the film -- so a window that arrived while another was being
+   * read replaced the one waiting, and its audio was lost. On a machine that
+   * only just keeps up, that cost whole stretches of speech: on an Iris Xe
+   * laptop the same video kept up on one run and dropped two or five windows
+   * on the next (APP-110, reopened), because the time a window takes varies
+   * and one slow window was enough to lose the next.
+   *
+   * So windows wait instead, up to fifteen minutes of audio (see pace.ts):
+   * a slow patch, or the model's first load, is absorbed, and a machine a
+   * little slower than the film falls behind and says so rather than
+   * cutting holes in the subtitles.
    */
   let running = false;
-  let pending: Extract<ToEngine, { kind: "transcribe" }> | null = null;
+  const waiting: Extract<ToEngine, { kind: "transcribe" }>[] = [];
   let dropped = 0;
   /**
    * The language this capture turned out to be in, once a window has said so.
@@ -168,10 +179,11 @@ export function createEngine(emit: Emit): Engine {
     const { audio, mime, offset, settings } = message;
     const auto = settings.language === "auto";
     try {
-      device ??= (await asrSupport()).device;
+      device = await chooseDevice(settings.backend);
       const result = await transcribeLocally({
         file: asFile(audio, mime),
         model: settings.model,
+        device,
         start: 0,
         end: null,
         language: auto ? heard ?? undefined : settings.language,
@@ -179,7 +191,7 @@ export function createEngine(emit: Emit): Engine {
         // must be allowed to come back with nothing in it.
         allowEmpty: true,
         onProgress: (p) => {
-          if (p.stage === "model" && loaded === settings.model) return;
+          if (p.stage === "model" && loaded === `${settings.model}|${device}`) return;
           say({
             stage: p.stage === "model" ? "model" : "transcribing",
             fraction: p.fraction,
@@ -188,7 +200,7 @@ export function createEngine(emit: Emit): Engine {
           });
         },
       });
-      loaded = settings.model;
+      loaded = `${settings.model}|${device}`;
       // Back onto the page's timeline. `transcribeLocally` reports seconds
       // from the start of what it was given, and what it was given began
       // at `offset` in the video.
@@ -210,15 +222,19 @@ export function createEngine(emit: Emit): Engine {
     }
   }
 
+  async function chooseDevice(backend: Settings["backend"]): Promise<"webgpu" | "wasm"> {
+    support ??= asrSupport();
+    const s = await support;
+    if (s.device !== "webgpu" || backend === "cpu") return "wasm";
+    if (backend === "gpu") return "webgpu";
+    return startsOnCpu(s) ? "wasm" : "webgpu";
+  }
+
   async function pump() {
     if (running) return;
     running = true;
     try {
-      while (pending) {
-        const next = pending;
-        pending = null;
-        await run(next);
-      }
+      while (waiting.length) await run(waiting.shift()!);
     } finally {
       running = false;
     }
@@ -227,7 +243,7 @@ export function createEngine(emit: Emit): Engine {
   return {
     handle(message) {
       if (message.kind === "transcribe") {
-        if (pending) {
+        if (enqueue(waiting, message, maxWaiting(message.settings.window))) {
           dropped += 1;
           say({
             stage: "transcribing",
@@ -235,8 +251,9 @@ export function createEngine(emit: Emit): Engine {
             note: `Transcribing (${dropped} window${dropped === 1 ? "" : "s"} skipped to keep up)`,
             device,
           });
+        } else if (running) {
+          say({ stage: "transcribing", fraction: null, note: behindNote(waiting.length, message.settings.model), device });
         }
-        pending = message;
         void pump();
         return;
       }
@@ -246,6 +263,7 @@ export function createEngine(emit: Emit): Engine {
         // over, the second video would open "(5 windows skipped)".
         heard = null;
         dropped = 0;
+        waiting.length = 0;
         say({ stage: "model", fraction: null, note: "Loading the speech model", device });
       }
     },

@@ -21,6 +21,16 @@
   </div>
 
   <div class="row">
+    <label for="backend">Runs on</label>
+    <select id="backend">
+      <option value="auto">Automatic</option>
+      <option value="gpu">Graphics card (GPU)</option>
+      <option value="cpu">Processor (CPU)</option>
+    </select>
+    <p class="hint" id="backend-note"></p>
+  </div>
+
+  <div class="row">
     <label for="window">Seconds per pass <output id="window-out"></output></label>
     <input type="range" id="window" min="10" max="30" step="5">
     <p class="hint">Longer passes read better and appear later.</p>
