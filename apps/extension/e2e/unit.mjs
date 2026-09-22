@@ -210,7 +210,7 @@ for (const [name, kept, incoming, keptWant] of [
 // protocol.ts reaches for the `chrome` global as it loads, which Node does
 // not have. Nothing here calls it; it only has to exist.
 globalThis.chrome ??= {};
-const { toWire, fromWire } = await import("../src/lib/protocol.ts");
+const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
 
 {
   // Chromium carries extension messages as JSON. This is that hop, and it is
@@ -238,6 +238,17 @@ const { toWire, fromWire } = await import("../src/lib/protocol.ts");
   ok("a 3 MB window encodes without blowing the stack", back instanceof Uint8Array, String(back));
   ok("and decodes to the same bytes", back instanceof Uint8Array && back.length === big.length
     && back.every((v, i) => v === big[i]));
+}
+
+{
+  // What the content script actually calls. In a browser it goes through a
+  // data URL (see protocol.ts for why Firefox needs that); here, without
+  // FileReader, through the bytes -- either way it has to land on the same
+  // wire text.
+  const bytes = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255]);
+  const wire = await blobToWire(new Blob([bytes], { type: "audio/webm" }));
+  eq("a recorded blob reaches the wire intact", [...fromWire(wire)], [...bytes]);
+  eq("an empty blob is empty on the wire", await blobToWire(new Blob([])), "");
 }
 
 {
