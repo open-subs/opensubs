@@ -37,9 +37,7 @@
 // `http://127.0.0.1/*` in host_permissions. That changes how access is
 // granted and nothing else; it is not part of either fault, and the package
 // on disk is not touched.
-import { chromium, firefox } from "playwright";
-import net from "node:net";
-import { randomUUID } from "node:crypto";
+import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -134,44 +132,137 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const t0 = Date.now();
 const at = () => ((Date.now() - t0) / 1000).toFixed(1).padStart(6);
 /**
- * Firefox has no --load-extension. It installs a temporary add-on over its
- * remote debugging protocol, which is what `web-ext run` does underneath: a
- * length-prefixed JSON conversation with the root actor, then the add-ons
- * actor. The add-on's internal UUID -- and so its moz-extension:// address --
- * is random per profile unless the profile names it, so the test names it.
+ * Firefox, driven over WebDriver.
+ *
+ * Playwright's Firefox is a patched build that cannot open a moz-extension://
+ * page at all -- a navigation there never commits -- so the popup, which is
+ * where Start comes from, is out of its reach. geckodriver drives the real
+ * Firefox, installs the package as a temporary add-on, and opens extension
+ * pages like any other. The add-on's internal UUID, and so its address, is
+ * pinned through a profile preference.
+ *
+ * What comes back is an object with the handful of Playwright calls the flow
+ * below uses -- newPage, goto, evaluate, waitForFunction, close -- so both
+ * browsers go through exactly the same steps and the same checks.
  */
-async function installInFirefox(port, path) {
-  const sock = net.connect(port, "127.0.0.1");
-  let buf = "";
-  const replies = [];
-  sock.on("data", (d) => {
-    buf += d.toString();
-    for (;;) {
-      const colon = buf.indexOf(":");
-      if (colon < 0) break;
-      const len = Number(buf.slice(0, colon));
-      if (buf.length < colon + 1 + len) break;
-      replies.push(JSON.parse(buf.slice(colon + 1, colon + 1 + len)));
-      buf = buf.slice(colon + 1 + len);
+async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPath }) {
+  const { spawn } = await import("node:child_process");
+  const port = 4444 + Math.floor(Math.random() * 500);
+  // --allow-system-access lets the test open a tab from the browser's own
+  // context, which is the only way to reach a moz-extension:// page:
+  // WebDriver refuses to navigate a content tab there.
+  const driver = spawn(geckodriver, ["--port", String(port), "--allow-system-access"], { stdio: "ignore" });
+  const base = `http://127.0.0.1:${port}`;
+  const call = async (method, path, body) => {
+    for (let i = 0; i < 50; i += 1) {
+      try {
+        const r = await fetch(`${base}${path}`, {
+          method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
+        });
+        const j = await r.json();
+        if (j.value?.error) throw new Error(`${j.value.error}: ${j.value.message}`);
+        return j.value;
+      } catch (e) {
+        if (String(e).includes("ECONNREFUSED") || String(e).includes("fetch failed")) { await new Promise((r) => setTimeout(r, 200)); continue; }
+        throw e;
+      }
     }
-  });
-  const send = (m) => { const j = JSON.stringify(m); sock.write(`${Buffer.byteLength(j)}:${j}`); };
-  const wait = async (pred) => {
-    for (let i = 0; i < 100; i += 1) {
-      const hit = replies.find(pred);
-      if (hit) return hit;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    throw new Error(`no reply from Firefox's debugger (${JSON.stringify(replies.slice(-2))})`);
+    throw new Error("geckodriver did not answer");
   };
-  await wait((r) => r.applicationType);
-  send({ to: "root", type: "getRoot" });
-  const root = await wait((r) => r.addonsActor);
-  send({ to: root.addonsActor, type: "installTemporaryAddon", addonPath: path });
-  const done = await wait((r) => r.addon || r.error);
-  sock.destroy();
-  if (done.error) throw new Error(`Firefox refused the add-on: ${done.error} ${done.message ?? ""}`);
-  return done.addon.id;
+  const session = await call("POST", "/session", { capabilities: { alwaysMatch: {
+    browserName: "firefox",
+    "moz:firefoxOptions": {
+      binary: "/Applications/Firefox.app/Contents/MacOS/firefox",
+      args: [...(headed ? [] : ["-headless"]), "-profile", profile],
+      prefs: {
+        "extensions.webextensions.uuids": JSON.stringify({ [geckoId]: uuid }),
+        "media.autoplay.default": 0,
+        "media.autoplay.blocking_policy": 0,
+        // The popup asks for the site with permissions.request(), and Firefox
+        // answers that with a prompt a person clicks "Allow" on. This answers
+        // yes without the prompt; the request itself still has to come from
+        // a real click, below.
+        "extensions.webextOptionalPermissionPrompts": false,
+      },
+    },
+  } } });
+  const id = session.sessionId;
+  const installed = await call("POST", `/session/${id}/moz/addon/install`, { path: unpackedPath, temporary: true });
+  if (installed !== geckoId) throw new Error(`installed ${installed}, expected ${geckoId}`);
+
+
+  let current = await call("GET", `/session/${id}/window`);
+  const handles = [current];
+  const focus = async (h) => { if (h !== current) { await call("POST", `/session/${id}/window`, { handle: h }); current = h; } };
+  const page = (initial) => { let handle = initial; return {
+    async goto(url) {
+      if (!url.startsWith("moz-extension:")) {
+        await focus(handle);
+        await call("POST", `/session/${id}/url`, { url });
+        return;
+      }
+      // Open it from the browser's own context, then find the tab it became.
+      const before = new Set(await call("GET", `/session/${id}/window/handles`));
+      await call("POST", `/session/${id}/moz/context`, { context: "chrome" });
+      await call("POST", `/session/${id}/execute/sync`, {
+        script: `const url = arguments[0];
+          const win = Services.wm.getMostRecentWindow("navigator:browser");
+          win.gBrowser.selectedTab = win.gBrowser.addTab(url, {
+            triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+          });`,
+        args: [url],
+      });
+      await call("POST", `/session/${id}/moz/context`, { context: "content" });
+      for (let i = 0; i < 50; i += 1) {
+        const now = await call("GET", `/session/${id}/window/handles`);
+        const fresh = now.find((h) => !before.has(h));
+        if (fresh) { handle = fresh; handles.push(fresh); current = null; await focus(fresh); break; }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    },
+    async evaluate(fn, arg) {
+      await focus(handle);
+      // `chrome` is the extension namespace the flow is written against.
+      // Firefox has it too, but its promise-returning twin is `browser`, so
+      // each function runs with `chrome` bound to that.
+      const script = `const done = arguments[arguments.length - 1];
+        const chrome = globalThis.browser ?? globalThis.chrome;
+        Promise.resolve((${fn.toString()})(arguments[0]))
+          .then((v) => done({ ok: v === undefined ? null : v }), (e) => done({ error: String(e && e.message || e) }));`;
+      const r = await call("POST", `/session/${id}/execute/async`, { script, args: [arg ?? null] });
+      if (r && r.error) throw new Error(r.error);
+      return r ? r.ok : r;
+    },
+    /** A real click, which is what permissions.request() insists on. */
+    async click(selector) {
+      await focus(handle);
+      const el = await call("POST", `/session/${id}/element`, { using: "css selector", value: selector });
+      const ref = el[Object.keys(el)[0]];
+      await call("POST", `/session/${id}/element/${ref}/click`, {});
+    },
+    async waitForFunction(fn) {
+      for (let i = 0; i < 300; i += 1) {
+        if (await this.evaluate(fn)) return;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      throw new Error("waitForFunction timed out");
+    },
+  }; };
+  let first = true;
+  return {
+    async newPage() {
+      if (first) { first = false; return page(handles[0]); }
+      const made = await call("POST", `/session/${id}/window/new`, { type: "tab" });
+      handles.push(made.handle);
+      return page(made.handle);
+    },
+    serviceWorkers() { return []; },
+    async close() {
+      await call("DELETE", `/session/${id}`).catch(() => {});
+      driver.kill();
+    },
+  };
 }
 
 let context;
@@ -179,26 +270,13 @@ let extensionBase;
 if (browserName === "firefox") {
   const geckoId = manifest.browser_specific_settings?.gecko?.id;
   if (!geckoId) throw new Error("the Firefox manifest names no gecko id");
-  const uuid = randomUUID();
-  const port = 6000 + Math.floor(Math.random() * 1000);
-  context = await firefox.launchPersistentContext(profileDir ? resolve(profileDir) : join(work, "profile"), {
-    headless: !headed,
-    args: ["-start-debugger-server", String(port)],
-    firefoxUserPrefs: {
-      "devtools.debugger.remote-enabled": true,
-      "devtools.debugger.prompt-connection": false,
-      "devtools.chrome.enabled": true,
-      "extensions.webextensions.uuids": JSON.stringify({ [geckoId]: uuid }),
-      // MV3 host permissions are the user's to grant in Firefox; the test
-      // copy asks for 127.0.0.1 and this grants what it asks for.
-      "extensions.originControls.grantByDefault": true,
-      "media.autoplay.default": 0,
-      "media.autoplay.blocking_policy": 0,
-    },
+  const uuid = "6f0b5f2e-4a1c-4d6e-9b8a-0c1d2e3f4a5b";
+  const profile = profileDir ? resolve(profileDir) : join(work, "profile");
+  const { mkdirSync } = await import("node:fs");
+  mkdirSync(profile, { recursive: true });
+  context = await firefoxContext({
+    geckodriver: flag("--geckodriver", "geckodriver"), profile, geckoId, uuid, unpackedPath: unpacked,
   });
-  await new Promise((r) => setTimeout(r, 1500));
-  const installed = await installInFirefox(port, unpacked);
-  if (installed !== geckoId) throw new Error(`installed ${installed}, expected ${geckoId}`);
   extensionBase = `moz-extension://${uuid}`;
 } else {
   context = await chromium.launchPersistentContext(profileDir ? resolve(profileDir) : join(work, "profile"), {
@@ -259,10 +337,49 @@ try {
       if (m.kind === "segments") window.__segments.push({ t: Date.now(), offset: m.offset, cues: m.cues });
     });
   });
+  // Access to the page, asked for the way the popup asks, and asked for
+  // first: without it Firefox cannot match the tab lookup below by URL, the
+  // lookup comes back empty, and Start goes out with no tab -- whereupon the
+  // background falls back to the tab that sent it, which is the popup page
+  // itself, and reports "Missing host permission" for a page it was never
+  // meant to touch. That cost this test three runs to see.
+  //
+  // permissions.request
+  // for this origin, from a click. Chrome granted the test copy's
+  // host_permissions at install, so only Firefox needs it -- and without it
+  // the fixed package correctly refuses the page ("Missing host permission
+  // for the tab"), which reads exactly like the bug under test.
+  if (browserName === "firefox") {
+    await control.evaluate((o) => {
+      const b = document.createElement("button");
+      b.id = "__allow";
+      b.textContent = "allow";
+      b.addEventListener("click", () => {
+        chrome.permissions.request({ origins: [`${o}/*`] })
+          .then((ok) => { document.body.dataset.allowed = String(ok); },
+                (e) => { document.body.dataset.allowed = `error: ${e.message}`; });
+      });
+      document.body.append(b);
+    }, origin);
+    await control.click("#__allow");
+    await control.waitForFunction(() => document.body.dataset.allowed !== undefined);
+    const allowed = await control.evaluate(() => document.body.dataset.allowed);
+    console.log(`${at()}  site access, asked for as the popup asks: ${allowed}`);
+    if (allowed !== "true") throw new Error(`Firefox did not grant the page: ${allowed}`);
+  }
+
+  // Found by comparing URLs, not by a match pattern: Firefox's match patterns
+  // take no port, so `http://127.0.0.1:52485/*` matches nothing there while
+  // Chrome accepts it -- and this page, like any local server, has a port.
   const tabId = await control.evaluate(
-    async (o) => (await chrome.tabs.query({ url: `${o}/*` }))[0]?.id,
+    async (o) => (await chrome.tabs.query({})).find((t) => (t.url ?? "").startsWith(`${o}/`))?.id,
     origin,
   );
+  if (typeof tabId !== "number") {
+    const all = await control.evaluate(async () => (await chrome.tabs.query({})).map((t) => ({ id: t.id, url: t.url, title: t.title, active: t.active })));
+    console.log(`${at()}  tabs the extension can see: ${JSON.stringify(all)}`);
+    throw new Error(`no tab found for ${origin} -- Start would go to the wrong page`);
+  }
 
   // What a person does: the video is playing, then they press Start.
   await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 0; return v.play(); });
@@ -285,11 +402,19 @@ try {
       return String(e.message ?? e);
     }
   }, tabId);
-  console.log(`${at()}  content script in the page: ${receiver}`);
+  // The same question asked of the page itself: once the content script has
+  // run and taken "begin", its subtitle overlay is in the document. This one
+  // works the same in both browsers -- Firefox's WebDriver sandbox makes the
+  // probe above fail on its own terms ("Incorrect argument types") whatever
+  // the extension is doing -- and it is closer to what a viewer sees.
+  const overlay = await page.evaluate(() => !!document.getElementById("opensubs-overlay-host"));
+  console.log(`${at()}  content script in the page: ${receiver}; subtitle overlay in the page: ${overlay ? "yes" : "no"}`);
+  const present = receiver === "present" || overlay;
 
   // Watch until the video ends, then give the last window time to land.
   let firstCueAt = null;
   let lastNote = "";
+  let seen = 0;
   const deadline = startedAt + (warmOnly ? 1200 : duration + windowS * 3 + 60) * 1000;
   for (;;) {
     const state = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }));
@@ -306,6 +431,15 @@ try {
     }
     if (warmOnly && state.count > 0) break;
     const ended = await page.evaluate(() => document.querySelector("video").ended);
+    // Broadcasts as well as the session's state: when Start fails the
+    // background says why and then drops the session, so by the next poll
+    // the state is blank and only the broadcast still knows what happened.
+    const heard = await control.evaluate((n) => window.__statuses.slice(n), seen);
+    for (const h of heard) {
+      if (h.stage === "error") console.log(`${at()}  [error, broadcast] ${h.note}`);
+    }
+    seen += heard.length;
+    if (heard.some((h) => h.stage === "error") && !state.running) break;
     if (state.status.stage === "error") break;
     if (ended && warmOnly) {
       // Keep the video going until the model has loaded and heard something.
@@ -387,7 +521,7 @@ try {
   console.log(`srt: ${join(work, "out.srt")}`);
 
   const fails = [];
-  if (receiver !== "present") fails.push(`no content script in the page (${receiver})`);
+  if (!present) fails.push(`no content script in the page (${receiver}; no overlay either)`);
   if (firstCueAt === null) fails.push("no subtitle ever arrived");
   else if (firstCueAt > 60) fails.push(`first subtitle took ${firstCueAt.toFixed(0)}s, over the 60s the task allows`);
   if (skipped > maxSkipped) fails.push(`${skipped} window(s) skipped to keep up`);

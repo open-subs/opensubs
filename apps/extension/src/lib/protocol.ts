@@ -149,3 +149,32 @@ export function fromWire(audio: WireAudio): Uint8Array {
   for (let i = 0; i < text.length; i += 1) bytes[i] = text.charCodeAt(i);
   return bytes;
 }
+
+/**
+ * A recorded window, straight to wire text.
+ *
+ * Through FileReader's data URL, never through the bytes, because of Firefox.
+ * There a content script sees objects the page's APIs make through a security
+ * wrapper, and the ArrayBuffer from `blob.arrayBuffer()` is one of them:
+ * building a Uint8Array over it reads the buffer's `constructor`, the wrapper
+ * refuses, and every window failed with 'Permission denied to access property
+ * "constructor"' -- so the fix for Chromium's JSON messaging, written against
+ * the bytes, sent Firefox no audio at all. A data URL is a string, the encoding
+ * is the browser's own, and a string crosses every boundary there is.
+ *
+ * Node has Blob and no FileReader, so the unit tests take the byte path; no
+ * browser does.
+ */
+export function blobToWire(blob: Blob): Promise<WireAudio> {
+  if (typeof FileReader === "undefined") return blob.arrayBuffer().then(toWire);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? "");
+      const comma = url.indexOf(",");
+      resolve(comma >= 0 ? url.slice(comma + 1) : "");
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("The recorded audio could not be read."));
+    reader.readAsDataURL(blob);
+  });
+}

@@ -8,7 +8,7 @@
  * host to reach it.
  */
 
-import { api, tell, toWire, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
+import { api, blobToWire, tell, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
 import { capture, findMedia, recordWindows } from "../lib/capture";
 import { cueAt } from "../lib/seam";
 
@@ -120,7 +120,7 @@ async function begin(next: Settings) {
       stream,
       settings.window,
       async (w) => {
-        const audio = toWire(await w.blob.arrayBuffer());
+        const audio = await blobToWire(w.blob);
         await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset });
       },
       () => running,

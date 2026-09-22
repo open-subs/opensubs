@@ -164,23 +164,33 @@ export async function recordWindows(
   const live = new Set<() => void>();
   let delivered: Promise<void> = Promise.resolve();
   let ended = media.ended;
+  // The first window that could not be delivered. Deliveries are chained, and
+  // a rejection in a chain skips everything after it without a word -- so the
+  // first cut of this loop let one bad window stop every later one and only
+  // said so when the film ended, two minutes on. It is caught here instead,
+  // capture stops at once, and the reason reaches the user while it matters.
+  let failure: unknown = null;
   const onEnded = () => { ended = true; };
   media.addEventListener("ended", onEnded);
 
   try {
-    while (running() && !ended) {
+    while (running() && !ended && failure === null) {
       const current = recordWindow(track, seconds, () => media.currentTime);
       live.add(current.stop);
       const got = current.done.finally(() => live.delete(current.stop));
       // In order, one at a time, and not at all once Stop has been pressed.
-      delivered = delivered.then(async () => {
-        const w = await got;
-        if (w && running()) await onWindow(w);
-      });
-      await until(step * 1000, () => !running() || ended);
+      delivered = delivered
+        .then(async () => {
+          if (failure !== null) return;
+          const w = await got;
+          if (w && running()) await onWindow(w);
+        })
+        .catch((e) => { failure ??= e; });
+      await until(step * 1000, () => !running() || ended || failure !== null);
     }
     for (const stop of [...live]) stop();
     await delivered;
+    if (failure !== null) throw failure;
   } finally {
     media.removeEventListener("ended", onEnded);
   }
