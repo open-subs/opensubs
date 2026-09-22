@@ -116,7 +116,10 @@ ffmpeg -hide_banner -loglevel error -y \
 
 # Deterministic speech with known ground truth, for real-ASR WER gating.
 # `say` is macOS-only; skipped elsewhere, and the ASR tests skip with it.
-if command -v say >/dev/null 2>&1; then
+# The binary, not the name: this script defines a `say` function for its own
+# log lines, so `command -v say` is true everywhere and Linux or Windows then
+# ran a /usr/bin/say that does not exist.
+if [ -x /usr/bin/say ]; then
   say "TTS speech with known transcript"
   TXT="The quick brown fox jumps over the lazy dog."
   /usr/bin/say -v Samantha -o "$OUT/speech.aiff" "$TXT"

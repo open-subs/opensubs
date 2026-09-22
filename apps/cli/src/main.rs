@@ -214,13 +214,7 @@ fn resolve_ffprobe(ffmpeg_bin: &Path) -> PathBuf {
 /// formula lacks it, which otherwise surfaces many stages later as an
 /// opaque "No such filter: 'ass'" from deep inside the burn.
 fn has_ass_filter(ffmpeg_bin: &Path) -> Result<bool, String> {
-    let out = Process::new(ffmpeg_bin)
-        .arg("-filters")
-        .output()
-        .map_err(|e| format!("failed to run {} -filters: {e}", ffmpeg_bin.display()))?;
-    Ok(String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .any(|l| l.split_whitespace().nth(1) == Some("ass")))
+    Ok(!subs_pipeline::missing_filters(ffmpeg_bin)?.contains(&"ass"))
 }
 
 fn encoder_for(fast: bool) -> VideoEncoder {
@@ -242,12 +236,14 @@ fn work_dir_for(output: &Path) -> PathBuf {
 }
 
 /// Checks `ffmpeg_bin` (resolved from `explicit`, or auto-detected when
-/// `None`) for libass, and offers an interactive `brew install ffmpeg-full`
-/// when it's missing entirely or lacks the filter -- but only when stdin is
-/// a real terminal (never prompts a script/pipe, see `IsTerminal`) and no
-/// `--ffmpeg` override was given (installing ffmpeg-full via Homebrew can't
-/// fix a specific pinned path the user chose themselves). Returns the
-/// ffmpeg binary to actually use, or the process exit code to return.
+/// `None`) for libass, and offers to install a working ffmpeg -- Homebrew's
+/// `ffmpeg-full` on macOS, Gyan.dev's full build through winget on Windows
+/// (see `subs_pipeline::install_method`) -- when it's missing entirely or
+/// lacks the filter, but only when stdin is a real terminal (never prompts
+/// a script/pipe, see `IsTerminal`) and no `--ffmpeg` override was given
+/// (installing one can't fix a specific pinned path the user chose
+/// themselves). Returns the ffmpeg binary to actually use, or the process
+/// exit code to return.
 fn ensure_ffmpeg_ready(explicit: Option<&Path>) -> Result<PathBuf, i32> {
     let ffmpeg_bin = resolve_ffmpeg(explicit);
     match has_ass_filter(&ffmpeg_bin) {
@@ -263,15 +259,19 @@ fn ensure_ffmpeg_ready(explicit: Option<&Path>) -> Result<PathBuf, i32> {
         ),
     }
 
-    if explicit.is_none() && std::io::stdin().is_terminal() {
-        eprint!("Install ffmpeg-full via Homebrew now? [y/N] ");
+    let method = subs_pipeline::install_method();
+    if let (None, true, Some(method)) = (explicit, std::io::stdin().is_terminal(), method) {
+        eprint!("{} now? [y/N] ", method.label);
         let _ = std::io::stderr().flush();
         let mut answer = String::new();
         let agreed = std::io::stdin().read_line(&mut answer).is_ok()
             && matches!(answer.trim().to_lowercase().as_str(), "y" | "yes");
 
         if agreed {
-            eprintln!("Running `brew install ffmpeg-full`\u{2026} this can take several minutes.");
+            eprintln!(
+                "Running `{}`\u{2026} this can take several minutes.",
+                method.command
+            );
             match subs_pipeline::install_ffmpeg_full(|line| eprintln!("  {line}")) {
                 Ok(()) => {
                     // Re-resolve rather than reusing the earlier `ffmpeg_bin`:
@@ -280,7 +280,7 @@ fn ensure_ffmpeg_ready(explicit: Option<&Path>) -> Result<PathBuf, i32> {
                     let ffmpeg_bin = resolve_ffmpeg(None);
                     return match has_ass_filter(&ffmpeg_bin) {
                         Ok(true) => {
-                            eprintln!("opensubs: ffmpeg-full installed, libass confirmed.");
+                            eprintln!("opensubs: ffmpeg installed, libass confirmed.");
                             Ok(ffmpeg_bin)
                         }
                         Ok(false) => {
@@ -307,10 +307,16 @@ fn ensure_ffmpeg_ready(explicit: Option<&Path>) -> Result<PathBuf, i32> {
         }
     }
 
-    eprintln!(
-        "opensubs: install an ffmpeg build with --enable-libass yourself (e.g. Homebrew's \
-         `brew install ffmpeg-full`) or pass --ffmpeg <path> to one."
-    );
+    match method {
+        Some(m) => eprintln!(
+            "opensubs: install an ffmpeg with libass yourself (`{}`) or pass --ffmpeg <path> to one.",
+            m.command
+        ),
+        None => eprintln!(
+            "opensubs: install an ffmpeg built with --enable-libass yourself, or pass \
+             --ffmpeg <path> to one."
+        ),
+    }
     Err(1)
 }
 
