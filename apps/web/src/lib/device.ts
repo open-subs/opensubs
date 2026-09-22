@@ -80,3 +80,44 @@ export function describeGpu(info: GpuInfo | null | undefined): string | undefine
   const parts = [info.vendor, info.architecture].filter((p): p is string => Boolean(p && p.trim()));
   return parts.length ? parts.join(" · ") : info.description || undefined;
 }
+
+/**
+ * An adapter that says nothing about itself: no vendor, no architecture,
+ * no device, no description. Firefox answers this way on every machine
+ * (APP-121) -- it withholds the fields -- so it cannot be told apart from
+ * any other GPU, fast or slow.
+ */
+export function isAnonymousAdapter(info: GpuInfo | null | undefined): boolean {
+  if (!info) return true;
+  return ![info.vendor, info.architecture, info.device, info.description].some((f) => f && f.trim());
+}
+
+/** Gecko, by its user agent: the one engine the rule below is about. */
+export function isFirefox(userAgent: string): boolean {
+  return /\bFirefox\//.test(userAgent) && !/\bSeamonkey\//i.test(userAgent);
+}
+
+/**
+ * Whether to start on the CPU although WebGPU is there.
+ *
+ * Firefox, with an adapter that says nothing. APP-121, measured on the
+ * Iris Xe laptop behind APP-111, Firefox 154, a 114-second clip:
+ *
+ *   WebGPU + Small   15% after ten minutes, "about 55 min left"
+ *   CPU    + Base    62-83 s, first download included
+ *
+ * Chrome on the same machine gets Base on the GPU, because Chrome says it
+ * is an Intel gen-12lp and the rule in isIntegratedGpu can act on that.
+ * Firefox says nothing, and on the one machine where its WebGPU was timed
+ * it was dozens of times slower than its own CPU path. With nothing to go
+ * on, the CPU is the choice that cannot be an hour: it is not the fastest
+ * possible on a machine with a strong GPU, and such a machine keeps the
+ * GPU one switch away.
+ *
+ * Firefox only. Safari may withhold the fields as well, and on Apple
+ * silicon WebGPU was measured to pay off -- guessing Safari slow would take
+ * that away on the strength of a measurement made in another browser.
+ */
+export function startsOnCpu(facts: { info: GpuInfo | null | undefined; userAgent: string }): boolean {
+  return isFirefox(facts.userAgent) && isAnonymousAdapter(facts.info);
+}

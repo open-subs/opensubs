@@ -44,11 +44,20 @@ const machines = [
   { name: "apple", label: "Apple silicon", info: { vendor: "apple", architecture: "metal-3" }, model: "whisper-small", switch: true },
   { name: "nvidia", label: "NVIDIA discrete", info: { vendor: "nvidia", architecture: "ampere" }, model: "whisper-small", switch: true },
   { name: "none", label: "no WebGPU", info: null, model: "whisper-base", switch: false },
+  // APP-121: Firefox withholds every field, so its GPU cannot be judged, and
+  // on the reporter's Iris Xe its WebGPU was dozens of times slower than its
+  // CPU. It starts on the CPU, with Base, and keeps the switch.
+  { name: "firefox", label: "Firefox, adapter says nothing", info: { vendor: "", architecture: "", device: "", description: "" },
+    ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",
+    model: "whisper-base", switch: true, backend: "cpu" },
+  // The same empty adapter in Chrome is left alone: not measured.
+  { name: "chrome-anon", label: "Chrome, adapter says nothing", info: { vendor: "", architecture: "" },
+    model: "whisper-small", switch: true, backend: "gpu" },
 ];
 
 const browser = await chromium.launch();
 for (const m of machines) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, ...(m.ua ? { userAgent: m.ua } : {}) });
   await page.addInitScript((info) => {
     const gpu = info
       ? { requestAdapter: async () => ({ info, features: new Set(), limits: {} }) }
@@ -74,7 +83,15 @@ for (const m of machines) {
 
   if (shots) await model.locator("xpath=ancestor::div[contains(@class,'field-row')]").screenshot({ path: `${shots}/${m.name}-gpu.png` }).catch(() => {});
 
-  if (hasSwitch) {
+  if (hasSwitch && m.backend) {
+    ok(`${m.label}: it starts on the ${m.backend.toUpperCase()}`, (await backend.inputValue()) === m.backend, await backend.inputValue());
+  }
+  if (hasSwitch && m.backend === "cpu") {
+    // Started on the CPU, the way back is the switch, and the model follows.
+    await backend.selectOption("gpu");
+    await page.waitForTimeout(300);
+    ok(`${m.label}: the GPU is one switch away`, (await backend.inputValue()) === "gpu");
+  } else if (hasSwitch) {
     await backend.selectOption("cpu");
     await page.waitForTimeout(300);
     const onCpu = await model.inputValue();
