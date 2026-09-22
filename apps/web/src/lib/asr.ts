@@ -32,6 +32,7 @@ import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
 import { describeGpu, isIntegratedGpu, type GpuInfo } from "./device";
+import { passEnd, plannedWindows, windowProgress } from "./windows";
 import {
   MAX_SEGMENT_S,
   MIN_CHARS_PER_SECOND,
@@ -826,28 +827,6 @@ const SNAP_RADIUS_S = 0.75;
  */
 const SNAP_QUIET_RATIO = 0.4;
 
-/**
- * How many windows the pipeline will cut this audio into.
- *
- * Deliberately mirrors the loop in transformers.js's
- * `AutomaticSpeechRecognitionPipeline._call_whisper` rather than
- * approximating it with a division: the last window is whatever is left
- * over, and `ceil(length / jump)` is off by one for exactly the lengths
- * that land on a boundary. A count that is one too low shows 105% and one
- * too high stops the bar short of the end, and both look like a bug.
- */
-export function whisperWindows(samples: number, chunkLengthS: number, strideLengthS: number): number {
-  const window = TARGET_SAMPLE_RATE * chunkLengthS;
-  const jump = window - 2 * TARGET_SAMPLE_RATE * strideLengthS;
-  if (jump <= 0 || samples <= 0) return 1;
-  let offset = 0;
-  let count = 0;
-  while (true) {
-    count += 1;
-    if (offset + window >= samples) return count;
-    offset += jump;
-  }
-}
 
 /**
  * Which language is being spoken, and where it changes.
@@ -897,6 +876,8 @@ interface WhisperInternals {
       lang_to_id?: Record<string, number>;
       decoder_start_token_id: number;
       suppress_tokens?: number[];
+      no_timestamps_token_id?: number;
+      eos_token_id?: number | number[];
     };
     generate(options: Record<string, unknown>): Promise<unknown>;
   };
@@ -1273,28 +1254,29 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   // indistinguishable from a hang -- and the honest thing for someone
   // deciding whether to wait is to say how much is left.
   //
-  // `generate()` calls `streamer.end()` once per window, and the pipeline
-  // forwards anything it is handed straight into `generate`, so a streamer
-  // that counts its own `end()` calls counts finished windows. `put()`
-  // fires per token and is deliberately ignored: token counts vary by
-  // window, so counting them would make the bar jump about. The total is
-  // summed across the runs, so one bar covers the whole job however many
-  // languages it turns out to be in.
-  const windows = runs.reduce(
-    (n, run) => n + whisperWindows(run.to - run.from, CHUNK_LENGTH_S, STRIDE_LENGTH_S),
-    0,
+  // The pipeline forwards anything it is handed straight into `generate`,
+  // so a streamer sees every call: the prompt and each token through
+  // `put()`, and `end()` when the call is done. The total is counted in
+  // windows across every pass (plannedWindows, lead-out included), so one
+  // bar covers the whole job however many languages it turns out to be in.
+  // How far into those windows the pipeline is comes from the tokens,
+  // because a window is not one call: see windowProgress.
+  const windows = plannedWindows(runs, audio.length, CHUNK_LENGTH_S, STRIDE_LENGTH_S);
+  const config = (transcriber as unknown as WhisperInternals).model?.generation_config;
+  const progress = windowProgress(
+    windows,
+    typeof config?.no_timestamps_token_id === "number" ? config.no_timestamps_token_id + 1 : undefined,
+    Array.isArray(config?.eos_token_id) ? config.eos_token_id[0] : config?.eos_token_id,
   );
-  let finished = 0;
   const streamer = {
-    put() {},
+    put(ids: unknown) {
+      progress.put(ids);
+    },
     end() {
-      finished += 1;
+      progress.end();
       onProgress?.({
         stage: "transcribing",
-        // Never past the end: the window count is this file's arithmetic
-        // and the pipeline's, and if they ever disagree a bar stuck at
-        // 100% beats one reading 130%.
-        fraction: Math.min(finished / Math.max(windows, 1), 1),
+        fraction: progress.fraction,
         note: "Listening to the audio",
       });
     },
@@ -1329,7 +1311,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     // Copied rather than viewed -- see the note in `languageRuns`. A view
     // here meant every stretch transcribed the start of the recording
     // again instead of its own audio.
-    const readTo = Math.min(run.to + LEAD_OUT_S * TARGET_SAMPLE_RATE, audio.length);
+    const readTo = passEnd(run, audio.length);
     const result = await transcriber(audio.slice(run.from, readTo), {
       streamer,
       // Sentence-level timestamps, not `"word"`.
@@ -1589,13 +1571,6 @@ const MAX_CUE_S = 7;
 /** And what a split aims for, so a divided segment reads at a normal pace. */
 const SPLIT_TARGET_S = 5;
 
-/**
- * How far past its own end a pass reads, so it can finish a sentence.
- *
- * Long enough for a phrase, short enough that it cannot get through the
- * next speaker's opening line in a language it is not reading.
- */
-const LEAD_OUT_S = 3;
 
 /**
  * Give back a plausible duration to any segment that came out with none.
