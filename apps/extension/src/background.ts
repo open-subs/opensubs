@@ -60,6 +60,30 @@ let session: Session | null = null;
  * to a popup that happened to be open at the time (APP-133).
  */
 let lastError: Status | null = null;
+/**
+ * Keeps an event page from being suspended while a session runs (APP-121).
+ *
+ * Firefox suspends an idle MV3 background page after 30 seconds and, with it,
+ * everything in its memory -- on Firefox that is the session and the engine
+ * itself. From Firefox 156, the windows arriving every twenty seconds and the
+ * popup's polling no longer count as activity: a session died about a minute
+ * in, went back to idle with no error, and produced no subtitles. What does
+ * count, in Firefox's own lifecycle code (ext-backgroundPage.js, "reset-idle"
+ * with reason "parentapicall"), is the background page itself calling an
+ * extension API implemented in the parent process. So while a session runs,
+ * it asks for something cheap every five seconds, and stops when the session
+ * does, so the page still sleeps when there is nothing to do.
+ */
+let keepAlive: ReturnType<typeof setInterval> | null = null;
+function holdAwake(on: boolean) {
+  if (on && keepAlive === null) {
+    keepAlive = setInterval(() => void api.runtime.getPlatformInfo().catch(() => undefined), 5_000);
+  } else if (!on && keepAlive !== null) {
+    clearInterval(keepAlive);
+    keepAlive = null;
+  }
+}
+
 /** Set only on Firefox, where the engine is a local object. */
 let local: Engine | null = null;
 let starting: Promise<void> | null = null;
@@ -80,7 +104,7 @@ async function startEngine(): Promise<void> {
   }
   if (local) return;
   const { createEngine } = await import("./engine/engine");
-  local = createEngine((message) => void fromEngine(message));
+  local = createEngine((message) => void fromEngine(message), { inBackgroundPage: true });
 }
 
 function toEngine(message: ToEngine) {
@@ -108,7 +132,7 @@ async function page(tabId: number, message: ToPage): Promise<boolean> {
   } catch {
     // The tab navigated or closed mid-flight. Stopping is the right answer
     // to both, and neither deserves an error in the console.
-    if (session?.tabId === tabId) session = null;
+    if (session?.tabId === tabId) { session = null; holdAwake(false); }
     return false;
   }
 }
@@ -170,12 +194,14 @@ async function start(tabId: number, next: Settings) {
   if (session && session.tabId !== tabId) await stop(session.tabId);
   await api.storage.local.set({ settings: next });
   session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: "Starting" }, take: 0 };
+  holdAwake(true);
   starting ??= startEngine();
   await starting;
   const refused = await inject(tabId);
   if (refused) {
     setStatus({ stage: "error", fraction: null, note: `This page cannot be subtitled: ${refused}` });
     session = null;
+    holdAwake(false);
     return;
   }
   await toEngine({ kind: "warm", model: next.model });
@@ -187,21 +213,24 @@ async function start(tabId: number, next: Settings) {
   if (!answer) {
     setStatus({ stage: "error", fraction: null, note: "The page did not answer. Reload it and press Start again." });
     session = null;
+    holdAwake(false);
     return;
   }
   if (!answer.found) {
     setStatus({ stage: "error", fraction: null, note: answer.reason });
     session = null;
+    holdAwake(false);
     return;
   }
   session.take = 1;
-  setStatus({ stage: "listening", fraction: null, note: "Listening" });
+  setStatus({ stage: "listening", fraction: null, note: answer.waiting ?? "Listening" });
 }
 
 async function stop(tabId: number) {
   if (session?.tabId === tabId) {
     await page(tabId, { kind: "halt" });
     session = null;
+    holdAwake(false);
   }
   setStatus({ stage: "idle", fraction: null, note: "Stopped" });
 }
@@ -247,7 +276,18 @@ api.runtime.onMessage.addListener(
 
         // From the page: one recorded window, on its way to the engine.
         case "window":
-          if (session && session.tabId === tabId && message.take === session.take) {
+          // Audio for a session this background no longer has: it was
+          // suspended and restarted with nothing in memory. Say so, and tell
+          // the page to stop, rather than dropping every window in silence.
+          if (!session) {
+            setStatus({
+              stage: "error",
+              fraction: null,
+              note: "The browser stopped the extension in the background, so subtitling stopped. Press Start again.",
+            });
+            return respond({ ok: false, lost: true });
+          }
+          if (session.tabId === tabId && message.take === session.take) {
             await toEngine({
               kind: "transcribe",
               audio: message.audio,
@@ -310,5 +350,5 @@ api.runtime.onMessage.addListener(
 );
 
 api.tabs.onRemoved.addListener((tabId) => {
-  if (session?.tabId === tabId) session = null;
+  if (session?.tabId === tabId) { session = null; holdAwake(false); }
 });

@@ -106,7 +106,13 @@ async function settleScript(cues: Cue[], heard: string, chosen: string): Promise
   return Promise.all(cues.map(async (c) => ({ ...c, text: await toSimplified(c.text) })));
 }
 
-export function createEngine(emit: Emit): Engine {
+/**
+ * `inBackgroundPage`: the engine is running in the extension's background
+ * page (Firefox, which has no offscreen documents). That page is suspended
+ * when idle, and single-threaded inference on its thread counted as idle --
+ * so there the CPU model runs in ONNX Runtime's worker (APP-121).
+ */
+export function createEngine(emit: Emit, { inBackgroundPage = false }: { inBackgroundPage?: boolean } = {}): Engine {
   let device: "webgpu" | "wasm" | undefined;
   /** What the browser offers, asked once: it does not change mid-session. */
   let support: Promise<AsrSupport> | null = null;
@@ -184,6 +190,7 @@ export function createEngine(emit: Emit): Engine {
         file: asFile(audio, mime),
         model: settings.model,
         device,
+        wasmProxy: inBackgroundPage,
         start: 0,
         end: null,
         language: auto ? heard ?? undefined : settings.language,

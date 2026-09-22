@@ -104,6 +104,7 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 // --- a page with a video, on its own origin ------------------------------
 
 const videoName = basename(video);
+const videoType = /\.webm$/i.test(videoName) ? "video/webm" : "video/mp4";
 const server = createServer((req, res) => {
   if (req.url === "/") {
     res.writeHead(200, { "content-type": "text/html" });
@@ -120,7 +121,7 @@ const server = createServer((req, res) => {
       const from = Number(range[1]);
       const to = range[2] ? Number(range[2]) : body.length - 1;
       res.writeHead(206, {
-        "content-type": "video/mp4",
+        "content-type": videoType,
         "content-range": `bytes ${from}-${to}/${body.length}`,
         "accept-ranges": "bytes",
         "content-length": to - from + 1,
@@ -128,7 +129,7 @@ const server = createServer((req, res) => {
       res.end(body.subarray(from, to + 1));
       return;
     }
-    res.writeHead(200, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-length": body.length });
+    res.writeHead(200, { "content-type": videoType, "accept-ranges": "bytes", "content-length": body.length });
     res.end(body);
     return;
   }
@@ -181,13 +182,21 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
   };
   const session = await call("POST", "/session", { capabilities: { alwaysMatch: {
     browserName: "firefox",
+    // Return at DOMContentLoaded: Firefox 156 holds the load event of a page
+    // whose video is still buffering, and the navigation timed out. The test
+    // waits for the video itself, below.
+    pageLoadStrategy: "eager",
     "moz:firefoxOptions": {
-      binary: "/Applications/Firefox.app/Contents/MacOS/firefox",
+      // --firefox-binary: a specific release, e.g. the one a report was made on.
+      binary: flag("--firefox-binary", "/Applications/Firefox.app/Contents/MacOS/firefox"),
       args: [...(headed ? [] : ["-headless"]), "-profile", profile],
       prefs: {
         "extensions.webextensions.uuids": JSON.stringify({ [geckoId]: uuid }),
         "media.autoplay.default": 0,
         "media.autoplay.blocking_policy": 0,
+        // The video's tab is behind the control tab; Firefox defers play()
+        // in a background tab until it is shown, and 156 held the promise.
+        "media.block-autoplay-until-in-foreground": false,
         // The popup asks for the site with permissions.request(), and Firefox
         // answers that with a prompt a person clicks "Allow" on. This answers
         // yes without the prompt; the request itself still has to come from
@@ -196,6 +205,10 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
         // --ff-webgpu: Firefox with WebGPU on, the APP-121 configuration --
         // an adapter that exists and says nothing about itself.
         ...(args.includes("--ff-webgpu") ? { "dom.webgpu.enabled": true, "gfx.webgpu.ignore-blocklist": true } : {}),
+        // --ff-idle MS: suspend an idle event page after MS instead of 30 s --
+        // a faster machine's stand-in for a slow one's longer quiet stretches
+        // (APP-121: suspended mid-load on an Iris Xe, never here at 30 s).
+        ...(args.includes("--ff-idle") ? { "extensions.background.idle.timeout": Number(flag("--ff-idle", "30000")) } : {}),
       },
     },
   } } });
@@ -364,7 +377,10 @@ try {
 
   const page = await context.newPage();
   await page.goto(`${origin}/`);
-  await page.waitForFunction(() => document.querySelector("video").readyState >= 2);
+  // Metadata, not data: Firefox 156 fetches nothing past the metadata until
+  // playback starts, and waiting for data before pressing play waited for
+  // ever. The duration is all that is needed here.
+  await page.waitForFunction(() => document.querySelector("video").readyState >= 1);
   const duration = await page.evaluate(() => document.querySelector("video").duration);
 
   // The popup's own page, opened as a tab: it has the same `chrome.*` the

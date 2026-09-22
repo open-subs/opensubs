@@ -257,6 +257,17 @@ export interface AsrOptions {
    * the CPU -- so anything but "wasm" means "whatever this machine has".
    */
   device?: "webgpu" | "wasm";
+  /**
+   * Run the CPU backend's model in a worker instead of on this thread.
+   *
+   * For a caller whose thread must stay responsive while the model works:
+   * the extension on Firefox runs Whisper in its background page, and
+   * single-threaded inference there blocked the page long enough for Firefox
+   * to suspend it as idle, session and all (APP-121). The web page does not
+   * set it. It is ONNX Runtime's own proxy, and only for its WASM backend,
+   * and it takes effect for the first CPU model loaded on this page.
+   */
+  wasmProxy?: boolean;
 }
 
 export interface AsrSupport {
@@ -1151,6 +1162,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   // no wasm backend. In a browser it is always there.
   const wasm = env.backends?.onnx?.wasm;
   if (wasm) wasm.wasmPaths = new URL("./ort/", document.baseURI).href;
+  if (wasm && options.wasmProxy && device === "wasm") (wasm as { proxy?: boolean }).proxy = true;
 
   // Keyed on the backend as well as the model. The two load different
   // weights -- quantised on the GPU, full precision on the CPU -- so a
