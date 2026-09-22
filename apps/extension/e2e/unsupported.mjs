@@ -6,11 +6,16 @@
 // change from day to day. Two servers on two ports are two origins, which is
 // what each case needs:
 //
-//   frame   the only video is in an iframe from the other origin (Dailymotion)
+//   frame   the only video is in a frame of the same site, another origin --
+//           Dailymotion's own player on geo.dailymotion.com
+//   embed   the only video is in a frame from another site (localhost vs
+//           127.0.0.1): a YouTube player on a blog
 //   cross   the video is served from the other origin without CORS, so
 //           captureStream() throws a SecurityError (Wikimedia Commons)
 //   ad      a spoken 8-second "ad" plays first; when it ends the page hides
-//           it and plays the lecture in another element (TED's pre-roll)
+//           it and plays the lecture in another element
+//   xad     the same, with the ad served from the other origin without CORS,
+//           so the ad itself cannot be read: TED's Google-hosted pre-roll
 //
 //   node e2e/unsupported.mjs --package dist --video lecture.mp4 --ad ad.mp4 [--profile dir]
 //   node e2e/unsupported.mjs --zip opensubs-chrome-1.0.2.zip ...      # a release, unmodified
@@ -64,6 +69,7 @@ const html = (body) => (res) => { res.writeHead(200, { "content-type": "text/htm
 const other = await serve({
   "/player": html(`<video src="/lecture.mp4" autoplay style="width:640px;height:360px"></video>`),
   "/lecture.mp4": (res) => sendFile(res, video, "video/mp4"),
+  "/ad.mp4": (res) => sendFile(res, ad, "video/mp4"),
 });
 const otherOrigin = `http://127.0.0.1:${other.address().port}`;
 const site = await serve({
@@ -80,6 +86,16 @@ const site = await serve({
     </script>`),
   "/ad.mp4": (res) => sendFile(res, ad, "video/mp4"),
   "/lecture.mp4": (res) => sendFile(res, video, "video/mp4"),
+  "/embed": html(`<h1>A blog with a video from another site</h1><iframe src="http://localhost:${other.address().port}/player" width="660" height="380" allow="autoplay"></iframe>`),
+  "/xad": html(`<video id="ad" src="${otherOrigin}/ad.mp4" autoplay style="width:640px;height:360px"></video>
+    <video id="film" src="/lecture.mp4" preload="auto" style="width:640px;height:360px;display:none"></video>
+    <script>
+      document.getElementById("ad").addEventListener("ended", () => {
+        document.getElementById("ad").style.display = "none";
+        const film = document.getElementById("film");
+        setTimeout(() => { film.style.display = ""; film.play(); }, 1500);
+      });
+    </script>`),
 });
 const origin = `http://127.0.0.1:${site.address().port}`;
 
@@ -159,9 +175,21 @@ if (!only || only === "frame") {
   const s = await settle(5000);
   console.log(`frame  -> ${s.status.stage}: ${s.status.note}`);
   ok("frame: an error within five seconds, not Listening", s.status.stage === "error", `${s.status.stage}: ${s.status.note}`);
-  ok("frame: it says the player is embedded from another site", /embedded from another site/.test(s.status.note), s.status.note);
+  // The Dailymotion shape: the site's own player, so no "go to its own page".
+  ok("frame: it says this site's player cannot be reached", /separate player frame/.test(s.status.note), s.status.note);
+  ok("frame: it does not send people looking for another page", !/own page/.test(s.status.note), s.status.note);
   ok("frame: the popup is not left running", !s.running, JSON.stringify({ running: s.running }));
   await shoot("frame");
+  await stopAll(page, tabId);
+}
+
+// --- 1b. a player embedded from another site ------------------------------
+if (!only || only === "embed") {
+  const { page, tabId } = await startOn("/embed");
+  const s = await settle(5000);
+  console.log(`embed  -> ${s.status.stage}: ${s.status.note}`);
+  ok("embed: an error within five seconds", s.status.stage === "error", `${s.status.stage}: ${s.status.note}`);
+  ok("embed: it says to open the video on that site's own page", /on that site's own page/.test(s.status.note), s.status.note);
   await stopAll(page, tabId);
 }
 
@@ -180,30 +208,37 @@ if (!only || only === "cross") {
   await stopAll(page, tabId);
 }
 
-// --- 3. Start pressed during an ad -----------------------------------------
-if (!only || only === "ad") {
-  const { page, tabId, t0 } = await startOn("/ad");
+// --- 3. Start pressed during an ad, readable (ad) and not (xad) ------------
+async function adCase(name) {
+  if (only && only !== name) return;
+  await control.evaluate(() => { window.__notes = []; });
+  const { page, tabId, t0 } = await startOn(`/${name}`);
   let moved = null;
+  let waited = null;
   let s;
   for (let i = 0; i < 240; i += 1) {
     s = await state();
-    const seen = await control.evaluate(() => window.__notes.find((n) => /moved to the video now playing/.test(n.note)));
-    if (moved === null && seen) {
-      moved = (seen.t - t0) / 1000;
-      console.log(`ad     -> ${moved.toFixed(1)}s after Start: ${seen.note}`);
-    }
-    if (s.count >= 6) { await shoot("ad"); break; }
+    const notes = await control.evaluate(() => window.__notes);
+    const w = notes.find((n) => /Waiting for the ad/.test(n.note));
+    if (waited === null && w) { waited = (w.t - t0) / 1000; console.log(`${name.padEnd(6)} -> ${waited.toFixed(1)}s after Start: ${w.note}`); }
+    const m = notes.find((n) => /moved to the video now playing/.test(n.note));
+    if (moved === null && m) { moved = (m.t - t0) / 1000; console.log(`${name.padEnd(6)} -> ${moved.toFixed(1)}s after Start: ${m.note}`); }
+    if (s.count >= 6) { await shoot(name); break; }
     if (s.status.stage === "error") break;
     await new Promise((r) => setTimeout(r, 1000));
   }
   const { srt } = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "cues" }));
-  console.log(`ad     -> ${s.count} lines after ${((Date.now() - t0) / 1000).toFixed(0)}s; status ${s.status.stage}: ${s.status.note}`);
-  console.log(String(srt).split("\n").slice(0, 12).map((l) => `         ${l}`).join("\n"));
-  ok("ad: it moves to the film when the ad ends", moved !== null, `${s.status.stage}: ${s.status.note}`);
-  ok("ad: the film is subtitled", /Gold Rush|California|Jacob Davis/i.test(srt), String(srt).slice(0, 200));
-  ok("ad: none of the ad's lines are in the film's subtitles", !/fellow Americans|your country/i.test(srt), String(srt).slice(0, 300));
+  console.log(`${name.padEnd(6)} -> ${s.count} lines after ${((Date.now() - t0) / 1000).toFixed(0)}s; status ${s.status.stage}: ${s.status.note}`);
+  console.log(String(srt).split("\n").slice(0, 8).map((l) => `         ${l}`).join("\n"));
+  ok(`${name}: no error`, s.status.stage !== "error", s.status.note);
+  if (name === "xad") ok("xad: it says it is waiting for the ad, instead of refusing the site", waited !== null);
+  ok(`${name}: it moves to the film when the ad ends`, moved !== null, `${s.status.stage}: ${s.status.note}`);
+  ok(`${name}: the film is subtitled`, /Gold Rush|California|Jacob Davis/i.test(srt), String(srt).slice(0, 200));
+  ok(`${name}: none of the ad's lines are in the film's subtitles`, !/fellow Americans|your country/i.test(srt), String(srt).slice(0, 300));
   await stopAll(page, tabId);
 }
+await adCase("ad");
+await adCase("xad");
 
 await context.close();
 site.close();

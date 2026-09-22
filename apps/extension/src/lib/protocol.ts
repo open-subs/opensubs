@@ -101,7 +101,10 @@ export type FromPage =
  * the page had looked for a video. On a page with none, "No video" arrived
  * first and "Listening" overwrote it, for good (APP-133).
  */
-export type BeginAnswer = { found: true; duration: number } | { found: false; reason: string };
+export type BeginAnswer =
+  /** `waiting`: found, but not readable yet -- an ad to be waited out. */
+  | { found: true; duration: number; waiting?: string }
+  | { found: false; reason: string };
 
 /** Sent by the background down to the content script. */
 export type ToPage =

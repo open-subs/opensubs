@@ -60,22 +60,45 @@ export function findMedia(doc: Document = document): HTMLMediaElement | null {
 }
 
 /**
+ * A host's site, near enough: its last two labels. "geo.dailymotion.com" and
+ * "www.dailymotion.com" are one site; "www.youtube.com" is another. Wrong
+ * for a suffix like "co.uk", where it only ever errs toward "same site",
+ * which gives the advice that is true for either case.
+ */
+export function siteOf(host: string): string {
+  return host.split(".").slice(-2).join(".");
+}
+
+/**
  * Why there is nothing to read, in words the user can act on (APP-133).
  *
  * A page with no video of its own but a frame of reasonable size almost
- * always has its player embedded from another site -- Dailymotion's pages
- * are one -- and a content script cannot reach into another site's frame.
+ * always has its player in that frame, and a content script cannot reach
+ * into another origin's frame. What to do depends on whose frame it is. A
+ * video embedded from another site -- a YouTube player on a blog -- has a
+ * page of its own there, and that page can be subtitled. A site that plays
+ * its own videos in a frame of its own, as Dailymotion does from
+ * geo.dailymotion.com, has no other page to go to, and saying "open the
+ * video on its own page" there sent people looking for one.
  */
 export function whyNoMedia(doc: Document = document): string {
   const frames = Array.from(doc.querySelectorAll("iframe")).filter((f) => {
     const r = f.getBoundingClientRect();
     return r.width >= 200 && r.height >= 120;
   });
-  if (frames.length) {
-    return "The video is in a player embedded from another site, which the extension cannot reach. " +
-      "Open the video on its own page and press Start again.";
-  }
-  return "No video or audio is playing on this page. Start the video, then press Start.";
+  if (!frames.length) return "No video or audio is playing on this page. Start the video, then press Start.";
+  const here = siteOf(doc.location?.hostname ?? "");
+  const elsewhere = frames.some((f) => {
+    try {
+      return siteOf(new URL(f.src, doc.baseURI).hostname) !== here;
+    } catch {
+      return false;
+    }
+  });
+  return elsewhere
+    ? "The video is in a player embedded from another site, which the extension cannot reach. " +
+        "Open the video on that site's own page and press Start again."
+    : "This site plays its videos in a separate player frame that the extension cannot reach, so it cannot be subtitled here.";
 }
 
 /** The largest element that is actually playing now, or null. */
@@ -161,6 +184,9 @@ export function bestContainer(): string {
  * that no decoder will open on its own. One recorder per window costs a few
  * milliseconds and gives a self-contained file each time.
  */
+/** A window shorter than this holds no speech worth sending. */
+export const MIN_WINDOW_MS = 1000;
+
 export function recordWindow(
   track: MediaStreamTrack,
   seconds: number,
@@ -178,11 +204,17 @@ export function recordWindow(
   const parts: Blob[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
 
+  const began = performance.now();
   const done = new Promise<Window | null>((resolve) => {
     rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
     const finish = () => {
       if (timer !== null) { clearTimeout(timer); timer = null; }
-      resolve(parts.length ? { blob: new Blob(parts, { type: mime || parts[0].type }), offset } : null);
+      // A window stopped almost as soon as it started -- the video ended just
+      // after it began, as an ad does -- holds a container with no audio in
+      // it, and the engine rejected it as "The clip has no length." and ended
+      // the session over nothing (APP-133). There is nothing in it to read.
+      const long = performance.now() - began >= MIN_WINDOW_MS;
+      resolve(parts.length && long ? { blob: new Blob(parts, { type: mime || parts[0].type }), offset } : null);
     };
     rec.onstop = finish;
     rec.onerror = finish;
