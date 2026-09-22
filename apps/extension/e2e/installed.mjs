@@ -60,6 +60,9 @@ const browserName = flag("--browser", "chromium");
 // "keeping up" means, so the steady state is measured on a profile that has
 // the model already, the way a user's second video is.
 const profileDir = flag("--profile", null);
+// Screenshots of lines on the video, taken after the run -- evidence for a
+// person, not an assertion.
+const shotsDir = args.includes("--shots") ? resolve(flag("--shots", ".")) : null;
 const warmOnly = args.includes("--warm");
 const speechUntil = args.includes("--speech-until") ? Number(flag("--speech-until", "0")) : null;
 
@@ -240,6 +243,12 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
       const el = await call("POST", `/session/${id}/element`, { using: "css selector", value: selector });
       const ref = el[Object.keys(el)[0]];
       await call("POST", `/session/${id}/element/${ref}/click`, {});
+    },
+    /** Only the visible viewport, which is what Playwright's default shows too. */
+    async screenshot({ path }) {
+      await focus(handle);
+      const png = await call("GET", `/session/${id}/screenshot`);
+      writeFileSync(path, Buffer.from(png, "base64"));
     },
     async waitForFunction(fn) {
       for (let i = 0; i < 300; i += 1) {
@@ -422,13 +431,6 @@ try {
       firstCueAt = (Date.now() - startedAt) / 1000;
       console.log(`${at()}  first subtitle, ${firstCueAt.toFixed(1)}s after Start`);
     }
-    const shown = state.status.fraction === null || state.status.fraction === undefined
-      ? state.status.note
-      : `${state.status.note} ${Math.floor(state.status.fraction * 10) * 10}%`;
-    if (shown !== lastNote) {
-      lastNote = shown;
-      console.log(`${at()}  [${state.status.stage}${state.status.device ? " " + state.status.device : ""}] ${lastNote}`);
-    }
     if (warmOnly && state.count > 0) break;
     const ended = await page.evaluate(() => document.querySelector("video").ended);
     // Broadcasts as well as the session's state: when Start fails the
@@ -453,6 +455,23 @@ try {
   const statuses = await control.evaluate(() => window.__statuses);
   const windows = await control.evaluate(() => window.__windows);
   const batches = await control.evaluate(() => window.__segments);
+  // Lines arrive a window or two after they are spoken, so a screenshot taken
+  // during the first playback mostly catches the gap between them. Seek back
+  // to a few lines instead, pause, and photograph each one on the video.
+  if (shotsDir) {
+    // From the SRT rather than the broadcasts, which Firefox does not deliver
+    // to the control page.
+    const secs = (x) => { const [h, m, r] = x.split(":"); return +h * 3600 + +m * 60 + +r.replace(",", "."); };
+    const at = [...String(srt).matchAll(/(\d\d:\d\d:\d\d,\d+) --> (\d\d:\d\d:\d\d,\d+)/g)]
+      .map((m) => ({ start: secs(m[1]), end: secs(m[2]) })).filter((c) => c.end - c.start > 1.5);
+    const picks = [at[1], at[Math.floor(at.length / 2)], at.at(-2)].filter(Boolean);
+    for (const [i, c] of picks.entries()) {
+      await page.evaluate((t) => { const v = document.querySelector("video"); v.pause(); v.currentTime = t; }, (c.start + c.end) / 2);
+      await new Promise((r) => setTimeout(r, 1200));
+      await page.screenshot({ path: join(shotsDir, `${browserName}-line${i + 1}.png`) })
+        .catch((e) => console.log(`screenshot ${i + 1}: ${e.message}`));
+    }
+  }
   const videoAt = (t) => ((t - startedAt) / 1000).toFixed(1);
   console.log("\nwindows the page sent:");
   for (const w of windows) console.log(`  at +${videoAt(w.t)}s  offset ${w.offset.toFixed(1)}s  ${w.bytes} bytes  ${w.mime}`);
