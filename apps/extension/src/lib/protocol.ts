@@ -80,9 +80,28 @@ export type WireAudio = string;
 
 /** Sent by the content script to the background. */
 export type FromPage =
-  | { kind: "window"; audio: WireAudio; mime: string; offset: number }
+  /**
+   * `take` counts the videos read in this session: it goes up when the page
+   * moves to another element (an ad giving way to the film), so lines from
+   * the one before, still in the engine's queue, can be told apart.
+   */
+  | { kind: "window"; audio: WireAudio; mime: string; offset: number; take: number }
   | { kind: "media"; found: boolean; duration: number; reason?: string }
+  /** The video being read ended or was replaced, and another is playing. */
+  | { kind: "switched"; take: number; duration: number }
+  /** The video being read ended and nothing else started. Not an error. */
+  | { kind: "finished" }
   | { kind: "ended" };
+
+/**
+ * The page's answer to "begin", as the reply to that message itself.
+ *
+ * It used to be a separate message sent after "begin" returned, and the
+ * background set "Listening" as soon as the send resolved -- which was before
+ * the page had looked for a video. On a page with none, "No video" arrived
+ * first and "Listening" overwrote it, for good (APP-133).
+ */
+export type BeginAnswer = { found: true; duration: number } | { found: false; reason: string };
 
 /** Sent by the background down to the content script. */
 export type ToPage =
@@ -94,7 +113,7 @@ export type ToPage =
 /** Background <-> engine host. */
 export type ToEngine =
   | { kind: "warm"; model: string }
-  | { kind: "transcribe"; audio: WireAudio; mime: string; offset: number; settings: Settings }
+  | { kind: "transcribe"; audio: WireAudio; mime: string; offset: number; settings: Settings; take?: number }
   | { kind: "release" };
 
 /**
@@ -108,7 +127,7 @@ export type ToEngine =
  */
 export type FromEngine =
   | { kind: "status"; status: Status }
-  | { kind: "segments"; cues: Cue[]; offset: number }
+  | { kind: "segments"; cues: Cue[]; offset: number; take?: number }
   | { kind: "failed"; message: string };
 
 /** The one place that knows both browsers' name for the API. */

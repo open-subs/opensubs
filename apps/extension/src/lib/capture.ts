@@ -59,6 +59,71 @@ export function findMedia(doc: Document = document): HTMLMediaElement | null {
   return pool.sort((a, b) => area(b) - area(a))[0] ?? null;
 }
 
+/**
+ * Why there is nothing to read, in words the user can act on (APP-133).
+ *
+ * A page with no video of its own but a frame of reasonable size almost
+ * always has its player embedded from another site -- Dailymotion's pages
+ * are one -- and a content script cannot reach into another site's frame.
+ */
+export function whyNoMedia(doc: Document = document): string {
+  const frames = Array.from(doc.querySelectorAll("iframe")).filter((f) => {
+    const r = f.getBoundingClientRect();
+    return r.width >= 200 && r.height >= 120;
+  });
+  if (frames.length) {
+    return "The video is in a player embedded from another site, which the extension cannot reach. " +
+      "Open the video on its own page and press Start again.";
+  }
+  return "No video or audio is playing on this page. Start the video, then press Start.";
+}
+
+/** The largest element that is actually playing now, or null. */
+export function playingMedia(doc: Document = document): HTMLMediaElement | null {
+  const live = Array.from(doc.querySelectorAll<HTMLMediaElement>("video, audio"))
+    .filter((el) => !el.paused && !el.ended && el.readyState >= 2);
+  const area = (el: HTMLMediaElement) => {
+    const r = el.getBoundingClientRect();
+    return r.width * r.height;
+  };
+  return live.sort((a, b) => area(b) - area(a))[0] ?? null;
+}
+
+/**
+ * Wait up to `ms` for something to be playing: after an ad, the film starts
+ * in the same element with a new source or in another element, a second or
+ * two later.
+ */
+export async function waitForPlaying(ms: number, doc: Document = document): Promise<HTMLMediaElement | null> {
+  const until = Date.now() + ms;
+  for (;;) {
+    const el = playingMedia(doc);
+    if (el || Date.now() >= until) return el;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+/**
+ * Open an element's audio, or say why not. The SecurityError for a
+ * cross-origin video -- "Cannot capture from element with cross-origin
+ * data", as on Wikimedia Commons -- is the usual failure by a wide margin.
+ */
+export function openAudio(el: HTMLMediaElement): { stream: MediaStream } | { reason: string } {
+  let stream: MediaStream;
+  try {
+    stream = capture(el);
+  } catch (e) {
+    const cross = e instanceof Error && (e.name === "SecurityError" || /cross-origin/i.test(e.message));
+    return {
+      reason: cross
+        ? "This site does not let other pages read its video's audio (it is served from another domain), so it cannot be subtitled here."
+        : "This video is protected, so its audio cannot be read.",
+    };
+  }
+  if (!stream.getAudioTracks().length) return { reason: "That video has no audio track." };
+  return { stream };
+}
+
 export function capture(el: HTMLMediaElement): MediaStream {
   const withCapture = el as HTMLMediaElement & {
     captureStream?: () => MediaStream;

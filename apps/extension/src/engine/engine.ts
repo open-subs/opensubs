@@ -176,7 +176,7 @@ export function createEngine(emit: Emit): Engine {
   const say = (status: Status) => emit({ kind: "status", status });
 
   async function run(message: Extract<ToEngine, { kind: "transcribe" }>) {
-    const { audio, mime, offset, settings } = message;
+    const { audio, mime, offset, settings, take } = message;
     const auto = settings.language === "auto";
     try {
       device = await chooseDevice(settings.backend);
@@ -216,7 +216,7 @@ export function createEngine(emit: Emit): Engine {
       if (auto && !heard && cues.length > 0 && result.languages?.length === 1) {
         heard = result.languages[0];
       }
-      emit({ kind: "segments", cues, offset });
+      emit({ kind: "segments", cues, offset, take });
     } catch (e) {
       emit({ kind: "failed", message: e instanceof Error ? e.message : String(e) });
     }
