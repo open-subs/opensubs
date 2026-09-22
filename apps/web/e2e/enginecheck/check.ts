@@ -58,6 +58,12 @@ const params = new URLSearchParams(location.search);
 const MODEL = params.get("model") ?? ASR_MODELS[0].id;
 const LANGUAGE = params.get("language") ?? undefined;
 const CLIP = params.get("clip") ?? "en.wav";
+// Where the pass begins. Whisper reads in 30-second windows from the start, so
+// moving the start by half a second reshuffles every window -- and which span,
+// if any, the first pass drops moves with it. That is the only honest way to
+// put the missed-line pass to work on a machine whose first pass drops
+// nothing: the same input a user produces by trimming the start.
+const START = Number(params.get("start") ?? "0");
 
 /**
  * When the bar last said it was finished, and every stage after it.
@@ -84,7 +90,7 @@ async function main() {
   const result = await transcribeLocally({
     file,
     model: MODEL,
-    start: 0,
+    start: START,
     end: null,
     language: LANGUAGE,
     onProgress: (p) => {

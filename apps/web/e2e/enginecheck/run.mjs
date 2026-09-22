@@ -14,6 +14,7 @@ const flag = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const port = flag("--port", "5180");
 const query = new URLSearchParams({ model: flag("--model", "onnx-community/whisper-base"), clip: flag("--clip", "en.wav") });
 const language = flag("--language", "auto");
+if (args.includes("--start")) query.set("start", flag("--start", "0"));
 if (language !== "auto") query.set("language", language);
 
 const context = await chromium.launchPersistentContext(resolve(flag("--profile", "/tmp/enginecheck-profile")), {
