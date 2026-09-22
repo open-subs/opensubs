@@ -30,6 +30,8 @@ const video = resolve(flag("--video", ""));
 const ad = resolve(flag("--ad", ""));
 const profileDir = flag("--profile", null);
 const only = flag("--only", null);
+// The popup as a person sees it after each case: opened afresh, at its size.
+const shots = args.includes("--shots") ? resolve(flag("--shots")) : null;
 
 const work = mkdtempSync(join(tmpdir(), "opensubs-unsupported-"));
 const unpacked = profileDir ? `${resolve(profileDir)}-extension` : join(work, "extension");
@@ -132,10 +134,24 @@ async function settle(ms) {
   return state();
 }
 
+async function shoot(name) {
+  if (!shots) return;
+  const { mkdirSync } = await import("node:fs");
+  mkdirSync(shots, { recursive: true });
+  const popup = await context.newPage();
+  await popup.setViewportSize({ width: 340, height: 560 });
+  await popup.goto(`${base}/popup.html`);
+  await popup.waitForTimeout(1200);
+  await popup.screenshot({ path: join(shots, `popup-${name}.png`), fullPage: true });
+  await popup.close();
+}
+
 async function stopAll(page, tabId) {
   await control.evaluate((id) => chrome.runtime.sendMessage({ kind: "stop", tabId: id }), tabId).catch(() => {});
   await page.close();
 }
+
+await shoot("idle");
 
 // --- 1. the player is in another site's frame ------------------------------
 if (!only || only === "frame") {
@@ -145,6 +161,7 @@ if (!only || only === "frame") {
   ok("frame: an error within five seconds, not Listening", s.status.stage === "error", `${s.status.stage}: ${s.status.note}`);
   ok("frame: it says the player is embedded from another site", /embedded from another site/.test(s.status.note), s.status.note);
   ok("frame: the popup is not left running", !s.running, JSON.stringify({ running: s.running }));
+  await shoot("frame");
   await stopAll(page, tabId);
 }
 
@@ -159,6 +176,7 @@ if (!only || only === "cross") {
   ok("cross: an error within five seconds, not Listening", s.status.stage === "error", `${s.status.stage}: ${s.status.note}`);
   ok("cross: it says the site does not allow it", /does not let other pages read/.test(s.status.note), s.status.note);
   ok("cross: the popup is not left running", !s.running);
+  await shoot("cross");
   await stopAll(page, tabId);
 }
 
@@ -174,7 +192,7 @@ if (!only || only === "ad") {
       moved = (seen.t - t0) / 1000;
       console.log(`ad     -> ${moved.toFixed(1)}s after Start: ${seen.note}`);
     }
-    if (s.count >= 6) break;
+    if (s.count >= 6) { await shoot("ad"); break; }
     if (s.status.stage === "error") break;
     await new Promise((r) => setTimeout(r, 1000));
   }
