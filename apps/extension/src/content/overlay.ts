@@ -9,7 +9,7 @@
  */
 
 import { api, blobToWire, tell, type BeginAnswer, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
-import { findMedia, openAudio, recordWindows, waitForPlaying, whyNoMedia } from "../lib/capture";
+import { findMedia, openAudio, playingMedia, recordWindows, waitForPlaying, whyNoMedia } from "../lib/capture";
 import { cueAt } from "../lib/seam";
 
 const HOST_ID = "opensubs-overlay-host";
@@ -90,6 +90,75 @@ const SWITCH_WAIT_MS = 8000;
 let take = 0;
 
 /**
+ * An unreadable clip this close to its end is waited out rather than refused.
+ *
+ * TED's pre-roll is served from Google's ad domain with no CORS, so its audio
+ * cannot be read, and Start pressed during it ended the session with "This
+ * site does not let other pages read its video's audio" -- about a film the
+ * page had not started yet (APP-133). An ad has seconds left; the film that
+ * cannot be read -- a Wikimedia Commons file -- has minutes, and still gets
+ * the error at once.
+ */
+const AD_REMAINING_S = 90;
+
+function endsSoon(el: HTMLMediaElement): boolean {
+  const left = el.duration - el.currentTime;
+  return Number.isFinite(left) && left <= AD_REMAINING_S;
+}
+
+/** Resolve when `el` has finished, been replaced, or stopped playing for good. */
+function endOf(el: HTMLMediaElement): Promise<void> {
+  return new Promise((resolve) => {
+    const left = Number.isFinite(el.duration) ? el.duration - el.currentTime : AD_REMAINING_S;
+    const done = () => {
+      el.removeEventListener("ended", done);
+      el.removeEventListener("emptied", done);
+      clearTimeout(timer);
+      clearInterval(poll);
+      resolve();
+    };
+    el.addEventListener("ended", done, { once: true });
+    el.addEventListener("emptied", done, { once: true });
+    // Some players hide the ad element instead of letting it end.
+    const poll = setInterval(() => { if (!running || !el.isConnected || (el.paused && el !== playingMedia())) done(); }, 500);
+    const timer = setTimeout(done, (left + 10) * 1000);
+  });
+}
+
+type Found = { el: HTMLMediaElement; stream: MediaStream } | { reason: string } | null;
+
+/**
+ * The first readable video, starting from `el`: an unreadable clip that ends
+ * soon is waited out and whatever plays next is tried. Null when nothing is
+ * playing at all.
+ */
+async function readable(el: HTMLMediaElement | null, onWait: (reason: string) => void): Promise<Found> {
+  let reason = "";
+  for (let tries = 0; el && tries < 10 && running; tries += 1) {
+    const opened = openAudio(el);
+    if ("stream" in opened) return { el, stream: opened.stream };
+    reason = opened.reason;
+    if (!endsSoon(el)) return { reason };
+    onWait(reason);
+    await endOf(el);
+    if (!running) return null;
+    el = await waitForPlaying(SWITCH_WAIT_MS);
+  }
+  return reason ? { reason } : null;
+}
+
+/** Start reading `found`, a new take whose lines replace the last one's. */
+async function adopt(found: { el: HTMLMediaElement; stream: MediaStream }, announce: boolean) {
+  media = found.el;
+  stream = found.stream;
+  take += 1;
+  cues = [];
+  paint();
+  if (announce) await tell<FromPage>({ kind: "switched", take, duration: found.el.duration || 0 });
+  void record();
+}
+
+/**
  * Find the video, open its audio, and answer -- then record, without making
  * the answer wait for it. The answer is the reply to "begin" itself, so
  * nothing the background says afterwards can overwrite it (APP-133).
@@ -99,19 +168,30 @@ async function begin(next: Settings): Promise<BeginAnswer> {
   const el = findMedia();
   if (!el) return { found: false, reason: whyNoMedia() };
   const opened = openAudio(el);
-  if ("reason" in opened) return { found: false, reason: opened.reason };
+  if ("reason" in opened && !endsSoon(el)) return { found: false, reason: opened.reason };
 
-  media = el;
-  stream = opened.stream;
-  take += 1;
-  cues = [];
   running = true;
   if (settings.overlay) {
     ensureOverlay();
     ticker = window.setInterval(paint, 120);
   }
-  void record();
-  return { found: true, duration: el.duration || 0 };
+  if ("stream" in opened) {
+    void adopt({ el, stream: opened.stream }, false);
+    return { found: true, duration: el.duration || 0 };
+  }
+  // Unreadable, and about to end: an ad. Answer now, wait it out, and move
+  // to what plays next -- or say why not, if nothing readable does.
+  void (async () => {
+    const found = await readable(el, () => undefined);
+    if (!running) return;
+    if (found && "el" in found) { await adopt(found, true); return; }
+    await tell<FromPage>({
+      kind: "media", found: false, duration: 0,
+      reason: found?.reason ?? "The clip that was playing ended, and nothing played after it. Start the video and press Start again.",
+    });
+    halt();
+  })();
+  return { found: true, duration: 0, waiting: "Waiting for the ad to finish -- its audio cannot be read" };
 }
 
 /**
@@ -125,58 +205,58 @@ async function begin(next: Settings): Promise<BeginAnswer> {
  * nothing starts, the video simply finished, and the page says so.
  */
 async function record() {
-  while (running && media && stream && settings) {
-    const el = media;
-    let replaced = false;
-    const onEmptied = () => { replaced = true; };
-    el.addEventListener("emptied", onEmptied, { once: true });
-    try {
-      const mine = take;
-      await recordWindows(
-        el,
-        stream,
-        settings.window,
-        async (w) => {
-          const audio = await blobToWire(w.blob);
-          await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset, take: mine });
-        },
-        () => running && !replaced,
-      );
-    } catch (e) {
-      await tell<FromPage>({
-        kind: "media", found: false, duration: 0,
-        reason: e instanceof Error ? e.message : String(e),
-      });
-      halt();
-      return;
-    } finally {
-      el.removeEventListener("emptied", onEmptied);
-    }
-    if (!running) return;
-
-    stream.getTracks().forEach((t) => t.stop());
-    stream = null;
-    const next = await waitForPlaying(SWITCH_WAIT_MS);
-    if (!running) return;
-    if (!next) {
-      // Finished, not failed. The overlay stays: lines still queued in the
-      // engine arrive after the video ends, and are there on a replay.
-      await tell<FromPage>({ kind: "finished" });
-      return;
-    }
-    const opened = openAudio(next);
-    if ("reason" in opened) {
-      await tell<FromPage>({ kind: "media", found: false, duration: 0, reason: opened.reason });
-      halt();
-      return;
-    }
-    media = next;
-    stream = opened.stream;
-    take += 1;
-    cues = [];
-    paint();
-    await tell<FromPage>({ kind: "switched", take, duration: next.duration || 0 });
+  if (!running || !media || !stream || !settings) return;
+  const el = media;
+  const current = stream;
+  let replaced = false;
+  const onEmptied = () => { replaced = true; };
+  el.addEventListener("emptied", onEmptied, { once: true });
+  try {
+    const mine = take;
+    await recordWindows(
+      el,
+      current,
+      settings.window,
+      async (w) => {
+        const audio = await blobToWire(w.blob);
+        const reply = (await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset, take: mine })) as
+          | { lost?: boolean }
+          | undefined;
+        // The background lost this session (APP-121: suspended by the
+        // browser). It has said so; recording on would only send audio
+        // nowhere.
+        if (reply?.lost) halt();
+      },
+      () => running && !replaced,
+    );
+  } catch (e) {
+    await tell<FromPage>({
+      kind: "media", found: false, duration: 0,
+      reason: e instanceof Error ? e.message : String(e),
+    });
+    halt();
+    return;
+  } finally {
+    el.removeEventListener("emptied", onEmptied);
   }
+  if (!running) return;
+
+  current.getTracks().forEach((t) => t.stop());
+  stream = null;
+  const next = await waitForPlaying(SWITCH_WAIT_MS);
+  if (!running) return;
+  if (!next) {
+    // Finished, not failed. The overlay stays: lines still queued in the
+    // engine arrive after the video ends, and are there on a replay.
+    await tell<FromPage>({ kind: "finished" });
+    return;
+  }
+  const found = await readable(next, () => undefined);
+  if (!running) return;
+  if (found && "el" in found) { await adopt(found, true); return; }
+  if (!found) { await tell<FromPage>({ kind: "finished" }); return; }
+  await tell<FromPage>({ kind: "media", found: false, duration: 0, reason: found.reason });
+  halt();
 }
 
 function halt() {

@@ -285,6 +285,14 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("unless it is already the one in use", !/Tiny model/.test(behindNote(3, "onnx-community/whisper-tiny")));
 }
 
+// --- whose frame is it (APP-133, retest) ----------------------------------
+{
+  const { siteOf, MIN_WINDOW_MS } = await import("../src/lib/capture.ts");
+  ok("Dailymotion's player frame is Dailymotion's own site", siteOf("geo.dailymotion.com") === siteOf("www.dailymotion.com"));
+  ok("a YouTube embed on a blog is another site", siteOf("www.youtube.com") !== siteOf("blog.example.org"));
+  ok("a window under a second is not sent (the ad's last instant)", MIN_WINDOW_MS === 1000);
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
