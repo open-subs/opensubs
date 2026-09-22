@@ -1,7 +1,36 @@
 use crate::scale::{scale_filter, OutputSize};
 use crate::trim::TrimRange;
 use crate::MediaInfo;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// A path as the value of a filter option, escaped for both of ffmpeg's
+/// parsers.
+///
+/// A filtergraph is read twice: once as a graph, where `\ ' [ ] , ;` are
+/// special, and then each filter's `key=value:key=value` list, where
+/// `\ ' : =` are. A path goes through both, so it is escaped for the
+/// option list first and the result escaped again for the graph.
+///
+/// Unescaped, every absolute path on Windows breaks the burn (APP-119):
+/// `C:\Users\...\subs.ass` split at the drive colon, the rest read as the
+/// filter's next option, and the backslashes consumed as escapes --
+/// "Unable to parse option value \"Usersycan4subs.ass\"". The same bytes
+/// in a path on macOS or Linux are legal file names, which is how the tests
+/// below reproduce it without Windows.
+pub fn filter_path(path: &Path) -> String {
+    escape(&escape(&path.to_string_lossy(), "\\':="), "\\'[],;")
+}
+
+fn escape(text: &str, special: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if special.contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VideoEncoder {
@@ -198,8 +227,8 @@ pub fn burn_args(job: &BurnJob, info: &MediaInfo) -> Vec<String> {
 
     filters.push(format!(
         "ass={}:fontsdir={}:shaping=complex",
-        job.ass.to_string_lossy(),
-        job.fonts_dir.to_string_lossy()
+        filter_path(&job.ass),
+        filter_path(&job.fonts_dir)
     ));
 
     let mut a: Vec<String> = vec![
@@ -277,6 +306,44 @@ mod tests {
     use super::*;
     use crate::{ColorMeta, MediaInfo, Rational};
     use std::path::PathBuf;
+
+    /// APP-119: the path the burn wrote on Windows, and what ffmpeg must be
+    /// handed for it. Checked against a real ffmpeg in
+    /// subs-pipeline/tests/burn_e2e.rs.
+    #[test]
+    fn a_windows_path_is_escaped_for_both_filter_parsers() {
+        assert_eq!(
+            filter_path(Path::new(r"C:\Users\ycan4\AppData\Local\Temp\subs.ass")),
+            r"C\\:\\\\Users\\\\ycan4\\\\AppData\\\\Local\\\\Temp\\\\subs.ass"
+        );
+    }
+
+    #[test]
+    fn every_special_character_is_escaped_and_nothing_else() {
+        // Option list: \ ' : =   Graph: \ ' [ ] , ;
+        assert_eq!(filter_path(Path::new("a:b")), r"a\\:b");
+        assert_eq!(filter_path(Path::new("a=b")), r"a\\=b");
+        assert_eq!(filter_path(Path::new("a'b")), r"a\\\'b");
+        assert_eq!(filter_path(Path::new("a[b],c;d")), r"a\[b\]\,c\;d");
+        assert_eq!(
+            filter_path(Path::new("/tmp/plain dir/subs.ass")),
+            "/tmp/plain dir/subs.ass"
+        );
+    }
+
+    #[test]
+    fn the_burn_hands_ffmpeg_the_escaped_paths() {
+        let job = BurnJob {
+            ass: PathBuf::from(r"C:\Temp\subs.ass"),
+            fonts_dir: PathBuf::from(r"C:\Temp"),
+            ..job()
+        };
+        let a = burn_args(&job, &sdr_info()).join(" ");
+        assert!(
+            a.contains(r"ass=C\\:\\\\Temp\\\\subs.ass:fontsdir=C\\:\\\\Temp:"),
+            "{a}"
+        );
+    }
 
     fn sdr_info() -> MediaInfo {
         MediaInfo {

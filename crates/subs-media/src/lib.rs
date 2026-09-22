@@ -14,7 +14,7 @@ pub mod scale;
 pub mod trim;
 
 pub use audio::extract_audio_args;
-pub use burn::{burn_args, BurnJob, VideoEncoder};
+pub use burn::{burn_args, filter_path, BurnJob, VideoEncoder};
 pub use color::{ColorMeta, HdrKind};
 pub use info::{MediaError, MediaInfo};
 pub use probe::probe_args;

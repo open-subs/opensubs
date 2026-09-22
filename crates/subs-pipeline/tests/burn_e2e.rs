@@ -954,3 +954,73 @@ fn a_trimmed_burn_is_a_zero_based_clip_with_its_subtitles_on_it() {
         );
     }
 }
+
+/// APP-119: a burn from a working directory with a Windows path in it.
+///
+/// On Windows every absolute path starts `C:\`, and the `ass=` filter read
+/// the drive colon as the end of its option and the backslashes as escapes,
+/// so no burn could run at all. On macOS and Linux the same characters are
+/// legal in a file name, so the directory below reproduces the Windows path
+/// byte for byte -- plus every other character ffmpeg's filter syntax
+/// treats specially. On Windows it is a real subdirectory of the real
+/// `C:\...` temp directory, with the characters Windows allows.
+#[test]
+fn a_burn_runs_from_a_windows_shaped_path() {
+    if require_or_skip(have("ffmpeg") && have("ffprobe"), "ffmpeg not installed") {
+        return;
+    }
+    if require_or_skip(
+        has_ass_filter(),
+        "ffmpeg has no libass (the `ass` filter); install ffmpeg-full",
+    ) {
+        return;
+    }
+    let input = fixture("720p30.mp4");
+    if require_or_skip(
+        input.exists(),
+        "fixture 720p30.mp4 missing; run scripts/gen-fixtures.sh",
+    ) {
+        return;
+    }
+
+    let name = if cfg!(windows) {
+        "o'brien [x],y;z=1"
+    } else {
+        r"C:\Users\o'brien [x],y;z=1"
+    };
+    let work = std::env::temp_dir().join("subs-e2e-paths").join(name);
+    std::fs::create_dir_all(&work).unwrap();
+    let output = work.join("burned.mp4");
+    let _ = std::fs::remove_file(&output);
+
+    let info = probe(&input);
+    let spec = JobSpec {
+        input: input.clone(),
+        output: output.clone(),
+        style: preset_by_name("Clean").unwrap(),
+        work_dir: work.clone(),
+        fonts_dir: work.clone(),
+        encoder: VideoEncoder::X264,
+        crf: 23,
+        preset: "ultrafast".into(),
+        tonemap: false,
+        prefer_gpu_tonemap: false,
+        trim: TrimRange::FULL,
+        size: OutputSize::Source,
+        translate: None,
+    };
+    let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
+    write_ass(&planned).unwrap();
+
+    let out = Command::new("ffmpeg")
+        .args(&planned.burn_argv)
+        .output()
+        .expect("spawn ffmpeg");
+    assert!(
+        out.status.success(),
+        "burn from {} failed: {}",
+        work.display(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(output.exists(), "no output file produced");
+}
