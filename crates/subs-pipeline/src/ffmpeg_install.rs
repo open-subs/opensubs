@@ -65,7 +65,7 @@ pub struct InstallMethod {
 const HOMEBREW: InstallMethod = InstallMethod {
     label: "Install ffmpeg-full via Homebrew",
     command: "brew install ffmpeg-full",
-    note: "Homebrew's ffmpeg-full includes whisper and libass; the plain ffmpeg formula does not.",
+    note: "The button installs Homebrew's ffmpeg-full, which has both; the plain ffmpeg formula has neither.",
 };
 
 /// Gyan.dev's full build, the one winget installs as `Gyan.FFmpeg`: it has
@@ -76,8 +76,8 @@ const HOMEBREW: InstallMethod = InstallMethod {
 const WINGET: InstallMethod = InstallMethod {
     label: "Install FFmpeg with winget",
     command: "winget install --id Gyan.FFmpeg --exact",
-    note: "This is Gyan.dev's full build (GPLv3), which includes whisper and libass. \
-           The essentials build does not include whisper.",
+    note: "The button installs Gyan.dev's full build (GPLv3), which has both; \
+           its essentials build has no whisper.",
 };
 
 /// The install this platform offers, or `None` where there is no one
