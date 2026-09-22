@@ -767,6 +767,9 @@
 
     void asrSupport().then((s) => {
       asr = s;
+      // Firefox, with an adapter that says nothing (APP-121): start on the
+      // CPU, which then settles the model on Base. The switch stays.
+      if (s.cpuFirst) asrBackend = "cpu";
       settleDefaultModel();
     });
 

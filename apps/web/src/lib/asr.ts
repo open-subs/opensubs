@@ -31,7 +31,7 @@ import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
 import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSeconds } from "./vad";
-import { describeGpu, isIntegratedGpu, type GpuInfo } from "./device";
+import { describeGpu, isIntegratedGpu, startsOnCpu, type GpuInfo } from "./device";
 import { passEnd, plannedWindows, windowProgress } from "./windows";
 import {
   MAX_SEGMENT_S,
@@ -272,6 +272,11 @@ export interface AsrSupport {
   integrated?: boolean;
   /** "intel · gen-12lp", when the adapter says. */
   gpu?: string;
+  /**
+   * WebGPU is there, but start on the CPU: Firefox, whose adapter says
+   * nothing about itself (APP-121). See ./device startsOnCpu.
+   */
+  cpuFirst?: boolean;
 }
 
 /**
@@ -298,7 +303,13 @@ export async function asrSupport(): Promise<AsrSupport> {
         // Chrome shipped before it and some builds still have only that.
         let info: GpuInfo | undefined = adapter.info;
         if (!info && adapter.requestAdapterInfo) info = await adapter.requestAdapterInfo().catch(() => undefined);
-        return { ok: true, device: "webgpu", integrated: isIntegratedGpu(info), gpu: describeGpu(info) };
+        return {
+          ok: true,
+          device: "webgpu",
+          integrated: isIntegratedGpu(info),
+          gpu: describeGpu(info),
+          cpuFirst: startsOnCpu({ info, userAgent: navigator.userAgent }),
+        };
       }
     } catch {
       // Fall through to WASM; an adapter request can throw on machines
