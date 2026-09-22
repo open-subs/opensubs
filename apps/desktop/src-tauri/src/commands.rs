@@ -173,22 +173,6 @@ fn resolve_ffprobe(ffmpeg_bin: &Path) -> PathBuf {
     }
 }
 
-/// True when `ffmpeg -filters` output lists the `ass` filter. Split out from
-/// [`has_ass_filter`] so the parsing itself is unit-testable without
-/// spawning a process.
-fn parse_filters_output(text: &str) -> bool {
-    text.lines()
-        .any(|l| l.split_whitespace().nth(1) == Some("ass"))
-}
-
-fn has_ass_filter(ffmpeg_bin: &Path) -> Result<bool, String> {
-    let out = Process::new(ffmpeg_bin)
-        .arg("-filters")
-        .output()
-        .map_err(|e| format!("failed to run {} -filters: {e}", ffmpeg_bin.display()))?;
-    Ok(parse_filters_output(&String::from_utf8_lossy(&out.stdout)))
-}
-
 fn probe_media(ffprobe: &Path, input: &Path) -> Result<MediaInfo, String> {
     let out = Process::new(ffprobe)
         .args(probe_args(input))
@@ -425,22 +409,10 @@ fn run_burn_job(
     let ffmpeg_bin = resolve_ffmpeg();
     let ffprobe_bin = resolve_ffprobe(&ffmpeg_bin);
 
-    match has_ass_filter(&ffmpeg_bin) {
-        Ok(true) => {}
-        Ok(false) => {
-            return Err(format!(
-                "{} has no libass (the `ass` filter is not registered in its `-filters` \
-                 output) and cannot burn subtitles. Install an ffmpeg build with \
-                 --enable-libass, e.g. Homebrew's `ffmpeg-full` (`brew install ffmpeg-full`).",
-                ffmpeg_bin.display()
-            ))
-        }
-        Err(e) => {
-            return Err(format!(
-                "could not check {} for libass: {e}",
-                ffmpeg_bin.display()
-            ))
-        }
+    match subs_pipeline::missing_filters(&ffmpeg_bin) {
+        Ok(missing) if missing.is_empty() => {}
+        Ok(missing) => return Err(missing_message(&ffmpeg_bin, &missing)),
+        Err(e) => return Err(format!("could not check {}: {e}", ffmpeg_bin.display())),
     }
 
     let info = probe_media(&ffprobe_bin, &input)
@@ -578,12 +550,70 @@ pub fn export_style(name: String) -> Result<String, String> {
         .ok_or_else(|| format!("no preset named '{name}'"))
 }
 
-/// Pre-flight check surfaced by the UI before a burn is attempted: `Ok(true)`
-/// means ffmpeg has libass and can burn subtitles, `Ok(false)` means it was
-/// found but lacks the `ass` filter (plain Homebrew `ffmpeg`, most likely).
+/// What is wrong with ffmpeg, in a sentence that says what to do about it.
+fn missing_message(ffmpeg_bin: &Path, missing: &[&str]) -> String {
+    let what: Vec<String> = subs_pipeline::REQUIRED_FILTERS
+        .iter()
+        .filter(|(name, _)| missing.contains(name))
+        .map(|(name, why)| format!("`{name}`, which {why}"))
+        .collect();
+    let fix = match subs_pipeline::install_method() {
+        Some(m) => format!(" Install one that has them: `{}`.", m.command),
+        None => " Install an ffmpeg 8 or later built with whisper and libass.".to_string(),
+    };
+    format!(
+        "{} has no {}.{fix}",
+        ffmpeg_bin.display(),
+        what.join(" and no ")
+    )
+}
+
+/// The UI's pre-flight check, before a burn is attempted.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FfmpegCheck {
+    /// Whether an ffmpeg could be run at all.
+    found: bool,
+    /// Required filters it lacks: `whisper`, `ass`, or both. Empty and
+    /// `found` means it can do the whole job.
+    missing: Vec<String>,
+    /// How to install one that works here, if there is one command for it.
+    install: Option<InstallHint>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallHint {
+    label: String,
+    command: String,
+    note: String,
+}
+
+/// Never an error: an ffmpeg that is not there is the commonest answer on
+/// Windows, and the banner needs to say what to do about it, not relay
+/// "program not found" (APP-120).
 #[tauri::command]
-pub fn check_ffmpeg() -> Result<bool, String> {
-    has_ass_filter(&resolve_ffmpeg())
+pub fn check_ffmpeg() -> FfmpegCheck {
+    let install = subs_pipeline::install_method().map(|m| InstallHint {
+        label: m.label.into(),
+        command: m.command.into(),
+        note: m.note.into(),
+    });
+    match subs_pipeline::missing_filters(&resolve_ffmpeg()) {
+        Ok(missing) => FfmpegCheck {
+            found: true,
+            missing: missing.into_iter().map(String::from).collect(),
+            install,
+        },
+        Err(_) => FfmpegCheck {
+            found: false,
+            missing: subs_pipeline::REQUIRED_FILTERS
+                .iter()
+                .map(|(n, _)| n.to_string())
+                .collect(),
+            install,
+        },
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -592,7 +622,8 @@ struct FfmpegInstallOutputPayload {
     line: String,
 }
 
-/// Runs `brew install ffmpeg-full`, emitting each line of its output as a
+/// Installs ffmpeg the way `check_ffmpeg`'s `install` says -- Homebrew on
+/// macOS, winget on Windows -- emitting each line of its output as a
 /// `ffmpeg-install-output` event so the UI can show live progress instead of
 /// a frozen button for the several minutes a real install takes. The
 /// frontend re-runs `check_ffmpeg` after this resolves to learn whether it
@@ -816,24 +847,29 @@ mod tests {
         assert_eq!(ffprobe, PathBuf::from("ffprobe"));
     }
 
+    // Parsing `ffmpeg -filters` is tested where it lives, in
+    // subs-pipeline's ffmpeg_install.
+
     #[test]
-    fn parse_filters_output_detects_the_ass_filter_line() {
-        // Real `ffmpeg -filters` shape: a flags column, then the filter name.
-        let sample = " ..C atadenoise      A->A       Apply an Adaptive Temporal Averaging Denoiser.\n \
-                       ..C ass              V->V       Render subtitles onto input video using the libass library.\n";
-        assert!(parse_filters_output(sample));
+    fn a_missing_filter_is_named_with_what_it_is_for() {
+        let m = missing_message(Path::new("ffmpeg"), &["whisper"]);
+        assert!(m.contains("`whisper`, which transcribes the audio"), "{m}");
+        assert!(!m.contains("`ass`"), "{m}");
     }
 
     #[test]
-    fn parse_filters_output_is_false_when_ass_is_absent() {
-        let sample =
-            " ... T.. atadenoise      A->A       Apply an Adaptive Temporal Averaging Denoiser.\n";
-        assert!(!parse_filters_output(sample));
-    }
-
-    #[test]
-    fn parse_filters_output_handles_empty_input() {
-        assert!(!parse_filters_output(""));
+    fn the_fix_offered_is_this_platforms_own() {
+        // APP-120: Windows was told to use Homebrew.
+        let m = missing_message(Path::new("ffmpeg"), &["whisper", "ass"]);
+        if cfg!(windows) {
+            assert!(m.contains("winget install --id Gyan.FFmpeg"), "{m}");
+        }
+        if cfg!(target_os = "macos") {
+            assert!(m.contains("brew install ffmpeg-full"), "{m}");
+        }
+        if !cfg!(target_os = "macos") {
+            assert!(!m.contains("brew"), "{m}");
+        }
     }
 
     #[test]

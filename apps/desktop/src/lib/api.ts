@@ -92,17 +92,38 @@ export function exportStyle(name: string): Promise<string> {
   return invoke("export_style", { name });
 }
 
-/** `true` when ffmpeg has libass and can burn subtitles. */
-export function checkFfmpeg(): Promise<boolean> {
+/** How to install a working ffmpeg on this platform. */
+export interface InstallHint {
+  /** What the install button says. */
+  label: string;
+  /** The same install, as a command to run by hand. */
+  command: string;
+  /** What gets installed, in a sentence. */
+  note: string;
+}
+
+/** What the pre-flight check found. */
+export interface FfmpegCheck {
+  /** Whether an ffmpeg could be run at all. */
+  found: boolean;
+  /** Required filters it lacks: "whisper" (transcribes), "ass" (burns). */
+  missing: string[];
+  /** Null where there is no one command for it (Linux). */
+  install: InstallHint | null;
+}
+
+/** Whether ffmpeg is there and has both filters the app needs. */
+export function checkFfmpeg(): Promise<FfmpegCheck> {
   return invoke("check_ffmpeg");
 }
 
 /**
- * Runs `brew install ffmpeg-full`. Resolves once the install itself
- * finishes (or rejects on failure) -- it does NOT re-check libass, since a
- * successful install and a working ffmpeg are two different questions;
- * call `checkFfmpeg()` again afterwards. Progress streams separately via
- * the `ffmpeg-install-output` event (see `FfmpegInstallOutputPayload`).
+ * Installs ffmpeg as `FfmpegCheck.install` describes -- Homebrew on macOS,
+ * winget on Windows. Resolves once the install itself finishes (or rejects
+ * on failure) -- it does NOT re-check the filters, since a successful
+ * install and a working ffmpeg are two different questions; call
+ * `checkFfmpeg()` again afterwards. Progress streams separately via the
+ * `ffmpeg-install-output` event (see `FfmpegInstallOutputPayload`).
  */
 export function installFfmpeg(): Promise<void> {
   return invoke("install_ffmpeg");

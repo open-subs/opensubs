@@ -1,5 +1,6 @@
-//! Shared binary-location helpers, used by both `ffmpeg_binary` (job.rs)
-//! and `brew_binary` (ffmpeg_install.rs). Not exported outside the crate.
+//! Shared binary-location helpers, used by `ffmpeg_binary` (job.rs) and
+//! the installers' own lookups (ffmpeg_install.rs). Not exported outside
+//! the crate.
 
 use std::path::PathBuf;
 
@@ -15,6 +16,30 @@ const HOMEBREW_PREFIXES: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
 
 pub(crate) fn homebrew_dirs() -> impl Iterator<Item = PathBuf> {
     HOMEBREW_PREFIXES.iter().map(PathBuf::from)
+}
+
+/// Where Windows package managers put `ffmpeg.exe`, for the same reason:
+/// the app's `PATH` was fixed when it started, so an ffmpeg installed from
+/// its own banner (APP-120) is not on it until the app restarts.
+///
+/// - winget links a portable package's commands from `Links`, per user or
+///   machine-wide by install scope -- `Gyan.FFmpeg` is one;
+/// - Chocolatey shims into `%ProgramData%\chocolatey\bin`;
+/// - Scoop into `%USERPROFILE%\scoop\shims`.
+///
+/// Built from environment variables, so on macOS and Linux, where none of
+/// them is set, it is empty.
+pub(crate) fn windows_dirs() -> Vec<PathBuf> {
+    let env = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    [
+        env("LOCALAPPDATA").map(|d| d.join("Microsoft").join("WinGet").join("Links")),
+        env("ProgramFiles").map(|d| d.join("WinGet").join("Links")),
+        env("ProgramData").map(|d| d.join("chocolatey").join("bin")),
+        env("USERPROFILE").map(|d| d.join("scoop").join("shims")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// First existing `<dir>/<name>` among `dirs`. A pure filesystem check, no

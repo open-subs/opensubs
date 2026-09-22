@@ -197,15 +197,18 @@ pub fn write_ass(planned: &PlannedJob) -> std::io::Result<()> {
 }
 
 /// Resolve the ffmpeg binary: the bundled sidecar (if any), then Homebrew's
-/// two real install prefixes checked directly (see `paths` module docs for
-/// why that matters beyond a plain `PATH` search), then `PATH` itself.
+/// two real install prefixes and the Windows package managers' directories,
+/// checked directly (see `paths` for why that matters beyond a plain `PATH`
+/// search), then `PATH` itself.
 pub fn ffmpeg_binary(vendor_dir: &Path) -> PathBuf {
     let name = if cfg!(windows) {
         "ffmpeg.exe"
     } else {
         "ffmpeg"
     };
-    let dirs = std::iter::once(vendor_dir.to_path_buf()).chain(crate::paths::homebrew_dirs());
+    let dirs = std::iter::once(vendor_dir.to_path_buf())
+        .chain(crate::paths::homebrew_dirs())
+        .chain(crate::paths::windows_dirs());
     crate::paths::find_binary(name, dirs).unwrap_or_else(|| PathBuf::from(name))
 }
 

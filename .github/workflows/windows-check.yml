@@ -1,0 +1,117 @@
+name: windows check
+
+# The desktop app and the CLI share one pipeline, and until APP-119 it had
+# never run on Windows: every absolute path there starts `C:\`, which
+# ffmpeg's filter syntax reads as an option separator and escapes. This runs
+# the real thing on a real Windows machine for every release candidate --
+# the ffmpeg the app itself offers to install (APP-120), a model where the
+# app downloads models to, and a two-minute English burn with an SRT.
+#
+# It does not gate the release; it is evidence. Read its log before calling
+# a Windows fix verified.
+
+on:
+  push:
+    tags: ["v*-rc.*"]
+  workflow_dispatch:
+
+jobs:
+  burn:
+    name: burn on Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The command the app's banner gives on Windows, verbatim
+      # (subs_pipeline::install_method). Where winget is missing from the
+      # runner image, the same Gyan.dev full build is unpacked by hand into
+      # the same Links directory, and the log says so.
+      - name: Install ffmpeg as the app tells Windows users to
+        run: |
+          $links = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links"
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id Gyan.FFmpeg --exact --silent --accept-source-agreements --accept-package-agreements
+            "INSTALLED WITH WINGET"
+          } else {
+            "winget is not on this runner image; unpacking the same build into $links"
+            $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
+            Invoke-WebRequest "https://github.com/GyanD/codexffmpeg/releases/download/9.0/ffmpeg-9.0-full_build.zip" -OutFile $zip
+            Expand-Archive $zip "$env:RUNNER_TEMP\ffmpeg"
+            New-Item -ItemType Directory -Force $links | Out-Null
+            Copy-Item "$env:RUNNER_TEMP\ffmpeg\*\bin\*.exe" $links
+          }
+          # winget links per user, or machine-wide when it runs elevated, as
+          # it may on a runner. The app checks both (paths::windows_dirs).
+          $ff = @("$links\ffmpeg.exe", "$env:ProgramFiles\WinGet\Links\ffmpeg.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $ff) { throw "no ffmpeg.exe in either winget Links directory" }
+          "FFMPEG=$ff" | Out-File -Append $env:GITHUB_ENV
+          "found $ff"
+          & $ff -hide_banner -filters | Select-String -Pattern " (whisper|ass) "
+
+      - name: Download base.en to where the app keeps models
+        run: |
+          $dir = Join-Path $env:USERPROFILE ".cache\opensubs-models"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" -OutFile "$dir\ggml-base.en.bin"
+          Get-Item "$dir\ggml-base.en.bin"
+
+      - name: Make a two-minute English video
+        run: |
+          & $env:FFMPEG -hide_banner -v error -f lavfi -i "color=c=0x1e2836:s=1280x720:r=30" -i apps/web/public/testmedia/en.wav -shortest -c:v libx264 -preset ultrafast -c:a aac "$env:RUNNER_TEMP\en.mp4"
+          Get-Item "$env:RUNNER_TEMP\en.mp4"
+
+      # APP-119 as reported: the whisper filter with the paths unescaped,
+      # the way the app built it before. This must fail.
+      - name: Before -- the unescaped filter the app used to build
+        run: |
+          $model = Join-Path $env:USERPROFILE ".cache\opensubs-models\ggml-base.en.bin"
+          $dest = Join-Path $env:TEMP "subs-whisper-before.jsonl"
+          & $env:FFMPEG -v error -i "$env:RUNNER_TEMP\en.mp4" -af "whisper=model=${model}:language=en:format=json:destination=${dest}:queue=3" -t 5 -f null - 2>&1 | Select-Object -First 3
+          if ($LASTEXITCODE -eq 0) { throw "the unescaped filter worked -- this check is not reproducing APP-119" }
+          "FAILED AS REPORTED (exit $LASTEXITCODE)"
+          # The runner fails a step on a nonzero exit code; this one was expected.
+          $global:LASTEXITCODE = 0
+
+      - name: Build the CLI
+        run: cargo build --release -p opensubs
+
+      # The real burn, with every ffmpeg taken off PATH so the app has to
+      # find the one it installed the way it would on a user's machine,
+      # where PATH was fixed before the install (APP-120).
+      - name: After -- burn two minutes of English, with an SRT
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'ffmpeg.exe')) }) -join ';'
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { throw "ffmpeg is still on PATH" }
+          $model = Join-Path $env:USERPROFILE ".cache\opensubs-models\ggml-base.en.bin"
+          ./target/release/opensubs.exe burn "$env:RUNNER_TEMP\en.mp4" -o "$env:RUNNER_TEMP\en.subbed.mp4" --model $model --language en --srt "$env:RUNNER_TEMP\en.srt" --preset ultrafast
+          if ($LASTEXITCODE -ne 0) { throw "burn failed ($LASTEXITCODE)" }
+          Get-Item "$env:RUNNER_TEMP\en.subbed.mp4", "$env:RUNNER_TEMP\en.srt"
+          $srt = Get-Content "$env:RUNNER_TEMP\en.srt" -Raw
+          $cues = ([regex]::Matches($srt, '-->')).Count
+          "SRT: $cues cues"
+          Get-Content "$env:RUNNER_TEMP\en.srt" -TotalCount 12
+          if ($cues -lt 10) { throw "only $cues cues for two minutes of speech" }
+
+      - name: Burn tests, on Windows paths
+        env:
+          SUBS_REQUIRE_FFMPEG: "1"
+        run: |
+          $env:PATH = (Split-Path $env:FFMPEG) + ";" + $env:PATH
+          bash scripts/gen-fixtures.sh
+          cargo test --release -p subs-media -p subs-asr -p subs-pipeline --lib
+          cargo test --release -p subs-pipeline --test burn_e2e a_burn_runs_from_a_windows_shaped_path
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-burn
+          path: |
+            ${{ runner.temp }}/en.srt
+            ${{ runner.temp }}/en.subbed.mp4
+          if-no-files-found: ignore

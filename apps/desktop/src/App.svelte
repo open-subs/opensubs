@@ -19,6 +19,7 @@
     burn,
     reveal,
     type MediaInfoDto,
+    type FfmpegCheck,
     type StyleDto,
     type FeatureDto,
     type LanguageDto,
@@ -73,7 +74,8 @@
   let downloadTotalBytes = $state<number | null>(null);
   let downloadError = $state<string | null>(null);
 
-  let ffmpegOk = $state<boolean | null>(null);
+  let ffmpeg = $state<FfmpegCheck | null>(null);
+  let ffmpegOk = $derived(ffmpeg ? ffmpeg.found && ffmpeg.missing.length === 0 : null);
   let ffmpegCheckError = $state<string | null>(null);
   let installingFfmpeg = $state(false);
   let installLog = $state<string[]>([]);
@@ -155,9 +157,9 @@
       .catch((e) => console.error("get_model_path failed", e));
 
     checkFfmpeg()
-      .then((ok) => (ffmpegOk = ok))
+      .then((check) => (ffmpeg = check))
       .catch((e) => {
-        ffmpegOk = false;
+        ffmpeg = { found: false, missing: [], install: null };
         ffmpegCheckError = String(e);
       });
 
@@ -346,12 +348,12 @@
         installLog = [...installLog, event.payload.line];
       });
       await installFfmpeg();
-      // A successful `brew install` doesn't guarantee libass is now
-      // present (e.g. it was already installed without it, or brew no-ops
-      // on an already-up-to-date formula) -- re-check for real rather than
-      // assuming.
+      // A successful install doesn't guarantee the filters are now present
+      // (e.g. brew no-ops on an already-installed formula, or an earlier
+      // ffmpeg without whisper still comes first) -- re-check for real
+      // rather than assuming.
       ffmpegCheckError = null;
-      ffmpegOk = await checkFfmpeg();
+      ffmpeg = await checkFfmpeg();
       if (!ffmpegOk) {
         installError = "Installed, but ffmpeg still can't burn subtitles -- see the log above.";
       }
@@ -394,32 +396,45 @@
     <div class="banner banner-danger">
       <Icon name="alert-triangle" />
       <div class="banner-body">
-        <strong>ffmpeg can't burn subtitles.</strong>
+        {#if ffmpeg && !ffmpeg.found}
+          <strong>OpenSubs needs ffmpeg, and this computer doesn't have it.</strong>
+        {:else}
+          <strong>This ffmpeg can't do the whole job.</strong>
+        {/if}
         {#if ffmpegCheckError}
           <p class="oa-caption">{ffmpegCheckError}</p>
-        {:else}
+        {:else if ffmpeg}
           <p class="oa-caption">
-            The ffmpeg on this machine has no libass (the <code>ass</code> filter is missing).
-            Install a build with <code>--enable-libass</code>, e.g. Homebrew's
-            <code>ffmpeg-full</code>.
+            OpenSubs uses two of ffmpeg's filters: <code>whisper</code>, which transcribes the
+            audio, and <code>ass</code> (libass), which burns the subtitles in.
+            {#if ffmpeg.found}
+              The ffmpeg found here has no {ffmpeg.missing.join(" and no ")}.
+            {/if}
+            {#if ffmpeg.install}
+              {ffmpeg.install.note}
+            {:else}
+              Install an ffmpeg 8 or later built with whisper and libass.
+            {/if}
           </p>
         {/if}
 
         {#if installingFfmpeg}
-          <p class="oa-caption">Installing ffmpeg-full via Homebrew&hellip; this can take several minutes.</p>
+          <p class="oa-caption">Installing ffmpeg (<code>{ffmpeg?.install?.command}</code>)&hellip; this can take several minutes.</p>
           {#if installLog.length > 0}
             <div class="install-log oa-mono">
               {#each installLog as line}<div>{line}</div>{/each}
             </div>
           {/if}
         {:else}
-          <div class="banner-actions">
-            <button type="button" class="btn btn-secondary btn-sm" onclick={doInstallFfmpeg}>
-              <Icon name="download" size={14} />
-              Install ffmpeg-full via Homebrew
-            </button>
-            <span class="oa-caption">or run <code>brew install ffmpeg-full</code> yourself</span>
-          </div>
+          {#if ffmpeg?.install}
+            <div class="banner-actions">
+              <button type="button" class="btn btn-secondary btn-sm" onclick={doInstallFfmpeg}>
+                <Icon name="download" size={14} />
+                {ffmpeg.install.label}
+              </button>
+              <span class="oa-caption">or run <code>{ffmpeg.install.command}</code> yourself</span>
+            </div>
+          {/if}
           {#if installError}
             <p class="error-text">{installError}</p>
           {/if}
@@ -766,7 +781,7 @@
         {#if videoPath && !modelPath}
           <span class="oa-caption">Pick a whisper model to enable burning.</span>
         {:else if ffmpegOk === false}
-          <span class="oa-caption">ffmpeg needs libass before this can run.</span>
+          <span class="oa-caption">ffmpeg needs {ffmpeg && !ffmpeg.found ? "installing" : "whisper and libass"} before this can run.</span>
         {:else if trimError}
           <span class="oa-caption">{trimError}</span>
         {/if}
