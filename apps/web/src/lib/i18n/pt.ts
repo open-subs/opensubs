@@ -7,6 +7,7 @@ const pt: Record<string, string> = {
   "Style": "Estilo",
   "Model": "Modelo",
   "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "Este computador tem gráficos integrados ({gpu}), lentos para este trabalho: em um deles, um vídeo de dois minutos levou cerca de quatro minutos com o Base e cerca de nove com o Small. É por isso que o Base é escolhido aqui. Para algo mais rápido, use sua própria chave de API acima, que roda um modelo maior em outro lugar.",
+  "{missed} of {total} lines came back untranslated, and are still in the original language. Translating again usually gets them; a larger model misses fewer.": "{missed} de {total} linhas voltaram sem tradução e continuam no idioma original. Traduzir de novo costuma resolver; um modelo maior deixa passar menos.",
   "Runs on": "Executa em",
   "Graphics card (GPU)": "Placa de vídeo (GPU)",
   "Processor (CPU)": "Processador (CPU)",

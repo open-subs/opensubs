@@ -7,6 +7,7 @@ const zhHant: Record<string, string> = {
   "Style": "樣式",
   "Model": "模型",
   "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "這台機器用的是內顯（{gpu}），跑這類工作比較慢：在這類機器上，兩分鐘的影片用 Base 約需四分鐘，用 Small 約需九分鐘。因此這裡預設選擇 Base。想要更快，可以在上方使用自己的 API key，改用別處更大的模型。",
+  "{missed} of {total} lines came back untranslated, and are still in the original language. Translating again usually gets them; a larger model misses fewer.": "有 {missed} 行（共 {total} 行）沒有譯出來，仍維持原文。再翻譯一次通常就能補上；換更大的模型漏得更少。",
   "Runs on": "執行於",
   "Graphics card (GPU)": "顯示卡 (GPU)",
   "Processor (CPU)": "處理器 (CPU)",

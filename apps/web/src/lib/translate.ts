@@ -24,6 +24,7 @@ import { applyTranslations, batchSize, translateRequestBody, parseTranslateRespo
 import type { Cue } from "./engine";
 import { translateOnBackend, jobKey } from "./account";
 import { contextGroups, joinGroup, spread } from "./context";
+import { translateChunk } from "./shortfall";
 
 export type ProviderId = "device" | "opensubs" | "claude" | "openai" | "deepl";
 
@@ -215,6 +216,11 @@ export interface TranslateOptions {
   baseUrl?: string;
   model?: string;
   onProgress?: (done: number, total: number, note: string) => void;
+  /**
+   * Some lines came back untranslated after a retry and a split, and are in
+   * their original language (APP-141). Everything else was translated.
+   */
+  onShortfall?: (missed: number, total: number) => void;
   signal?: AbortSignal;
 }
 
@@ -254,18 +260,16 @@ export async function translateCues(options: TranslateOptions): Promise<Cue[]> {
   const size = providerId === "device" ? units.length : batchSize();
   const translated: string[] = [];
 
+  let missed = 0;
   for (let i = 0; i < units.length; i += size) {
     assertNotAborted(signal);
     const chunk = units.slice(i, i + size);
-    const back = await batch(chunk);
-    if (back.length !== chunk.length) {
-      throw new Error(
-        `The translator returned ${back.length} lines for ${chunk.length} subtitles.`,
-      );
-    }
-    translated.push(...back);
+    const back = await translateChunk(batch, chunk, signal);
+    missed += back.missed;
+    translated.push(...back.lines);
     onProgress?.(Math.min(i + size, units.length), units.length, "Translating");
   }
+  if (missed > 0) options.onShortfall?.(missed, units.length);
 
   // Back to one line per cue, which is what the count check downstream
   // and every timing in the file depend on.
@@ -429,7 +433,7 @@ function openAiBatcher(options: TranslateOptions): Batch {
     } catch {
       throw new Error("The server did not return a chat completion.");
     }
-    return readTranslationsArray(content, texts.length);
+    return readTranslationsArray(content);
   };
 }
 
@@ -440,7 +444,7 @@ function openAiBatcher(options: TranslateOptions): Batch {
  * often wrap the object in a ``` fence or a sentence of preamble, and
  * failing the whole export over that would be needlessly brittle.
  */
-function readTranslationsArray(content: string, expected: number): string[] {
+function readTranslationsArray(content: string): string[] {
   const trimmed = content.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
@@ -454,9 +458,8 @@ function readTranslationsArray(content: string, expected: number): string[] {
   }
   const list = (parsed as { translations?: unknown }).translations;
   if (!Array.isArray(list)) throw new Error('The model returned no "translations" array.');
-  if (list.length !== expected) {
-    throw new Error(`The model returned ${list.length} lines for ${expected} subtitles.`);
-  }
+  // The count is the caller's business: a short reply is retried and then
+  // split, rather than throwing the batch away (APP-141).
   return list.map((v) => String(v ?? ""));
 }
 

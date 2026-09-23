@@ -270,6 +270,12 @@
    */
   let originalScale = $state(0.8);
   let translateError = $state<string | null>(null);
+  /**
+   * Some lines came back untranslated (APP-141). Not an error: everything
+   * else was translated and is on screen, so this sits beside the result and
+   * says what to do about the rest.
+   */
+  let translateShortfall = $state<string | null>(null);
   let deviceStatus = $state<string | null>(null);
 
   let asr = $state<AsrSupport | null>(null);
@@ -1650,6 +1656,7 @@
 
     translating = true;
     translateError = null;
+    translateShortfall = null;
     translateProgress = "";
     // Always translate the original, never a translation. Re-running with
     // a different target language used to feed the previous output back
@@ -1667,6 +1674,12 @@
         model: providerModel.trim() || activeProvider.defaultModel,
         onProgress: (done, total, note) => {
           translateProgress = `${done}/${total} ${note}`;
+        },
+        onShortfall: (missed, total) => {
+          translateShortfall = t(
+            "{missed} of {total} lines came back untranslated, and are still in the original language. Translating again usually gets them; a larger model misses fewer.",
+            { missed, total },
+          );
         },
       });
       // Only once the translation is in hand: a failed or cancelled run
@@ -2744,6 +2757,9 @@
           {/if}
         </button>
       </div>
+      {#if translateShortfall}
+        <p class="oa-caption">{translateShortfall}</p>
+      {/if}
       {#if translateError}
         <p class="field-error">{translateError}</p>
       {/if}
