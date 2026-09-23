@@ -127,6 +127,10 @@ jobs:
           $cues = ([regex]::Matches((Get-Content "$env:RUNNER_TEMP\en.nolinks.srt" -Raw), '-->')).Count
           "SRT with links removed: $cues cues"
           if ($cues -lt 10) { throw "only $cues cues" }
+          # Put them back: the steps after this one expect a normal install.
+          $bin = Split-Path (Get-ChildItem -Recurse -Filter ffmpeg.exe $packages | Select-Object -First 1).FullName
+          Copy-Item (Join-Path $bin "ffmpeg.exe"), (Join-Path $bin "ffprobe.exe") $links
+          if (-not (Test-Path $env:FFMPEG)) { throw "failed to restore the links" }
 
       - name: Burn tests, on Windows paths
         env:
