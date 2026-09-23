@@ -7,6 +7,7 @@ const ja: Record<string, string> = {
   "Style": "スタイル",
   "Model": "モデル",
   "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "このパソコンは内蔵グラフィックス（{gpu}）で、この処理には時間がかかります。同種の環境では、2 分の動画に Base で約 4 分、Small で約 9 分かかりました。そのためここでは Base を選んでいます。もっと速く終わらせたい場合は、上の自分の API キーを使い、別の場所でより大きなモデルを動かしてください。",
+  "{missed} of {total} lines came back untranslated, and are still in the original language. Translating again usually gets them; a larger model misses fewer.": "{total} 行のうち {missed} 行が訳されず、原文のままです。もう一度翻訳すればたいてい埋まります。大きなモデルほど取りこぼしが減ります。",
   "Runs on": "実行場所",
   "Graphics card (GPU)": "グラフィックス (GPU)",
   "Processor (CPU)": "プロセッサー (CPU)",
