@@ -6,6 +6,7 @@ const es: Record<string, string> = {
   "Export": "Exportar",
   "Style": "Estilo",
   "Model": "Modelo",
+  "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "Este equipo tiene gráficos integrados ({gpu}), lentos para esta tarea: en uno de ellos, un vídeo de dos minutos tardó unos cuatro minutos con Base y unos nueve con Small. Por eso aquí se elige Base. Para ir más rápido, usa tu propia clave de API arriba, que ejecuta un modelo mayor en otro sitio.",
   "Runs on": "Se ejecuta en",
   "Graphics card (GPU)": "Tarjeta gráfica (GPU)",
   "Processor (CPU)": "Procesador (CPU)",

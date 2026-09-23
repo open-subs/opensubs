@@ -1834,6 +1834,14 @@
       Whisper runs here, on your machine{asrDevice === "webgpu"
         ? ", on the GPU"
         : ""}. The audio is never uploaded; only the model is downloaded, once.
+      {#if asr?.integrated}
+        <!-- APP-111 measured this hardware: say what it is and what it costs,
+             rather than only quietly choosing the smaller model. -->
+        {t(
+          "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.",
+          { gpu: asr.gpu ?? "integrated" },
+        )}
+      {/if}
       {#if asr?.device === "webgpu" && asrBackend === "cpu"}
         {t("On the processor it needs the larger full-precision model, about four times the download, and the page may stop responding while it works.")}
       {:else if asr?.device === "wasm"}
