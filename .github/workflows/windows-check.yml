@@ -107,6 +107,27 @@ jobs:
           Get-Content "$env:RUNNER_TEMP\en.srt" -TotalCount 12
           if ($cues -lt 10) { throw "only $cues cues for two minutes of speech" }
 
+      # APP-120, retested: on an account without administrator rights winget
+      # makes no Links shortcut. It unpacks into Packages and puts that on the
+      # user's PATH in the registry -- neither of which the running app had.
+      # This runner is an administrator, so the shape is made by hand: take
+      # the links away and leave only what a normal account would have.
+      - name: After -- burn with winget's links removed (a normal account's shape)
+        run: |
+          $links = Split-Path $env:FFMPEG
+          Remove-Item (Join-Path $links "ffmpeg.exe"), (Join-Path $links "ffprobe.exe") -Force
+          if (Test-Path (Join-Path $links "ffmpeg.exe")) { throw "the links are still there" }
+          $packages = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages"
+          "what is left: $((Get-ChildItem -Recurse -Filter ffmpeg.exe $packages | Select-Object -First 1).FullName)"
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'ffmpeg.exe')) }) -join ';'
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { throw "ffmpeg is still on PATH" }
+          $model = Join-Path $env:USERPROFILE ".cache\opensubs-models\ggml-base.en.bin"
+          ./target/release/opensubs.exe burn "$env:RUNNER_TEMP\en.mp4" -o "$env:RUNNER_TEMP\en.nolinks.mp4" --model $model --language en --srt "$env:RUNNER_TEMP\en.nolinks.srt" --preset ultrafast
+          if ($LASTEXITCODE -ne 0) { throw "burn failed with the links removed ($LASTEXITCODE)" }
+          $cues = ([regex]::Matches((Get-Content "$env:RUNNER_TEMP\en.nolinks.srt" -Raw), '-->')).Count
+          "SRT with links removed: $cues cues"
+          if ($cues -lt 10) { throw "only $cues cues" }
+
       - name: Burn tests, on Windows paths
         env:
           SUBS_REQUIRE_FFMPEG: "1"
