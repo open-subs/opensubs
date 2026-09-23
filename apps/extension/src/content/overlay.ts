@@ -110,8 +110,29 @@ function paint() {
  */
 const SWITCH_WAIT_MS = 8000;
 
-/** Counts the videos read this session; see FromPage "window". */
+/**
+ * Counts the videos read in this session; see FromPage "window".
+ *
+ * Reset by every Start, because the background counts from one as well. It
+ * was not, so a second Start in the same page sent take 2 to a background
+ * expecting take 1, and every window was dropped as belonging to a video the
+ * page had moved on from: Stop, Start, and nothing more was ever
+ * transcribed until the page was reloaded (APP-145).
+ */
 let take = 0;
+/**
+ * Which session the page is in. Start increments it; Stop ends it.
+ *
+ * `record` runs for as long as a video is being read, and it does not stop
+ * the instant Stop is pressed: it is waiting on a recorder, and it wakes up
+ * afterwards. By then a second Start may have begun a new session -- and the
+ * old loop went on to stop the new session's audio track and set its stream
+ * to null, or to adopt the video itself. What the user saw was Stop, Start,
+ * and then "Listening" for ever with no subtitles until the page was
+ * reloaded (APP-145). Every step of the loop now checks that its session is
+ * still the current one before it touches anything shared.
+ */
+let session = 0;
 
 /**
  * An unreadable clip this close to its end is waited out rather than refused.
@@ -196,6 +217,8 @@ async function begin(next: Settings): Promise<BeginAnswer> {
   if ("reason" in opened && !endsSoon(el)) return { found: false, reason: opened.reason };
 
   running = true;
+  session += 1;
+  take = 0;
   catchup = { index: -1, until: 0 };
   if (settings.overlay) {
     ensureOverlay();
@@ -234,16 +257,20 @@ async function record() {
   if (!running || !media || !stream || !settings) return;
   const el = media;
   const current = stream;
+  /** The session this loop belongs to; see `session`. */
+  const mySession = session;
+  const mine = take;
+  const stillMine = () => running && session === mySession;
   let replaced = false;
   const onEmptied = () => { replaced = true; };
   el.addEventListener("emptied", onEmptied, { once: true });
   try {
-    const mine = take;
     await recordWindows(
       el,
       current,
       settings.window,
       async (w) => {
+        if (!stillMine()) return;
         const audio = await blobToWire(w.blob);
         const reply = (await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset, take: mine })) as
           | { lost?: boolean }
@@ -253,9 +280,10 @@ async function record() {
         // nowhere.
         if (reply?.lost) halt();
       },
-      () => running && !replaced,
+      () => stillMine() && !replaced,
     );
   } catch (e) {
+    if (!stillMine()) return;
     await tell<FromPage>({
       kind: "media", found: false, duration: 0,
       reason: e instanceof Error ? e.message : String(e),
@@ -264,13 +292,14 @@ async function record() {
     return;
   } finally {
     el.removeEventListener("emptied", onEmptied);
+    // This loop's own track, whichever session is current now.
+    current.getTracks().forEach((t) => t.stop());
   }
-  if (!running) return;
+  if (!stillMine()) return;
 
-  current.getTracks().forEach((t) => t.stop());
   stream = null;
   const next = await waitForPlaying(SWITCH_WAIT_MS);
-  if (!running) return;
+  if (!stillMine()) return;
   if (!next) {
     // Finished, not failed. The overlay stays: lines still queued in the
     // engine arrive after the video ends, and are there on a replay.
@@ -278,7 +307,7 @@ async function record() {
     return;
   }
   const found = await readable(next, () => undefined);
-  if (!running) return;
+  if (!stillMine()) return;
   if (found && "el" in found) { await adopt(found, true); return; }
   if (!found) { await tell<FromPage>({ kind: "finished" }); return; }
   await tell<FromPage>({ kind: "media", found: false, duration: 0, reason: found.reason });
@@ -287,6 +316,7 @@ async function record() {
 
 function halt() {
   running = false;
+  session += 1;
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   if (ticker !== null) { clearInterval(ticker); ticker = null; }
@@ -321,6 +351,12 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
       return true;
     case "halt": halt(); break;
     case "cues": cues = message.cues; paint(); break;
+    case "settings":
+      settings = message.settings;
+      if (settings.overlay) ensureOverlay();
+      else removeOverlay();
+      paint();
+      break;
     case "status":
       if (note) {
         const s = message.status;

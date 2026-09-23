@@ -204,7 +204,7 @@ async function start(tabId: number, next: Settings) {
     holdAwake(false);
     return;
   }
-  await toEngine({ kind: "warm", model: next.model });
+  await toEngine({ kind: "warm", model: next.model, backend: next.backend });
   // The page answers "begin" once it has found the video and opened its
   // audio, or with why it could not. Only then is "Listening" true -- set
   // before, it overwrote the page's "no video" and stayed there (APP-133).
@@ -258,6 +258,19 @@ api.runtime.onMessage.addListener(
           if (tabId) await stop(tabId);
           return respond({ ok: true });
 
+        // Settings changed while the popup is open. Kept for next time, and
+        // applied to a running session at once: the subtitle size is a thing
+        // you judge by looking at it (APP-144).
+        case "settings": {
+          const next = message.settings;
+          await api.storage.local.set({ settings: next });
+          if (session) {
+            session.settings = next;
+            await page(session.tabId, { kind: "settings", settings: next });
+          }
+          return respond({ ok: true });
+        }
+
         case "state":
           return respond({
             running: !!session,
@@ -287,6 +300,11 @@ api.runtime.onMessage.addListener(
             });
             return respond({ ok: false, lost: true });
           }
+          // A window from a take the page has moved past is stale (an ad's,
+          // see "switched"). One from a *later* take means the page counted
+          // ahead of this session -- which cost APP-145 every window of a
+          // second Start -- so follow the page rather than drop its audio.
+          if (session.tabId === tabId && message.take > session.take) session.take = message.take;
           if (session.tabId === tabId && message.take === session.take) {
             await toEngine({
               kind: "transcribe",

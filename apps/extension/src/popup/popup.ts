@@ -19,6 +19,7 @@ const windowEl = $<HTMLInputElement>("window");
 const windowOut = $<HTMLOutputElement>("window-out");
 const overlayEl = $<HTMLInputElement>("overlay");
 const backendEl = $<HTMLSelectElement>("backend");
+const sizeEl = $<HTMLSelectElement>("size");
 const backendNote = $<HTMLParagraphElement>("backend-note");
 const statusEl = $<HTMLDivElement>("status");
 const deviceEl = $<HTMLParagraphElement>("device");
@@ -54,6 +55,10 @@ const LANGUAGES: [string, string][] = [
 let running = false;
 
 function fill() {
+  const automatic = document.createElement("option");
+  automatic.value = "auto";
+  automatic.textContent = "Automatic";
+  modelEl.append(automatic);
   for (const m of ASR_MODELS) {
     const o = document.createElement("option");
     o.value = m.id;
@@ -74,7 +79,7 @@ function readSettings(): Settings {
     language: languageEl.value,
     window: Number(windowEl.value),
     overlay: overlayEl.checked,
-    fontScale: DEFAULT_SETTINGS.fontScale,
+    fontScale: Number(sizeEl.value) || DEFAULT_SETTINGS.fontScale,
     backend: backendEl.value as Settings["backend"],
   };
 }
@@ -85,12 +90,16 @@ function showSettings(s: Settings) {
   windowEl.value = String(s.window);
   overlayEl.checked = s.overlay;
   backendEl.value = s.backend ?? DEFAULT_SETTINGS.backend;
+  sizeEl.value = String(s.fontScale ?? DEFAULT_SETTINGS.fontScale);
   syncNotes();
 }
 
 function syncNotes() {
   windowOut.textContent = `${windowEl.value}s`;
-  modelNote.textContent = ASR_MODELS.find((m) => m.id === modelEl.value)?.note ?? "";
+  modelNote.textContent =
+    modelEl.value === "auto"
+      ? "Base where this machine can keep up with the video, Tiny where it cannot."
+      : (ASR_MODELS.find((m) => m.id === modelEl.value)?.note ?? "");
   backendNote.textContent = BACKEND_NOTES[backendEl.value] ?? "";
 }
 
@@ -171,8 +180,14 @@ saveEl.addEventListener("click", async () => {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 });
 
-for (const el of [modelEl, languageEl, windowEl, overlayEl, backendEl]) {
+for (const el of [modelEl, languageEl, windowEl, overlayEl, backendEl, sizeEl]) {
   el.addEventListener("input", syncNotes);
+}
+
+// The size and the overlay switch are judged by looking at the video, so they
+// are sent as they change rather than waiting for the next Start (APP-144).
+for (const el of [sizeEl, overlayEl]) {
+  el.addEventListener("change", () => void tell({ kind: "settings", settings: readSettings() }));
 }
 
 api.runtime.onMessage.addListener((message: { kind: string; status?: Status }) => {
