@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Canlı altyazı, yerel Whisper AI - OpenSubs"
+  },
+  "description": {
+    "message": "Geçerli sekmedeki video veya sesin canlı altyazısını yerel bir Whisper modeliyle oluşturur. Hiçbir şey yüklenmez."
+  }
+}

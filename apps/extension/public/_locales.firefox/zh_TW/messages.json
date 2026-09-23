@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "任何影片即時字幕產生 - 本機Whisper AI、音訊不上傳 | OpenSubs"
+  },
+  "description": {
+    "message": "為目前分頁播放的影片或音訊即時產生字幕，使用本機運作的Whisper模型，音訊不會上傳。"
+  }
+}

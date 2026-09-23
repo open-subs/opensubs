@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Phụ đề trực tiếp, AI Whisper cục bộ - OpenSubs"
+  },
+  "description": {
+    "message": "Tạo phụ đề trực tiếp cho video hoặc âm thanh đang phát trong tab hiện tại bằng mô hình Whisper cục bộ. Không tải lên đâu cả."
+  }
+}

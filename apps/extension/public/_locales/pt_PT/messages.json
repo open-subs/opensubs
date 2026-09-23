@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Legendas em direto para qualquer vídeo - IA Whisper local - OpenSubs"
+  },
+  "description": {
+    "message": "Gera legendas em direto para o vídeo ou áudio do separador atual com um modelo Whisper local. Nada é enviado."
+  }
+}

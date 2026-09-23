@@ -35,6 +35,15 @@ for (const dir of ["icons", "_locales", "ort"]) {
   if (existsSync(from)) cpSync(from, join(out, dir), { recursive: true });
 }
 
+// The stores cap the extension's name at different lengths -- 75 characters on
+// the Chrome Web Store, 50 on addons.mozilla.org -- so Firefox carries a shorter
+// name for the same extension, in every language. Only the files present in the
+// overlay are replaced; a locale it does not mention keeps the Chrome wording.
+if (target === "firefox") {
+  const overlay = join(root, "public", "_locales.firefox");
+  if (existsSync(overlay)) cpSync(overlay, join(out, "_locales"), { recursive: true });
+}
+
 mkdirSync(out, { recursive: true });
 copyFileSync(join(root, "src", "popup", "popup.html"), join(out, "popup.html"));
 copyFileSync(join(root, "src", "popup", "popup.css"), join(out, "popup.css"));

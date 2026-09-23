@@ -350,6 +350,49 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("two windows waiting is the point of giving up on Base", AUTO_BEHIND === 2);
 }
 
+// --- the store listings, one per language --------------------------------
+{
+  const { readdirSync, readFileSync, existsSync } = await import("node:fs");
+  const { join, dirname } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const root = dirname(dirname(fileURLToPath(import.meta.url)));
+
+  // Chrome's own table of the locales an extension may carry
+  // (developer.chrome.com/docs/extensions/reference/api/i18n). A folder that
+  // is not on it is rejected at upload -- "pt" was, and had to become "pt_PT".
+  const CHROME = new Set(("ar am bg bn ca cs da de el en en_AU en_GB en_US es es_419 et fa fi fil fr gu he hi hr hu "
+    + "id it ja kn ko lt lv ml mr ms nl no pl pt_BR pt_PT ro ru sk sl sr sv sw ta te th tr uk vi zh_CN zh_TW").split(" "));
+
+  const read = (dir, loc) => JSON.parse(readFileSync(join(root, "public", dir, loc, "messages.json"), "utf8"));
+  const locales = readdirSync(join(root, "public", "_locales")).filter((n) => !n.startsWith("."));
+
+  ok("every language the listing is written in is one Chrome accepts",
+    locales.every((l) => CHROME.has(l)), locales.filter((l) => !CHROME.has(l)).join(", "));
+  ok("English is there, because the manifest names it as the fallback", locales.includes("en"));
+
+  for (const loc of locales) {
+    const m = read("_locales", loc);
+    eq(`${loc}: the manifest's two strings, and nothing else`, Object.keys(m).sort(), ["description", "name"]);
+    ok(`${loc}: neither string is empty`, m.name.message.trim() !== "" && m.description.message.trim() !== "");
+    // 75 characters, from the manifest reference. Over it the upload fails.
+    ok(`${loc}: the name fits the Chrome Web Store`, m.name.message.length <= 75, `${m.name.message.length} chars`);
+  }
+
+  // Firefox shows the name in a narrower column and on a page that truncates
+  // it, so those are shorter; the overlay may leave a language out, and then
+  // that language keeps the Chrome wording.
+  const ff = join(root, "public", "_locales.firefox");
+  for (const loc of readdirSync(ff).filter((n) => !n.startsWith("."))) {
+    ok(`${loc}: a Firefox name only for a language the listing has`, locales.includes(loc));
+    const m = read("_locales.firefox", loc);
+    eq(`${loc}: the same two strings for Firefox`, Object.keys(m).sort(), ["description", "name"]);
+    ok(`${loc}: the Firefox name is the shorter of the two`, m.name.message.length <= 50, `${m.name.message.length} chars`);
+  }
+  ok("the Firefox overlay is only copied over the Firefox build",
+    existsSync(join(root, "scripts", "copy-static.mjs"))
+    && /_locales\.firefox/.test(readFileSync(join(root, "scripts", "copy-static.mjs"), "utf8")));
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);

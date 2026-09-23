@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "任意视频实时字幕生成 - 本地Whisper AI、音频不上传 | OpenSubs"
+  },
+  "description": {
+    "message": "为当前标签页播放的视频或音频实时生成字幕，使用本地运行的Whisper模型，音频不会上传。"
+  }
+}

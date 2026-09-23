@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Legendas ao vivo, IA Whisper local - OpenSubs"
+  },
+  "description": {
+    "message": "Gera legendas ao vivo para o vídeo ou áudio da aba atual usando um modelo Whisper local. Nada é enviado para a nuvem."
+  }
+}

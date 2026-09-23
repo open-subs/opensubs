@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Live ondertiteling voor elke video - Lokale Whisper-AI - OpenSubs"
+  },
+  "description": {
+    "message": "Genereert live ondertiteling voor de video of audio in je huidige tab met een lokaal Whisper-model. Niets wordt geüpload."
+  }
+}

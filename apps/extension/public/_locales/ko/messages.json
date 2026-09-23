@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "모든 동영상 실시간 자막 생성 - 로컬 Whisper AI, 업로드 없음 - OpenSubs"
+  },
+  "description": {
+    "message": "현재 탭에서 재생 중인 동영상·오디오에 로컬 Whisper 모델로 실시간 자막을 생성합니다. 아무것도 업로드되지 않습니다."
+  }
+}

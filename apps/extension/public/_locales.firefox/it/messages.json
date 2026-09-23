@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Sottotitoli in diretta, IA locale - OpenSubs"
+  },
+  "description": {
+    "message": "Genera sottotitoli in diretta per il video o l'audio della scheda attiva con un modello Whisper locale. Nulla viene caricato online."
+  }
+}
