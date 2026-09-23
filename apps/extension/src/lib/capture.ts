@@ -278,8 +278,15 @@ export async function recordWindows(
 
   const live = new Set<() => void>();
   // The first window is short, so something is on screen long before a full
-  // pass of audio has played (APP-148). Everything after it is full length.
+  // pass of audio has played (APP-148). The full-length window still starts
+  // at the same moment, rather than after it: a short window is a worse read
+  // of the same audio -- Whisper writes debris over a few seconds of music
+  // where it would have transcribed the sentence that followed -- and if the
+  // next window began where the short one ended, whatever the short one
+  // missed would be missed for good. Measured on Firefox before that: 90% of
+  // the speech covered, against 100% with the windows as they were.
   let length = Math.min(FIRST_WINDOW_S, seconds);
+  let first = length < seconds;
   // Windows in a row that came back with no audio in them. One is a recorder
   // that opened while the video was paused; a run of them means no sound is
   // reaching the extension at all, and saying nothing about that leaves the
@@ -319,8 +326,14 @@ export async function recordWindows(
           if (running()) await onWindow(w);
         })
         .catch((e) => { failure ??= e; });
+      if (first) {
+        // Straight on to the full-length window, which therefore covers the
+        // same audio the short one does and everything after it.
+        first = false;
+        length = seconds;
+        continue;
+      }
       await until(Math.max(1, length - OVERLAP_S) * 1000, () => !running() || ended || failure !== null);
-      length = seconds;
     }
     for (const stop of [...live]) stop();
     await delivered;
