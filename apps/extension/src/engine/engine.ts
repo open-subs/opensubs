@@ -184,6 +184,9 @@ export function createEngine(emit: Emit): Engine {
 
   const say = (status: Status) => emit({ kind: "status", status });
 
+  /** What `asr.ts` says about a clip with nothing in it to read. */
+  const EMPTY_WINDOW = /no audio track|no length/i;
+
   async function run(message: Extract<ToEngine, { kind: "transcribe" }>) {
     const { audio, mime, offset, settings, take } = message;
     const auto = settings.language === "auto";
@@ -245,7 +248,18 @@ export function createEngine(emit: Emit): Engine {
       }
       emit({ kind: "segments", cues, offset, take });
     } catch (e) {
-      emit({ kind: "failed", message: e instanceof Error ? e.message : String(e) });
+      const why = e instanceof Error ? e.message : String(e);
+      // One window that holds no audio is not a broken session. A recorder
+      // started while the video was paused or already over returns a
+      // container with nothing in it, and rejecting that ended the whole
+      // capture with "That video has no audio track to transcribe." over a
+      // video that was playing perfectly well. The window is skipped and the
+      // next one is read.
+      if (EMPTY_WINDOW.test(why)) {
+        emit({ kind: "segments", cues: [], offset, take });
+        return;
+      }
+      emit({ kind: "failed", message: why });
     }
   }
 

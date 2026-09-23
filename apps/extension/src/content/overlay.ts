@@ -226,7 +226,7 @@ async function begin(next: Settings): Promise<BeginAnswer> {
   }
   if ("stream" in opened) {
     void adopt({ el, stream: opened.stream }, false);
-    return { found: true, duration: el.duration || 0 };
+    return { found: true, duration: el.duration || 0, url: location.href };
   }
   // Unreadable, and about to end: an ad. Answer now, wait it out, and move
   // to what plays next -- or say why not, if nothing readable does.
@@ -240,7 +240,10 @@ async function begin(next: Settings): Promise<BeginAnswer> {
     });
     halt();
   })();
-  return { found: true, duration: 0, waiting: "Waiting for the ad to finish -- its audio cannot be read" };
+  return {
+    found: true, duration: 0, url: location.href,
+    waiting: "Waiting for the ad to finish -- its audio cannot be read",
+  };
 }
 
 /**
@@ -350,7 +353,13 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
         respond({ found: false, reason: e instanceof Error ? e.message : String(e) } satisfies BeginAnswer));
       return true;
     case "halt": halt(); break;
-    case "cues": cues = message.cues; paint(); break;
+    case "cues":
+      cues = message.cues;
+      // Lines from before this Start are already behind the picture; showing
+      // them again would replay the last few minutes over a live video.
+      if (message.seen && cues.length) catchup = { index: cues.length - 1, until: 0 };
+      paint();
+      break;
     case "settings":
       settings = message.settings;
       if (settings.overlay) ensureOverlay();
@@ -373,6 +382,11 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
 });
 
 // A page that navigates away (an SPA route change, a next episode) leaves a
-// recorder pointed at a detached element. Stop rather than record silence.
-window.addEventListener("pagehide", halt);
+// recorder pointed at a detached element. Stop rather than record silence --
+// and say that the page is going, so the subtitles kept for it after a Stop
+// go with it instead of being offered for the next page (APP-146).
+window.addEventListener("pagehide", () => {
+  halt();
+  void tell<FromPage>({ kind: "gone" });
+});
 }

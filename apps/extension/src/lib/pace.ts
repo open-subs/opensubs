@@ -177,3 +177,36 @@ export function pickModel(chosen: string, device: "webgpu" | "wasm", behind: boo
   if (chosen !== "auto") return chosen;
   return device === "wasm" || behind ? AUTO_FAST : AUTO_GOOD;
 }
+
+/**
+ * The first window of a capture is short.
+ *
+ * Every window has to be recorded before it can be read, so the first
+ * subtitle cannot arrive until a whole pass of audio has played -- twenty
+ * seconds on the default setting, during which the extension has nothing to
+ * show and looks broken. It is most obvious on a second Start, where the
+ * model is already in memory and the wait is purely this (APP-148). Six
+ * seconds is enough for a sentence or two, and Whisper pads a short clip to
+ * its own thirty either way, so the only cost is one extra pass at the top
+ * of each video.
+ */
+export const FIRST_WINDOW_S = 6;
+
+/**
+ * The sizes the subtitle can be set to, smallest first.
+ *
+ * They were 0.8 / 1 / 1.3 / 1.7 and the whole set read too large: the
+ * smallest still covered the picture in a normal YouTube window, and nobody
+ * reached for the largest (APP-147). Each step is now one notch down from
+ * where it was, and the extra-large step is gone.
+ */
+export const SIZES = [0.6, 0.8, 1] as const;
+
+/** The offered size nearest `scale` -- what a setting saved before the sizes moved becomes. */
+export function nearestSize(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return DEFAULT_SIZE;
+  return SIZES.reduce((best, s) => (Math.abs(s - scale) < Math.abs(best - scale) ? s : best), SIZES[0]);
+}
+
+/** Medium: a little smaller than the picture's own captions, and legible on a phone. */
+export const DEFAULT_SIZE = SIZES[1];

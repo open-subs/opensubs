@@ -9,6 +9,7 @@
 
 import { ASR_MODELS } from "../../../web/src/lib/asr";
 import { api, DEFAULT_SETTINGS, tell, type Settings, type Status } from "../lib/protocol";
+import { nearestSize } from "../lib/pace";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -90,7 +91,10 @@ function showSettings(s: Settings) {
   windowEl.value = String(s.window);
   overlayEl.checked = s.overlay;
   backendEl.value = s.backend ?? DEFAULT_SETTINGS.backend;
-  sizeEl.value = String(s.fontScale ?? DEFAULT_SETTINGS.fontScale);
+  // The sizes moved down a notch and the largest went (APP-147), so a size
+  // saved by an older build may name one that is no longer offered. Without
+  // this the select shows nothing and the next change sends the default.
+  sizeEl.value = String(nearestSize(s.fontScale ?? DEFAULT_SETTINGS.fontScale));
   syncNotes();
 }
 
@@ -136,8 +140,16 @@ function setRunning(on: boolean) {
   for (const el of [modelEl, languageEl, windowEl, backendEl]) el.disabled = on;
 }
 
+/** The tab the popup is a remote for. */
+async function activeTab(): Promise<number | undefined> {
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+  return tab?.id;
+}
+
 async function refresh() {
-  const state = (await tell({ kind: "state" })) as
+  // With the tab, because subtitles kept after Stop belong to the page they
+  // were made from: another tab's are not this popup's to offer (APP-146).
+  const state = (await tell({ kind: "state", tabId: await activeTab() })) as
     | { running: boolean; status: Status; count: number; settings: Settings }
     | undefined;
   if (!state) return;
@@ -171,7 +183,7 @@ goEl.addEventListener("click", async () => {
 });
 
 saveEl.addEventListener("click", async () => {
-  const got = (await tell({ kind: "cues" })) as { srt: string; count: number } | undefined;
+  const got = (await tell({ kind: "cues", tabId: await activeTab() })) as { srt: string; count: number } | undefined;
   if (!got?.count) return;
   const url = URL.createObjectURL(new Blob([got.srt], { type: "text/plain" }));
   await api.downloads.download({ url, filename: "subtitles.srt", saveAs: true });

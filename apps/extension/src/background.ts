@@ -30,6 +30,7 @@ import {
   type ToEngine,
   type ToPage,
 } from "./lib/protocol";
+import { FIRST_WINDOW_S } from "./lib/pace";
 import { stitch, toSrt, toVtt } from "./lib/seam";
 import type { Engine } from "./engine/engine";
 
@@ -50,9 +51,37 @@ interface Session {
   status: Status;
   /** The page's current take; lines from an earlier one are dropped. */
   take: number;
+  /** The page's own address, from its answer to "begin". See `kept`. */
+  url?: string;
 }
 
 let session: Session | null = null;
+/**
+ * What the last session transcribed, after it stopped (APP-146).
+ *
+ * Stop used to drop the session, and the subtitles with it: the count went to
+ * zero, Save .srt greyed out, and several minutes of transcription were gone
+ * with no warning -- for someone who only meant to pause, or to change the
+ * model. Stopping ends the recording; it does not throw away what was made.
+ *
+ * They are kept against the page they were made from, so pressing Start again
+ * on that page carries on the same file, and a different page starts a new
+ * one. The page says which page it is, because this extension asks for no
+ * `tabs` permission and so cannot look a tab's address up.
+ */
+let kept: { tabId: number; url?: string; cues: Cue[] } | null = null;
+
+/** The lines held for this tab, if any -- what Save .srt would write. */
+function held(tabId?: number): Cue[] {
+  if (!kept) return [];
+  return tabId === undefined || kept.tabId === tabId ? kept.cues : [];
+}
+
+/** How Stop reads once there is something to save. */
+function stoppedNote(lines: number): string {
+  if (!lines) return "Stopped";
+  return `Stopped. ${lines} line${lines === 1 ? "" : "s"} kept -- save them, or press Start to carry on.`;
+}
 /**
  * What went wrong last, kept after the session it ended. A Start that fails
  * clears the session, and the popup asks for state when it opens -- without
@@ -223,16 +252,32 @@ async function start(tabId: number, next: Settings) {
     return;
   }
   session.take = 1;
-  setStatus({ stage: "listening", fraction: null, note: answer.waiting ?? "Listening" });
+  session.url = answer.url;
+  // Start again on the page the kept lines came from and it is one file,
+  // carried on where it left off; on any other page it is a new one (APP-146).
+  const carried = kept && kept.tabId === tabId && kept.url === answer.url ? kept.cues : [];
+  kept = null;
+  if (carried.length) {
+    session.cues = carried;
+    await page(tabId, { kind: "cues", cues: carried, seen: true });
+  }
+  setStatus({
+    stage: "listening",
+    fraction: null,
+    // Recording has to happen before there is anything to read, and on a
+    // second Start that wait is all there is to see (APP-148).
+    note: answer.waiting ?? `Listening -- recording the first ${FIRST_WINDOW_S} seconds`,
+  });
 }
 
 async function stop(tabId: number) {
   if (session?.tabId === tabId) {
     await page(tabId, { kind: "halt" });
+    kept = session.cues.length ? { tabId, url: session.url, cues: session.cues } : null;
     session = null;
     holdAwake(false);
   }
-  setStatus({ stage: "idle", fraction: null, note: "Stopped" });
+  setStatus({ stage: "idle", fraction: null, note: stoppedNote(held(tabId).length) });
 }
 
 async function storedSettings(): Promise<Settings> {
@@ -271,21 +316,22 @@ api.runtime.onMessage.addListener(
           return respond({ ok: true });
         }
 
-        case "state":
+        case "state": {
+          const lines = session?.cues ?? held(tabId);
           return respond({
             running: !!session,
             tabId: session?.tabId ?? null,
-            status: session?.status ?? lastError ?? { stage: "idle", fraction: null, note: "" },
-            count: session?.cues.length ?? 0,
+            status: session?.status ?? lastError ?? { stage: "idle", fraction: null, note: stoppedNote(lines.length) },
+            count: lines.length,
             settings: session?.settings ?? (await storedSettings()),
           });
+        }
 
-        case "cues":
-          return respond({
-            srt: toSrt(session?.cues ?? []),
-            vtt: toVtt(session?.cues ?? []),
-            count: session?.cues.length ?? 0,
-          });
+        // Save .srt, which is offered after Stop as well as during a session.
+        case "cues": {
+          const lines = session?.cues ?? held(tabId);
+          return respond({ srt: toSrt(lines), vtt: toVtt(lines), count: lines.length });
+        }
 
         // From the page: one recorded window, on its way to the engine.
         case "window":
@@ -347,6 +393,11 @@ api.runtime.onMessage.addListener(
         case "ended":
           return respond({ ok: true });
 
+        // The page has gone: the lines were that page's, so they go too.
+        case "gone":
+          if (kept?.tabId === tabId) kept = null;
+          return respond({ ok: true });
+
         // From the engine, on Chromium, where it is a separate document.
         case "segments":
         case "failed":
@@ -369,4 +420,5 @@ api.runtime.onMessage.addListener(
 
 api.tabs.onRemoved.addListener((tabId) => {
   if (session?.tabId === tabId) { session = null; holdAwake(false); }
+  if (kept?.tabId === tabId) kept = null;
 });
