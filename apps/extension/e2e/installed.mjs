@@ -386,13 +386,17 @@ try {
     // first one seen may already be gone: ask whichever one answers.
     let running = null;
     let worker = null;
-    for (let i = 0; i < 20 && running === null; i += 1) {
-      worker = context.serviceWorkers().at(-1)
-        ?? (await context.waitForEvent("serviceworker", { timeout: 20000 }));
+    const until = Date.now() + 60000;
+    while (running === null && Date.now() < until) {
+      worker = context.serviceWorkers().at(-1) ?? null;
+      if (!worker) {
+        await context.waitForEvent("serviceworker", { timeout: 5000 }).catch(() => null);
+        continue;
+      }
       running = await worker.evaluate(() => chrome.runtime.getManifest().version).catch(() => null);
       if (running === null) await new Promise((r) => setTimeout(r, 500));
     }
-    if (running === null) throw new Error("no service worker would answer");
+    if (running === null) throw new Error("no service worker would answer in a minute");
     extensionBase = `chrome-extension://${new URL(worker.url()).host}`;
     // The worker must be running *this* package. A reused profile keeps the
     // extension's service worker between launches, and with an unchanged
