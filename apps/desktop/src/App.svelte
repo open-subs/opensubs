@@ -355,7 +355,13 @@
       ffmpegCheckError = null;
       ffmpeg = await checkFfmpeg();
       if (!ffmpegOk) {
-        installError = "Installed, but ffmpeg still can't burn subtitles -- see the log above.";
+        // The install itself worked; this app cannot see it. On Windows,
+        // winget without administrator rights writes the new folder to the
+        // user's PATH in the registry, and a program keeps the PATH it
+        // started with -- so a restart is the honest answer (APP-120).
+        installError = ffmpeg?.found
+          ? "Installed, but that ffmpeg still cannot do the whole job. The log above says what it did."
+          : "Installed. Close OpenSubs and open it again to use it -- a program only sees a new install once it starts afresh.";
       }
     } catch (e) {
       installError = String(e);
@@ -418,14 +424,20 @@
           </p>
         {/if}
 
-        {#if installingFfmpeg}
-          <p class="oa-caption">Installing ffmpeg (<code>{ffmpeg?.install?.command}</code>)&hellip; this can take several minutes.</p>
+        {#if installingFfmpeg || installLog.length > 0}
+          {#if installingFfmpeg}
+            <p class="oa-caption">Installing ffmpeg (<code>{ffmpeg?.install?.command}</code>)&hellip; this can take several minutes.</p>
+          {/if}
           {#if installLog.length > 0}
             <div class="install-log oa-mono">
               {#each installLog as line}<div>{line}</div>{/each}
             </div>
           {/if}
-        {:else}
+          {#if installError}
+            <p class="error-text">{installError}</p>
+          {/if}
+        {/if}
+        {#if !installingFfmpeg}
           {#if ffmpeg?.install}
             <div class="banner-actions">
               <button type="button" class="btn btn-secondary btn-sm" onclick={doInstallFfmpeg}>
@@ -435,7 +447,7 @@
               <span class="oa-caption">or run <code>{ffmpeg.install.command}</code> yourself</span>
             </div>
           {/if}
-          {#if installError}
+          {#if installError && installLog.length === 0}
             <p class="error-text">{installError}</p>
           {/if}
         {/if}

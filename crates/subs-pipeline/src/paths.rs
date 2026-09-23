@@ -39,7 +39,134 @@ pub(crate) fn windows_dirs() -> Vec<PathBuf> {
     ]
     .into_iter()
     .flatten()
+    .chain(winget_package_bins())
+    .chain(registry_path_dirs())
     .collect()
+}
+
+/// Where winget unpacks a portable package when it cannot make links.
+///
+/// On an account without administrator rights and without developer mode,
+/// winget creates no `Links` shortcut at all: it unpacks into
+/// `%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_<source>\
+/// ffmpeg-<version>-full_build\bin` and adds that to the user's `PATH` in
+/// the registry. An app that had already started -- the one that pressed the
+/// install button -- has neither, and reported that it still could not burn
+/// (APP-120, retested). Both are searched now.
+fn winget_package_bins() -> Vec<PathBuf> {
+    let Some(local) = std::env::var_os("LOCALAPPDATA") else {
+        return Vec::new();
+    };
+    let packages = PathBuf::from(local)
+        .join("Microsoft")
+        .join("WinGet")
+        .join("Packages");
+    let Ok(entries) = std::fs::read_dir(&packages) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for package in entries.flatten() {
+        if !package
+            .file_name()
+            .to_string_lossy()
+            .starts_with("Gyan.FFmpeg")
+        {
+            continue;
+        }
+        // One build directory inside, named for the version.
+        if let Ok(inner) = std::fs::read_dir(package.path()) {
+            for build in inner.flatten() {
+                found.push(build.path().join("bin"));
+            }
+        }
+    }
+    found
+}
+
+/// The `PATH` as the registry has it now, which is where an installer writes
+/// it -- not the copy this process was started with. Windows only: `reg.exe`
+/// is not there to run anywhere else.
+fn registry_path_dirs() -> Vec<PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    const KEYS: [&str; 2] = [
+        "HKCU\\Environment",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+    ];
+    let mut dirs = Vec::new();
+    for key in KEYS {
+        let Ok(out) = std::process::Command::new("reg")
+            .args(["query", key, "/v", "Path"])
+            .output()
+        else {
+            continue;
+        };
+        let text = String::from_utf8_lossy(&out.stdout);
+        dirs.extend(
+            parse_reg_path(&text)
+                .into_iter()
+                .map(|d| PathBuf::from(expand_env(&d, |n| std::env::var(n).ok()))),
+        );
+    }
+    dirs
+}
+
+/// The directories in a `reg query ... /v Path` listing.
+///
+/// The line is `    Path    REG_EXPAND_SZ    C:\dir;C:\other`, with the value
+/// after the third run of whitespace and semicolons between entries.
+pub(crate) fn parse_reg_path(output: &str) -> Vec<String> {
+    for line in output.lines() {
+        let mut parts = line.split_whitespace();
+        if parts.next() != Some("Path") {
+            continue;
+        }
+        let kind = parts.next().unwrap_or("");
+        if !kind.starts_with("REG_") {
+            continue;
+        }
+        // Split off the value itself, which may contain spaces.
+        let value = line.split_once(kind).map(|(_, v)| v.trim()).unwrap_or("");
+        return value
+            .split(';')
+            .map(str::trim)
+            .filter(|d| !d.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+    Vec::new()
+}
+
+/// `%LOCALAPPDATA%\...` with the variables filled in. An unknown variable is
+/// left as it is, which simply fails to resolve as a directory.
+pub(crate) fn expand_env(text: &str, get: impl Fn(&str) -> Option<String>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('%') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        match after.find('%') {
+            Some(end) => {
+                let name = &after[..end];
+                match get(name) {
+                    Some(value) => out.push_str(&value),
+                    None => {
+                        out.push('%');
+                        out.push_str(name);
+                        out.push('%');
+                    }
+                }
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push('%');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// First existing `<dir>/<name>` among `dirs`. A pure filesystem check, no
@@ -101,6 +228,59 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    /// APP-120, retested: on an account without administrator rights winget
+    /// makes no Links shortcut. It unpacks the package and puts that bin
+    /// directory on the user's PATH in the registry, which the already
+    /// running app does not have.
+    #[test]
+    fn the_registry_path_is_read_as_a_list_of_directories() {
+        let out = "\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ                %USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps;            C:\\Users\\ycan4\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\r\n\r\n";
+        let dirs = parse_reg_path(out);
+        assert_eq!(dirs.len(), 2, "{dirs:?}");
+        assert!(
+            dirs[1].ends_with("ffmpeg-9.0.2-full_build\\bin"),
+            "{dirs:?}"
+        );
+    }
+
+    #[test]
+    fn a_directory_with_a_space_in_it_survives() {
+        let out = "    Path    REG_SZ    C:\\Program Files\\WinGet\\Links;C:\\other\r\n";
+        assert_eq!(
+            parse_reg_path(out),
+            vec![
+                "C:\\Program Files\\WinGet\\Links".to_string(),
+                "C:\\other".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn no_path_value_is_no_directories() {
+        assert!(parse_reg_path(
+            "HKEY_CURRENT_USER\\Environment\r\n    TEMP    REG_SZ    C:\\t\r\n"
+        )
+        .is_empty());
+        assert!(parse_reg_path("").is_empty());
+    }
+
+    #[test]
+    fn variables_in_a_registry_path_are_filled_in() {
+        let get = |name: &str| match name {
+            "USERPROFILE" => Some("C:\\Users\\ycan4".to_string()),
+            _ => None,
+        };
+        assert_eq!(
+            expand_env("%USERPROFILE%\\bin", get),
+            "C:\\Users\\ycan4\\bin"
+        );
+        // An unknown one is left alone rather than swallowed: it then simply
+        // does not exist as a directory.
+        assert_eq!(expand_env("%NOPE%\\bin", get), "%NOPE%\\bin");
+        assert_eq!(expand_env("C:\\plain", get), "C:\\plain");
+        assert_eq!(expand_env("100%", get), "100%");
     }
 
     #[test]
