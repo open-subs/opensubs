@@ -69,6 +69,9 @@ const backendFlag = args.includes("--backend") ? flag("--backend", "auto") : nul
 // for a machine that only just keeps up -- APP-110's Iris Xe, which one
 // run kept up and the next dropped windows. 1 is no throttle.
 const throttle = Number(flag("--throttle", "1"));
+// Measure how long this page's own thread is unavailable while the engine
+// works: a toolbar popup shares that thread (APP-140).
+const probePopup = args.includes("--probe-popup");
 const shotsDir = args.includes("--shots") ? resolve(flag("--shots", ".")) : null;
 const warmOnly = args.includes("--warm");
 const speechUntil = args.includes("--speech-until") ? Number(flag("--speech-until", "0")) : null;
@@ -384,10 +387,13 @@ try {
   const duration = await page.evaluate(() => document.querySelector("video").duration);
 
   // The popup's own page, opened as a tab: it has the same `chrome.*` the
-  // popup does, and it is where status broadcasts land.
+  // popup does, it is where status broadcasts land, and -- with --probe-popup
+  // -- it is how responsive that page is while the engine works. A toolbar
+  // popup opens in this same renderer; when it is blocked, the popup does not
+  // appear at all (APP-140), which automation cannot click but can measure.
   const control = await context.newPage();
   await control.goto(`${extensionBase}/popup.html`);
-  await control.evaluate(() => {
+  await control.evaluate((probePopup) => {
     window.__statuses = [];
     window.__windows = [];
     window.__segments = [];
@@ -395,13 +401,22 @@ try {
     // is not addressed to it -- which is what lets this see each window the
     // page sends and each batch of lines the engine returns, without any
     // hook in the product.
+    if (probePopup) {
+      window.__beats = [];
+      let last = performance.now();
+      setInterval(() => {
+        const now = performance.now();
+        window.__beats.push(now - last);
+        last = now;
+      }, 100);
+    }
     chrome.runtime.onMessage.addListener((m) => {
       if (!m) return;
       if (m.kind === "status") window.__statuses.push({ t: Date.now(), note: m.status.note, stage: m.status.stage, device: m.status.device });
       if (m.kind === "window") window.__windows.push({ t: Date.now(), offset: m.offset, bytes: typeof m.audio === "string" ? Math.round(m.audio.length * 0.75) : JSON.stringify(m.audio).length, mime: m.mime });
       if (m.kind === "segments") window.__segments.push({ t: Date.now(), offset: m.offset, cues: m.cues });
     });
-  });
+  }, probePopup);
   // Access to the page, asked for the way the popup asks, and asked for
   // first: without it Firefox cannot match the tab lookup below by URL, the
   // lookup comes back empty, and Start goes out with no tab -- whereupon the
@@ -487,9 +502,23 @@ try {
   const deadline = startedAt + (warmOnly ? 1200 : duration * 4 + 120) * 1000;
   let lastCount = 0;
   let lastChange = Date.now();
+  // Photographs while it plays, without touching the scrubber: the overlay
+  // is in a closed shadow root, so what is on the video can only be seen
+  // (APP-139). The post-run shots below seek deliberately; these do not.
+  const liveShots = new Set();
   for (;;) {
     const state = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }));
     if (state.count !== lastCount) { lastCount = state.count; lastChange = Date.now(); }
+    if (shotsDir) {
+      const into = Math.round((Date.now() - startedAt) / 1000);
+      for (const when of [45, 70, 95]) {
+        if (into >= when && into < when + 3 && !liveShots.has(when)) {
+          liveShots.add(when);
+          mkdirSync(shotsDir, { recursive: true });
+          await page.screenshot({ path: join(shotsDir, `${browserName}-playing-${when}s.png`) }).catch(() => {});
+        }
+      }
+    }
     const catchingUp = /catching up|behind/.test(state.status.note ?? "");
     if (state.count > 0 && firstCueAt === null) {
       firstCueAt = (Date.now() - startedAt) / 1000;
@@ -599,6 +628,14 @@ try {
   console.log(`\n${count} subtitle lines, covering ${(coverage * 100).toFixed(0)}% of the ${speechSeconds.length}s with speech in them  (device ${device})`);
   console.log(`silences: ${silences.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}s`).join(", ") || "none"}   lines starting before the previous ended: ${early}   unreadably brief lines: ${flashes}`);
   console.log(`language detection passes: ${detections}   windows skipped: ${skipped}`);
+  if (probePopup) {
+    const beats = await control.evaluate(() => window.__beats ?? []);
+    const stalls = beats.filter((b) => b > 500).sort((a, b) => b - a);
+    console.log(
+      `popup page: longest stall ${Math.round(Math.max(0, ...beats))}ms, ` +
+        `${stalls.length} over 500ms (a toolbar popup has to paint in this thread)`,
+    );
+  }
   console.log(`gaps of 5s or more: ${gaps.length ? gaps.join(", ") : "none"}`);
   console.log(`first subtitle: ${firstCueAt === null ? "never" : firstCueAt.toFixed(1) + "s after Start"}`);
   writeFileSync(join(work, "out.srt"), srt);

@@ -10,7 +10,7 @@
 
 import { api, blobToWire, tell, type BeginAnswer, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
 import { findMedia, openAudio, playingMedia, recordWindows, waitForPlaying, whyNoMedia } from "../lib/capture";
-import { cueAt } from "../lib/seam";
+import { BEHIND_S, liveLine, type Catchup } from "../lib/pace";
 
 const HOST_ID = "opensubs-overlay-host";
 
@@ -71,12 +71,36 @@ function removeOverlay() {
   note = null;
 }
 
+/**
+ * Which line is on the video, and how far behind it is.
+ *
+ * Reset by a new capture, and by a switch: the lines are another video's.
+ */
+let catchup: Catchup = { index: -1, until: 0 };
+/** Whether the note under the line is ours to clear. See `paint`. */
+let sayingBehind = false;
+
 function paint() {
   if (!line || !media) return;
-  const cue = cueAt(cues, media.currentTime);
-  const text = cue ? cue.text : "";
+  const shown = liveLine(cues, media.currentTime, Date.now(), catchup);
+  // Transcribing a live video always trails it, so the line for this exact
+  // moment is usually not made yet. Show the newest one instead, and say how
+  // far back it is, rather than showing nothing at all (APP-139).
+  const text = shown ? cues[shown.index].text : "";
+  if (shown) catchup = { index: shown.index, until: shown.until };
   if (line.textContent !== text) line.textContent = text;
   line.style.fontSize = `calc((1.6vw + 12px) * ${settings?.fontScale ?? 1})`;
+
+  if (note) {
+    const behind = shown && shown.lag > BEHIND_S ? `${Math.round(shown.lag)}s behind` : "";
+    if (behind) {
+      note.textContent = behind;
+      sayingBehind = true;
+    } else if (sayingBehind) {
+      note.textContent = "";
+      sayingBehind = false;
+    }
+  }
 }
 
 /**
@@ -153,6 +177,7 @@ async function adopt(found: { el: HTMLMediaElement; stream: MediaStream }, annou
   stream = found.stream;
   take += 1;
   cues = [];
+  catchup = { index: -1, until: 0 };
   paint();
   if (announce) await tell<FromPage>({ kind: "switched", take, duration: found.el.duration || 0 });
   void record();
@@ -171,6 +196,7 @@ async function begin(next: Settings): Promise<BeginAnswer> {
   if ("reason" in opened && !endsSoon(el)) return { found: false, reason: opened.reason };
 
   running = true;
+  catchup = { index: -1, until: 0 };
   if (settings.overlay) {
     ensureOverlay();
     ticker = window.setInterval(paint, 120);
