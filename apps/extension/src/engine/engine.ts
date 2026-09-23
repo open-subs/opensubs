@@ -23,10 +23,10 @@
  * can: a direct call on Firefox, a message hop on Chromium.
  */
 
-import { transcribeLocally, asrSupport, type AsrSupport } from "../../../web/src/lib/asr";
+import { transcribeLocally, asrSupport, loadLocalModel, type AsrSupport } from "../../../web/src/lib/asr";
 import { isSignOff } from "../../../web/src/lib/cleanup";
 import { isChinese, toSimplified, wantsTraditional } from "../../../web/src/lib/script";
-import { behindNote, enqueue, maxWaiting, startsOnCpu } from "../lib/pace";
+import { AUTO_BEHIND, AUTO_FAST, behindNote, enqueue, maxWaiting, pickModel, startsOnCpu } from "../lib/pace";
 import { fromWire, type Cue, type FromEngine, type Settings, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
 
 export type Emit = (message: FromEngine) => void;
@@ -127,6 +127,13 @@ export function createEngine(emit: Emit): Engine {
    * cutting holes in the subtitles.
    */
   let running = false;
+  /**
+   * This capture has fallen behind, so "Automatic" stops trying to carry
+   * Base. Sticky for the capture: a machine that fell behind once will
+   * again, and swapping models back and forth would reload the model each
+   * time (APP-142).
+   */
+  let behind = false;
   const waiting: Extract<ToEngine, { kind: "transcribe" }>[] = [];
   let dropped = 0;
   /**
@@ -172,6 +179,8 @@ export function createEngine(emit: Emit): Engine {
    * what the screen said.
    */
   let loaded: string | null = null;
+  /** The automatic choice already announced, so it is said once. */
+  let said: string | null = null;
 
   const say = (status: Status) => emit({ kind: "status", status });
 
@@ -180,9 +189,19 @@ export function createEngine(emit: Emit): Engine {
     const auto = settings.language === "auto";
     try {
       device = await chooseDevice(settings.backend);
+      const model = pickModel(settings.model, device, behind);
+      if (settings.model === "auto" && model === AUTO_FAST && said !== model) {
+        said = model;
+        say({
+          stage: "model",
+          fraction: null,
+          note: "Using the Tiny model, which keeps up on this machine",
+          device,
+        });
+      }
       const result = await transcribeLocally({
         file: asFile(audio, mime),
-        model: settings.model,
+        model,
         device,
         // The CPU model runs in ONNX Runtime's worker, never on this
         // document's own thread. Single-threaded inference there blocks
@@ -199,7 +218,7 @@ export function createEngine(emit: Emit): Engine {
         // must be allowed to come back with nothing in it.
         allowEmpty: true,
         onProgress: (p) => {
-          if (p.stage === "model" && loaded === `${settings.model}|${device}`) return;
+          if (p.stage === "model" && loaded === `${model}|${device}`) return;
           say({
             stage: p.stage === "model" ? "model" : "transcribing",
             fraction: p.fraction,
@@ -208,7 +227,7 @@ export function createEngine(emit: Emit): Engine {
           });
         },
       });
-      loaded = `${settings.model}|${device}`;
+      loaded = `${model}|${device}`;
       // Back onto the page's timeline. `transcribeLocally` reports seconds
       // from the start of what it was given, and what it was given began
       // at `offset` in the video.
@@ -227,6 +246,38 @@ export function createEngine(emit: Emit): Engine {
       emit({ kind: "segments", cues, offset, take });
     } catch (e) {
       emit({ kind: "failed", message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  /**
+   * Start loading the model for the settings this session will use.
+   *
+   * The backend is asked for first, because which weights are fetched
+   * depends on it. Failures are not reported here: the first window will
+   * try again and report properly, and a Start that cannot load has nothing
+   * to say until then.
+   */
+  async function warm(model: string, backend: Settings["backend"]) {
+    try {
+      device = await chooseDevice(backend);
+      const wanted = pickModel(model, device, behind);
+      if (model === "auto" && wanted === AUTO_FAST && said !== wanted) {
+        said = wanted;
+        say({ stage: "model", fraction: null, note: "Using the Tiny model, which keeps up on this machine", device });
+      }
+      await loadLocalModel({
+        model: wanted,
+        device,
+        wasmProxy: true,
+        onProgress: (p) => {
+          if (loaded === `${model}|${device}`) return;
+          say({ stage: p.stage === "model" ? "model" : "transcribing", fraction: p.fraction, note: p.note, device });
+        },
+      });
+      loaded = `${wanted}|${device}`;
+    } catch {
+      // Left to the first window, which reports failures where the user is
+      // already watching for them.
     }
   }
 
@@ -260,6 +311,7 @@ export function createEngine(emit: Emit): Engine {
             device,
           });
         } else if (running) {
+          if (waiting.length >= AUTO_BEHIND) behind = true;
           say({ stage: "transcribing", fraction: null, note: behindNote(waiting.length, message.settings.model), device });
         }
         void pump();
@@ -271,8 +323,16 @@ export function createEngine(emit: Emit): Engine {
         // over, the second video would open "(5 windows skipped)".
         heard = null;
         dropped = 0;
+        behind = false;
+        said = null;
         waiting.length = 0;
         say({ stage: "model", fraction: null, note: "Loading the speech model", device });
+        // And fetch it now, rather than when the first window arrives: the
+        // page records for twenty seconds before there is any audio to read,
+        // and nothing used that time. The first subtitle was a whole window
+        // later than it had to be, and the screen said only "Listening"
+        // meanwhile (APP-143). `run` waits on the same promise.
+        void warm(message.model, message.backend);
       }
     },
   };

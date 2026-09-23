@@ -1085,55 +1085,28 @@ function quietestNear(audio: Float32Array, centre: number, radius: number): numb
   return quietest + Math.round(frame / 2);
 }
 
-export async function transcribeLocally(options: AsrOptions): Promise<AsrResult> {
-  const { file, model, start, end, language, onProgress, signal, allowEmpty } = options;
-
-  const support = await asrSupport();
-  if (!support.ok) throw new Error(support.reason ?? "Transcription is not supported here.");
-  const device: "webgpu" | "wasm" = options.device === "wasm" ? "wasm" : support.device;
-
-  onProgress?.({ stage: "audio", fraction: 0, note: "Reading the audio" });
-  const audio = await extractAudio(
-    file,
-    start,
-    end,
-    (fraction) =>
-      onProgress?.({ stage: "audio", fraction, note: "Reading the audio" }),
-    signal,
-  );
-
-  // Ask whether anyone is speaking before asking what they said.
-  //
-  // Before the model, not after: a clip with nobody in it needs no
-  // transcription at all, so this saves the whole wait rather than
-  // throwing away its result. Costs a couple of seconds on a two-minute
-  // clip, against a minute or more of Whisper.
-  //
-  // `allowEmpty` callers -- one window of a live capture -- skip it. A
-  // ten-second window of silence between two sentences is ordinary and
-  // has its own handling; this test is about a whole clip.
-  if (!allowEmpty) {
-    onProgress?.({ stage: "audio", fraction: null, note: "Listening for a voice" });
-    try {
-      const heard = await speechSeconds(audio, (fraction) =>
-        onProgress?.({ stage: "audio", fraction, note: "Listening for a voice" }),
-      );
-      if (!hasSpeech(heard)) {
-        return {
-          transcript: { language: language ?? "auto", duration: 0, words: [], segments: [] },
-          audio,
-          audioOffset: 0,
-          noSpeech: true,
-        };
-      }
-    } catch (e) {
-      // A VAD that cannot load must not stop a transcription. The worst
-      // case without it is the bug this was written for, which is a
-      // great deal better than refusing to caption anything.
-      console.warn("voice detection unavailable, transcribing anyway:", e);
-    }
-  }
-
+/**
+ * Load the model, or hand back the one already loaded.
+ *
+ * Split out so a caller can start the download before it has any audio.
+ * The extension presses Start and records for twenty seconds before the
+ * first window exists; until this, nothing was fetched in that time and the
+ * first subtitle was a whole window later than it needed to be (APP-143).
+ * The promise is the same one `transcribeLocally` waits on, so calling both
+ * loads once.
+ */
+export async function loadLocalModel(options: {
+  model: string;
+  device: "webgpu" | "wasm";
+  wasmProxy?: boolean;
+  onProgress?: (progress: AsrProgress) => void;
+}): Promise<unknown> {
+  const { model, device, onProgress } = options;
+  // Already loading, or loaded: hand back the same promise and say nothing.
+  // Every window asks for the model, and re-announcing "Loading the speech
+  // model" each time made the status flicker between that and the download's
+  // own progress.
+  if (pipelinePromise && loadedModelId === `${model}|${device}`) return pipelinePromise;
   onProgress?.({ stage: "model", fraction: null, note: "Loading the speech model" });
 
   /** Bytes per weight file, so the download reports as one figure. */
@@ -1234,6 +1207,59 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     },
   });
 
+  return pipelinePromise;
+}
+
+export async function transcribeLocally(options: AsrOptions): Promise<AsrResult> {
+  const { file, model, start, end, language, onProgress, signal, allowEmpty } = options;
+
+  const support = await asrSupport();
+  if (!support.ok) throw new Error(support.reason ?? "Transcription is not supported here.");
+  const device: "webgpu" | "wasm" = options.device === "wasm" ? "wasm" : support.device;
+
+  onProgress?.({ stage: "audio", fraction: 0, note: "Reading the audio" });
+  const audio = await extractAudio(
+    file,
+    start,
+    end,
+    (fraction) =>
+      onProgress?.({ stage: "audio", fraction, note: "Reading the audio" }),
+    signal,
+  );
+
+  // Ask whether anyone is speaking before asking what they said.
+  //
+  // Before the model, not after: a clip with nobody in it needs no
+  // transcription at all, so this saves the whole wait rather than
+  // throwing away its result. Costs a couple of seconds on a two-minute
+  // clip, against a minute or more of Whisper.
+  //
+  // `allowEmpty` callers -- one window of a live capture -- skip it. A
+  // ten-second window of silence between two sentences is ordinary and
+  // has its own handling; this test is about a whole clip.
+  if (!allowEmpty) {
+    onProgress?.({ stage: "audio", fraction: null, note: "Listening for a voice" });
+    try {
+      const heard = await speechSeconds(audio, (fraction) =>
+        onProgress?.({ stage: "audio", fraction, note: "Listening for a voice" }),
+      );
+      if (!hasSpeech(heard)) {
+        return {
+          transcript: { language: language ?? "auto", duration: 0, words: [], segments: [] },
+          audio,
+          audioOffset: 0,
+          noSpeech: true,
+        };
+      }
+    } catch (e) {
+      // A VAD that cannot load must not stop a transcription. The worst
+      // case without it is the bug this was written for, which is a
+      // great deal better than refusing to caption anything.
+      console.warn("voice detection unavailable, transcribing anyway:", e);
+    }
+  }
+
+  await loadLocalModel({ model, device, wasmProxy: options.wasmProxy, onProgress });
   const transcriber = (await pipelinePromise) as ((
     audio: Float32Array,
     options: Record<string, unknown>,

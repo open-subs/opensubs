@@ -31,6 +31,7 @@ export interface Status {
 }
 
 export interface Settings {
+  /** A model id, or "auto": Base where it keeps up, Tiny where it does not. */
   model: string;
   /** A language code, or "auto". */
   language: string;
@@ -47,7 +48,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  model: "onnx-community/whisper-base",
+  model: "auto",
   language: "auto",
   window: 20,
   overlay: true,
@@ -58,6 +59,8 @@ export const DEFAULT_SETTINGS: Settings = {
 /** Sent by the popup; handled by the background. */
 export type Command =
   | { kind: "start"; tabId?: number; settings: Settings }
+  /** Changed while a session runs -- the subtitle size, so far (APP-144). */
+  | { kind: "settings"; tabId?: number; settings: Settings }
   | { kind: "stop"; tabId?: number }
   | { kind: "state"; tabId?: number }
   | { kind: "cues"; tabId?: number };
@@ -109,13 +112,14 @@ export type BeginAnswer =
 /** Sent by the background down to the content script. */
 export type ToPage =
   | { kind: "begin"; settings: Settings }
+  | { kind: "settings"; settings: Settings }
   | { kind: "halt" }
   | { kind: "cues"; cues: Cue[] }
   | { kind: "status"; status: Status };
 
 /** Background <-> engine host. */
 export type ToEngine =
-  | { kind: "warm"; model: string }
+  | { kind: "warm"; model: string; backend: Settings["backend"] }
   | { kind: "transcribe"; audio: WireAudio; mime: string; offset: number; settings: Settings; take?: number }
   | { kind: "release" };
 
