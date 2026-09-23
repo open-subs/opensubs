@@ -145,3 +145,35 @@ export function liveLine(
     : Math.min(Math.max(cue.end - cue.start, MIN_HOLD_S), MAX_HOLD_S);
   return { index: next, until: now + hold * 1000, lag: at - cue.end };
 }
+
+
+/**
+ * The models "Automatic" chooses between.
+ *
+ * Base is the better recogniser and the slower one. On an Intel integrated
+ * GPU it does not keep up: the subtitles fell thirty to seventy seconds
+ * behind the picture and stayed there, which is no use to someone watching
+ * (APP-142). Tiny reads the same window in about a third of the time.
+ *
+ * Multilingual Tiny, not the English-only one: "Automatic" cannot know what
+ * language is coming, and handing an English-only model a French video would
+ * be a worse failure than being slow.
+ */
+export const AUTO_FAST = "onnx-community/whisper-tiny";
+export const AUTO_GOOD = "onnx-community/whisper-base";
+
+/** Windows waiting before "Automatic" gives up on keeping Base. */
+export const AUTO_BEHIND = 2;
+
+/**
+ * Which model to read this window with.
+ *
+ * A model the user chose is theirs, always. "Automatic" starts on Tiny where
+ * the engine is already running on the processor -- the machines that cannot
+ * carry Base -- and drops to Tiny anywhere else that falls behind, because a
+ * backlog only grows.
+ */
+export function pickModel(chosen: string, device: "webgpu" | "wasm", behind: boolean): string {
+  if (chosen !== "auto") return chosen;
+  return device === "wasm" || behind ? AUTO_FAST : AUTO_GOOD;
+}
