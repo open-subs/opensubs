@@ -12,6 +12,8 @@
  * have to work whether the far side is a separate document or the sender.
  */
 
+import { DEFAULT_SIZE } from "./pace.ts";
+
 /** A finished subtitle line on the *media element's* timeline, in seconds. */
 export interface Cue {
   start: number;
@@ -52,7 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "auto",
   window: 20,
   overlay: true,
-  fontScale: 1,
+  fontScale: DEFAULT_SIZE,
   backend: "auto",
 };
 
@@ -94,7 +96,13 @@ export type FromPage =
   | { kind: "switched"; take: number; duration: number }
   /** The video being read ended and nothing else started. Not an error. */
   | { kind: "finished" }
-  | { kind: "ended" };
+  | { kind: "ended" }
+  /**
+   * The page itself is going: navigated away, or closed. The subtitles kept
+   * after Stop belong to the page they were made from, so they go with it
+   * (APP-146).
+   */
+  | { kind: "gone" };
 
 /**
  * The page's answer to "begin", as the reply to that message itself.
@@ -105,8 +113,13 @@ export type FromPage =
  * first and "Listening" overwrote it, for good (APP-133).
  */
 export type BeginAnswer =
-  /** `waiting`: found, but not readable yet -- an ad to be waited out. */
-  | { found: true; duration: number; waiting?: string }
+  /**
+   * `waiting`: found, but not readable yet -- an ad to be waited out.
+   * `url`: the page's own address, which says whether the subtitles kept
+   * from an earlier Start were made from this same page (APP-146). It comes
+   * from the page because the background has no `tabs` permission to ask.
+   */
+  | { found: true; duration: number; waiting?: string; url?: string }
   | { found: false; reason: string };
 
 /** Sent by the background down to the content script. */
@@ -114,7 +127,12 @@ export type ToPage =
   | { kind: "begin"; settings: Settings }
   | { kind: "settings"; settings: Settings }
   | { kind: "halt" }
-  | { kind: "cues"; cues: Cue[] }
+  /**
+   * `seen`: these lines were made before this Start -- they were carried over
+   * from the session that was stopped (APP-146). The overlay keeps them for
+   * the file and for a seek back, and does not replay them over the video.
+   */
+  | { kind: "cues"; cues: Cue[]; seen?: boolean }
   | { kind: "status"; status: Status };
 
 /** Background <-> engine host. */

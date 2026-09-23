@@ -82,6 +82,9 @@ const restart = args.includes("--restart");
 // whether it wakes before or after the new Start decides which way the race
 // in APP-145 falls, so the gap is a dial.
 const restartGap = Number(flag("--restart-gap", "3000"));
+// Pressing Start again with the model already in memory: how long the user
+// may be left with nothing on screen before it counts as broken (APP-148).
+const FIRST_LINE_MAX_S = Number(flag("--first-line", "15"));
 // --size N: change the subtitle size while the video plays, and photograph
 // the video before and after (APP-144).
 const sizeChange = args.includes("--size") ? Number(flag("--size", "1.7")) : null;
@@ -411,8 +414,10 @@ try {
 
   }
 
+  console.log(`${at()}  browser up, extension at ${extensionBase.slice(0, 40)}`);
   const page = await context.newPage();
   await page.goto(`${origin}/`);
+  console.log(`${at()}  the page with the video is open`);
   // Metadata, not data: Firefox 156 fetches nothing past the metadata until
   // playback starts, and waiting for data before pressing play waited for
   // ever. The duration is all that is needed here.
@@ -424,6 +429,7 @@ try {
   // -- it is how responsive that page is while the engine works. A toolbar
   // popup opens in this same renderer; when it is blocked, the popup does not
   // appear at all (APP-140), which automation cannot click but can measure.
+  console.log(`${at()}  the video is ready (${duration.toFixed(1)}s)`);
   const control = await context.newPage();
   // Retried: the extension is briefly unreachable while its worker restarts
   // (see the reload above), and the first navigation is refused.
@@ -504,6 +510,7 @@ try {
     throw new Error(`no tab found for ${origin} -- Start would go to the wrong page`);
   }
 
+  console.log(`${at()}  the extension's own page is open, tab ${tabId}`);
   // What a person does: the video is playing, then they press Start.
   await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 0; return v.play(); });
   const startedAt = Date.now();
@@ -548,13 +555,24 @@ try {
   let restarted = false;
   let sizeChanged = false;
   let afterRestart = null;
+  let afterStop = null;
   // Photographs while it plays, without touching the scrubber: the overlay
   // is in a closed shadow root, so what is on the video can only be seen
   // (APP-139). The post-run shots below seek deliberately; these do not.
   const liveShots = new Set();
   for (;;) {
     const state = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }));
-    if (state.count !== lastCount) { lastCount = state.count; lastChange = Date.now(); }
+    if (state.count !== lastCount) {
+      lastCount = state.count;
+      lastChange = Date.now();
+      // The wait a user sits through after pressing Start a second time: the
+      // model is already loaded, so what is being waited for is a window of
+      // audio to record (APP-148).
+      if (afterRestart && afterRestart.first === null && state.count > 0) {
+        afterRestart.first = (Date.now() - afterRestart.at) / 1000;
+        console.log(`${at()}  first subtitle after the second Start, ${afterRestart.first.toFixed(1)}s later`);
+      }
+    }
     if (shotsDir) {
       const into = Math.round((Date.now() - startedAt) / 1000);
       for (const when of [45, 70, 95]) {
@@ -593,6 +611,19 @@ try {
       const stoppedAt = await page.evaluate(() => document.querySelector("video").currentTime);
       await control.evaluate((id) => chrome.runtime.sendMessage({ kind: "stop", tabId: id }), tabId);
       console.log(`${at()}  Stop pressed with ${before} lines`);
+      // What a user does next: reach for Save .srt. The popup enables that
+      // button from the count the background reports, and saves what the
+      // "cues" message hands back -- so both are asked, as the popup asks
+      // them (APP-146).
+      afterStop = await control.evaluate((id) => Promise.all([
+        chrome.runtime.sendMessage({ kind: "state", tabId: id }),
+        chrome.runtime.sendMessage({ kind: "cues", tabId: id }),
+      ]).then(([s, c]) => ({ before: s.count, lines: c.count, srt: c.srt.length, note: s.status?.note ?? "" })), tabId);
+      afterStop.before = before;
+      console.log(
+        `${at()}  after Stop: the popup would read ${afterStop.lines} line(s), Save .srt ` +
+          `${afterStop.lines ? "enabled" : "greyed out"}, srt ${afterStop.srt} bytes -- "${afterStop.note}"`,
+      );
       await new Promise((r) => setTimeout(r, restartGap));
       const answer = await control.evaluate(
         (m) => chrome.runtime.sendMessage(m),
@@ -605,7 +636,7 @@ try {
       // Start is supposed to do. Lines before it are the first session's
       // queued windows finishing, which arrive either way (APP-145 reported
       // them as "5 residual lines").
-      afterRestart = { at: Date.now(), through: stoppedAt };
+      afterRestart = { at: Date.now(), through: stoppedAt, first: null, count: state.count };
       console.log(`${at()}  the video was at ${stoppedAt.toFixed(1)}s when Stop was pressed`);
     }
     const ended = await page.evaluate(() => document.querySelector("video").ended);
@@ -746,9 +777,22 @@ try {
   const fails = [];
   if (!present) fails.push(`no content script in the page (${receiver}; no overlay either)`);
   if (restart && !afterRestart) fails.push("never reached three lines, so Stop and Start were not exercised");
+  // Stopping is not discarding. The subtitles made before Stop are what the
+  // user waited for, and Save .srt is disabled when the count is zero.
+  if (afterStop && afterStop.lines === 0) {
+    fails.push(`the ${afterStop.before} lines made before Stop were lost when Stop was pressed, and Save .srt was greyed out`);
+  }
+  if (afterStop && afterStop.lines > 0 && afterStop.srt === 0) fails.push("lines were kept after Stop but the .srt came back empty");
+  if (afterRestart && afterRestart.first !== null && afterRestart.first > FIRST_LINE_MAX_S) {
+    fails.push(`${afterRestart.first.toFixed(0)}s of nothing after the second Start, over the ${FIRST_LINE_MAX_S}s a restart is allowed`);
+  }
   if (restart && afterRestart && afterRestartMade < 3) {
     fails.push(`only ${afterRestartMade} lines after pressing Start again without reloading`);
   }
+  // Zero windows with a video that played is not "no speech in it": it is
+  // capture that never delivered anything, which the run above would
+  // otherwise report only as an absence of subtitles.
+  if (!warmOnly && windows.length === 0) fails.push("the page sent no audio at all, though the video played");
   if (firstCueAt === null) fails.push("no subtitle ever arrived");
   else if (firstCueAt > 60) fails.push(`first subtitle took ${firstCueAt.toFixed(0)}s, over the 60s the task allows`);
   if (skipped > maxSkipped) fails.push(`${skipped} window(s) skipped to keep up`);

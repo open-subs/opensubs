@@ -22,6 +22,10 @@
  * without CORS headers taints the element so `captureStream` throws.
  */
 
+// With the extension, because the unit tests run this file in node, which
+// resolves no extension for it.
+import { FIRST_WINDOW_S } from "./pace.ts";
+
 /**
  * Each window begins this long before the previous one ends.
  *
@@ -186,6 +190,18 @@ export function bestContainer(): string {
  */
 /** A window shorter than this holds no speech worth sending. */
 export const MIN_WINDOW_MS = 1000;
+/**
+ * Nor does one this small, whatever its clock says.
+ *
+ * A recorder opened on a track that is not carrying audio -- the video is
+ * paused, or ended while the page was not looking -- runs its full length
+ * and returns the container header alone, about a hundred bytes. A second
+ * of real Opus is ten thousand. The engine could only report that as "that
+ * video has no audio track", about a video that was playing.
+ */
+export const MIN_WINDOW_BYTES = 2000;
+/** Empty windows in a row before the silence is reported rather than waited out. */
+export const SILENT_WINDOWS = 3;
 
 export function recordWindow(
   track: MediaStreamTrack,
@@ -214,7 +230,8 @@ export function recordWindow(
       // it, and the engine rejected it as "The clip has no length." and ended
       // the session over nothing (APP-133). There is nothing in it to read.
       const long = performance.now() - began >= MIN_WINDOW_MS;
-      resolve(parts.length && long ? { blob: new Blob(parts, { type: mime || parts[0].type }), offset } : null);
+      const blob = parts.length ? new Blob(parts, { type: mime || parts[0].type }) : null;
+      resolve(blob && long && blob.size >= MIN_WINDOW_BYTES ? { blob, offset } : null);
     };
     rec.onstop = finish;
     rec.onerror = finish;
@@ -232,9 +249,11 @@ export function recordWindow(
 /**
  * Record window after window, each overlapping the last, until stopped.
  *
- * A new window starts every `seconds - OVERLAP_S`, while the previous one is
- * still recording, so there are briefly two MediaRecorders on the track --
- * which is allowed, and each still produces a self-contained file.
+ * A new window starts `OVERLAP_S` before the one before it ends, while that
+ * one is still recording, so there are briefly two MediaRecorders on the
+ * track -- which is allowed, and each still produces a self-contained file.
+ * The first window is FIRST_WINDOW_S long rather than `seconds`, so the
+ * first subtitle does not wait out a whole pass (APP-148).
  *
  * `onWindow` is called in order and never twice at once, so a slow consumer
  * cannot be handed two windows together. It must not be used to throttle
@@ -257,8 +276,15 @@ export async function recordWindows(
   const track = stream.getAudioTracks()[0];
   if (!track) throw new Error("That video has no audio track this extension can read.");
 
-  const step = Math.max(1, seconds - OVERLAP_S);
   const live = new Set<() => void>();
+  // The first window is short, so something is on screen long before a full
+  // pass of audio has played (APP-148). Everything after it is full length.
+  let length = Math.min(FIRST_WINDOW_S, seconds);
+  // Windows in a row that came back with no audio in them. One is a recorder
+  // that opened while the video was paused; a run of them means no sound is
+  // reaching the extension at all, and saying nothing about that leaves the
+  // session sitting on "Listening" for as long as the film lasts.
+  let silent = 0;
   let delivered: Promise<void> = Promise.resolve();
   let ended = media.ended;
   // The first window that could not be delivered. Deliveries are chained, and
@@ -272,7 +298,7 @@ export async function recordWindows(
 
   try {
     while (running() && !ended && failure === null) {
-      const current = recordWindow(track, seconds, () => media.currentTime);
+      const current = recordWindow(track, length, () => media.currentTime);
       live.add(current.stop);
       const got = current.done.finally(() => live.delete(current.stop));
       // In order, one at a time, and not at all once Stop has been pressed.
@@ -280,10 +306,21 @@ export async function recordWindows(
         .then(async () => {
           if (failure !== null) return;
           const w = await got;
-          if (w && running()) await onWindow(w);
+          if (!w) {
+            silent += 1;
+            if (silent >= SILENT_WINDOWS) {
+              throw new Error(
+                "No sound is reaching the extension from this video. Check that it is not muted, and press Start again.",
+              );
+            }
+            return;
+          }
+          silent = 0;
+          if (running()) await onWindow(w);
         })
         .catch((e) => { failure ??= e; });
-      await until(step * 1000, () => !running() || ended || failure !== null);
+      await until(Math.max(1, length - OVERLAP_S) * 1000, () => !running() || ended || failure !== null);
+      length = seconds;
     }
     for (const stop of [...live]) stop();
     await delivered;

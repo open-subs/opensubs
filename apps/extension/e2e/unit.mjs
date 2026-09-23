@@ -350,6 +350,46 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("two windows waiting is the point of giving up on Base", AUTO_BEHIND === 2);
 }
 
+// --- the subtitle sizes (APP-147) ----------------------------------------
+{
+  const { SIZES, DEFAULT_SIZE, nearestSize } = await import("../src/lib/pace.ts");
+  const { DEFAULT_SETTINGS } = await import("../src/lib/protocol.ts");
+  eq("three sizes, smallest first", [...SIZES], [0.6, 0.8, 1]);
+  ok("the smallest is smaller than the old smallest, which still covered the picture", SIZES[0] < 0.8);
+  ok("the middle one is what a fresh install gets", DEFAULT_SIZE === SIZES[1] && DEFAULT_SETTINGS.fontScale === SIZES[1]);
+  ok("every step is a visible one", SIZES.every((s, i) => i === 0 || s / SIZES[i - 1] >= 1.2));
+  // A size saved by rc.13, where the sizes went up to 1.7 and the select had
+  // an option for each: it has to land on one of the three now offered, or
+  // the popup shows an empty box.
+  ok("extra large becomes the largest there is", nearestSize(1.7) === 1);
+  ok("the old large becomes the largest too", nearestSize(1.3) === 1);
+  ok("the old medium is the new large", nearestSize(1) === 1);
+  ok("the old small is the new medium", nearestSize(0.8) === 0.8);
+  ok("a size that is already offered is left alone", nearestSize(0.6) === 0.6);
+  ok("nonsense falls back to the default", nearestSize(0) === DEFAULT_SIZE && nearestSize(NaN) === DEFAULT_SIZE);
+}
+
+// --- the first window is short (APP-148) ---------------------------------
+{
+  const { FIRST_WINDOW_S } = await import("../src/lib/pace.ts");
+  const { MIN_WINDOW_BYTES, MIN_WINDOW_MS } = await import("../src/lib/capture.ts");
+  // A recorder opened on a track carrying no audio returns the container
+  // header alone -- 111 bytes, measured, on a run where the video had ended
+  // before Start. A second of real Opus is nearer ten thousand.
+  ok("a container with nothing in it is not sent", MIN_WINDOW_BYTES > 111);
+  ok("and a second of real audio still is", MIN_WINDOW_BYTES < 10000);
+  ok("the length guard is still there too", MIN_WINDOW_MS === 1000);
+  const { SILENT_WINDOWS } = await import("../src/lib/capture.ts");
+  // Long enough that one recorder opening on a paused video is waited out,
+  // short enough that a muted video is reported inside a minute.
+  ok("a run of empty windows is reported rather than waited out", SILENT_WINDOWS >= 2 && SILENT_WINDOWS <= 4);
+  const { OVERLAP_S } = await import("../src/lib/seam.ts");
+  const { DEFAULT_SETTINGS } = await import("../src/lib/protocol.ts");
+  ok("the first pass is shorter than a normal one", FIRST_WINDOW_S < DEFAULT_SETTINGS.window);
+  ok("and long enough to hold a sentence", FIRST_WINDOW_S >= 5);
+  ok("it still leaves room for the overlap the seams need", FIRST_WINDOW_S > OVERLAP_S);
+}
+
 // --- the store listings, one per language --------------------------------
 {
   const { readdirSync, readFileSync, existsSync } = await import("node:fs");
