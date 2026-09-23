@@ -104,7 +104,7 @@ async function startEngine(): Promise<void> {
   }
   if (local) return;
   const { createEngine } = await import("./engine/engine");
-  local = createEngine((message) => void fromEngine(message), { inBackgroundPage: true });
+  local = createEngine((message) => void fromEngine(message));
 }
 
 function toEngine(message: ToEngine) {
