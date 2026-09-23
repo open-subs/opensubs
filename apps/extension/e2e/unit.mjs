@@ -337,6 +337,19 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("the threshold between the two is five seconds", BEHIND_S === 5);
 }
 
+// --- which model "Automatic" reads with (APP-142) -------------------------
+{
+  const { pickModel, AUTO_FAST, AUTO_GOOD, AUTO_BEHIND } = await import("../src/lib/pace.ts");
+  ok("on the GPU, Automatic reads with Base", pickModel("auto", "webgpu", false) === AUTO_GOOD);
+  ok("on the processor it starts on Tiny -- the machines that cannot carry Base",
+    pickModel("auto", "wasm", false) === AUTO_FAST);
+  ok("a GPU that falls behind drops to Tiny too", pickModel("auto", "webgpu", true) === AUTO_FAST);
+  ok("Tiny here is the multilingual one, not the English-only build", AUTO_FAST === "onnx-community/whisper-tiny");
+  ok("a model the user chose is left alone, however slow",
+    pickModel("onnx-community/whisper-small", "wasm", true) === "onnx-community/whisper-small");
+  ok("two windows waiting is the point of giving up on Base", AUTO_BEHIND === 2);
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
