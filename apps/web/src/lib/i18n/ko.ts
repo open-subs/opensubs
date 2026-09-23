@@ -6,6 +6,7 @@ const ko: Record<string, string> = {
   "Export": "내보내기",
   "Style": "스타일",
   "Model": "모델",
+  "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "이 컴퓨터는 내장 그래픽({gpu})을 사용하며, 이 작업에는 느립니다. 같은 종류의 기기에서 2분짜리 영상에 Base는 약 4분, Small은 약 9분이 걸렸습니다. 그래서 여기서는 Base를 선택합니다. 더 빠르게 하려면 위에서 본인의 API 키를 사용해 더 큰 모델을 다른 곳에서 실행하세요.",
   "Runs on": "실행 위치",
   "Graphics card (GPU)": "그래픽 카드 (GPU)",
   "Processor (CPU)": "프로세서 (CPU)",

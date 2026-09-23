@@ -6,6 +6,7 @@ const ja: Record<string, string> = {
   "Export": "書き出し",
   "Style": "スタイル",
   "Model": "モデル",
+  "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.": "このパソコンは内蔵グラフィックス（{gpu}）で、この処理には時間がかかります。同種の環境では、2 分の動画に Base で約 4 分、Small で約 9 分かかりました。そのためここでは Base を選んでいます。もっと速く終わらせたい場合は、上の自分の API キーを使い、別の場所でより大きなモデルを動かしてください。",
   "Runs on": "実行場所",
   "Graphics card (GPU)": "グラフィックス (GPU)",
   "Processor (CPU)": "プロセッサー (CPU)",
