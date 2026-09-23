@@ -74,6 +74,17 @@ const throttle = Number(flag("--throttle", "1"));
 const probePopup = args.includes("--probe-popup");
 const shotsDir = args.includes("--shots") ? resolve(flag("--shots", ".")) : null;
 const warmOnly = args.includes("--warm");
+// --restart: Stop once lines are arriving, then Start again without
+// reloading the page, and judge the run on what comes after that (APP-145).
+const restart = args.includes("--restart");
+// How long to wait between Stop and the second Start. The old loop is
+// waiting on a recorder when Stop is pressed and wakes a moment later:
+// whether it wakes before or after the new Start decides which way the race
+// in APP-145 falls, so the gap is a dial.
+const restartGap = Number(flag("--restart-gap", "3000"));
+// --size N: change the subtitle size while the video plays, and photograph
+// the video before and after (APP-144).
+const sizeChange = args.includes("--size") ? Number(flag("--size", "1.7")) : null;
 const speechUntil = args.includes("--speech-until") ? Number(flag("--speech-until", "0")) : null;
 
 if (!existsSync(video)) {
@@ -343,6 +354,15 @@ if (browserName === "firefox") {
   });
   extensionBase = `moz-extension://${uuid}`;
 } else {
+  // The worker's *code*, not the manifest, is what a reused profile keeps.
+  // Chrome caches the background script per profile, and getManifest()
+  // reports the installed manifest either way -- so a run could test the
+  // previous build's background while every check said it was current.
+  // Dropping the script cache forces this package's code to be read;
+  // CacheStorage, which holds the downloaded model, is left alone.
+  if (profileDir) {
+    rmSync(join(resolve(profileDir), "Default", "Service Worker", "ScriptCache"), { recursive: true, force: true });
+  }
   context = await chromium.launchPersistentContext(profileDir ? resolve(profileDir) : join(work, "profile"), {
     // Full Chromium, not Playwright's default headless shell: the shell cannot
     // load extensions at all, and the symptom is a wait for a service worker
@@ -362,8 +382,17 @@ if (browserName === "firefox") {
 let exitCode = 0;
 try {
   if (browserName !== "firefox") {
-    const worker =
-      context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker", { timeout: 20000 }));
+    // Dropping the script cache makes Chrome start a fresh worker, so the
+    // first one seen may already be gone: ask whichever one answers.
+    let running = null;
+    let worker = null;
+    for (let i = 0; i < 20 && running === null; i += 1) {
+      worker = context.serviceWorkers().at(-1)
+        ?? (await context.waitForEvent("serviceworker", { timeout: 20000 }));
+      running = await worker.evaluate(() => chrome.runtime.getManifest().version).catch(() => null);
+      if (running === null) await new Promise((r) => setTimeout(r, 500));
+    }
+    if (running === null) throw new Error("no service worker would answer");
     extensionBase = `chrome-extension://${new URL(worker.url()).host}`;
     // The worker must be running *this* package. A reused profile keeps the
     // extension's service worker between launches, and with an unchanged
@@ -372,10 +401,10 @@ try {
     // load fresh each time, so this test once ran stale seam logic for three
     // rounds while everything else was current. The test copy's version is
     // unique per run, and the worker is asked which version it is.
-    const running = await worker.evaluate(() => chrome.runtime.getManifest().version);
     if (running !== manifest.version) {
       throw new Error(`the extension's worker is running ${running}, not this package (${manifest.version})`);
     }
+
   }
 
   const page = await context.newPage();
@@ -392,7 +421,17 @@ try {
   // popup opens in this same renderer; when it is blocked, the popup does not
   // appear at all (APP-140), which automation cannot click but can measure.
   const control = await context.newPage();
-  await control.goto(`${extensionBase}/popup.html`);
+  // Retried: the extension is briefly unreachable while its worker restarts
+  // (see the reload above), and the first navigation is refused.
+  for (let i = 0; ; i += 1) {
+    try {
+      await control.goto(`${extensionBase}/popup.html`);
+      break;
+    } catch (e) {
+      if (i >= 10) throw e;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
   await control.evaluate((probePopup) => {
     window.__statuses = [];
     window.__windows = [];
@@ -412,8 +451,8 @@ try {
     }
     chrome.runtime.onMessage.addListener((m) => {
       if (!m) return;
-      if (m.kind === "status") window.__statuses.push({ t: Date.now(), note: m.status.note, stage: m.status.stage, device: m.status.device });
-      if (m.kind === "window") window.__windows.push({ t: Date.now(), offset: m.offset, bytes: typeof m.audio === "string" ? Math.round(m.audio.length * 0.75) : JSON.stringify(m.audio).length, mime: m.mime });
+      if (m.kind === "status") window.__statuses.push({ t: Date.now(), note: m.status.note, stage: m.status.stage, device: m.status.device, fraction: m.status.fraction });
+      if (m.kind === "window") window.__windows.push({ t: Date.now(), take: m.take, offset: m.offset, bytes: typeof m.audio === "string" ? Math.round(m.audio.length * 0.75) : JSON.stringify(m.audio).length, mime: m.mime });
       if (m.kind === "segments") window.__segments.push({ t: Date.now(), offset: m.offset, cues: m.cues });
     });
   }, probePopup);
@@ -502,6 +541,9 @@ try {
   const deadline = startedAt + (warmOnly ? 1200 : duration * 4 + 120) * 1000;
   let lastCount = 0;
   let lastChange = Date.now();
+  let restarted = false;
+  let sizeChanged = false;
+  let afterRestart = null;
   // Photographs while it plays, without touching the scrubber: the overlay
   // is in a closed shadow root, so what is on the video can only be seen
   // (APP-139). The post-run shots below seek deliberately; these do not.
@@ -524,14 +566,60 @@ try {
       firstCueAt = (Date.now() - startedAt) / 1000;
       console.log(`${at()}  first subtitle, ${firstCueAt.toFixed(1)}s after Start`);
     }
+    if (sizeChange && !sizeChanged && state.count >= 2 && shotsDir) {
+      sizeChanged = true;
+      mkdirSync(shotsDir, { recursive: true });
+      await page.screenshot({ path: join(shotsDir, `${browserName}-size-before.png`) }).catch(() => {});
+      await control.evaluate(
+        (m) => chrome.runtime.sendMessage(m),
+        { kind: "settings", settings: { model, language, window: windowS, overlay: true, fontScale: sizeChange, ...(backendFlag ? { backend: backendFlag } : {}) } },
+      );
+      const applied = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }).then((r) => r.settings?.fontScale));
+      console.log(`${at()}  subtitle size set to ${sizeChange} while playing; the session now reads ${applied}`);
+      await new Promise((r) => setTimeout(r, 1500));
+      await page.screenshot({ path: join(shotsDir, `${browserName}-size-after.png`) }).catch(() => {});
+    }
     if (warmOnly && state.count > 0) break;
+    if (restart && !restarted && state.count >= 3) {
+      restarted = true;
+      const before = state.count;
+      // Where the video itself had got to. The first session recorded
+      // nothing past this, queued or not, so a line for later audio can only
+      // come from the second Start.
+      const stoppedAt = await page.evaluate(() => document.querySelector("video").currentTime);
+      await control.evaluate((id) => chrome.runtime.sendMessage({ kind: "stop", tabId: id }), tabId);
+      console.log(`${at()}  Stop pressed with ${before} lines`);
+      await new Promise((r) => setTimeout(r, restartGap));
+      const answer = await control.evaluate(
+        (m) => chrome.runtime.sendMessage(m),
+        { kind: "start", tabId, settings: { model, language, window: windowS, overlay: true, fontScale: 1, ...(backendFlag ? { backend: backendFlag } : {}) } },
+      );
+      console.log(`${at()}  Start again, without reloading -> ${JSON.stringify(answer)}`);
+      // Everything from here is the second session's.
+      // Where the first session got to. Lines for audio past that point can
+      // only come from windows recorded after the restart -- what the second
+      // Start is supposed to do. Lines before it are the first session's
+      // queued windows finishing, which arrive either way (APP-145 reported
+      // them as "5 residual lines").
+      afterRestart = { at: Date.now(), through: stoppedAt };
+      console.log(`${at()}  the video was at ${stoppedAt.toFixed(1)}s when Stop was pressed`);
+    }
     const ended = await page.evaluate(() => document.querySelector("video").ended);
     // Broadcasts as well as the session's state: when Start fails the
     // background says why and then drops the session, so by the next poll
     // the state is blank and only the broadcast still knows what happened.
     const heard = await control.evaluate((n) => window.__statuses.slice(n), seen);
     for (const h of heard) {
-      if (h.stage === "error") console.log(`${at()}  [error, broadcast] ${h.note}`);
+      if (h.stage === "error") { console.log(`${at()}  [error, broadcast] ${h.note}`); continue; }
+      // Every change of status, with the time: what the user is told, and
+      // when. APP-143 is entirely about this timeline.
+      const shown = h.fraction === null || h.fraction === undefined
+        ? h.note
+        : `${h.note} ${Math.floor(h.fraction * 10) * 10}%`;
+      if (shown && shown !== lastNote) {
+        lastNote = shown;
+        console.log(`${at()}  [${h.stage}${h.device ? " " + h.device : ""}] ${shown}`);
+      }
     }
     seen += heard.length;
     if (heard.some((h) => h.stage === "error") && !state.running) break;
@@ -569,7 +657,7 @@ try {
   }
   const videoAt = (t) => ((t - startedAt) / 1000).toFixed(1);
   console.log("\nwindows the page sent:");
-  for (const w of windows) console.log(`  at +${videoAt(w.t)}s  offset ${w.offset.toFixed(1)}s  ${w.bytes} bytes  ${w.mime}`);
+  for (const w of windows) console.log(`  at +${videoAt(w.t)}s  take ${w.take}  offset ${w.offset.toFixed(1)}s  ${w.bytes} bytes  ${w.mime}`);
   console.log("what the engine returned:");
   for (const b of batches) {
     const span = b.cues.length ? `${b.cues[0].start.toFixed(1)}-${b.cues[b.cues.length - 1].end.toFixed(1)}s` : "nothing";
@@ -628,6 +716,15 @@ try {
   console.log(`\n${count} subtitle lines, covering ${(coverage * 100).toFixed(0)}% of the ${speechSeconds.length}s with speech in them  (device ${device})`);
   console.log(`silences: ${silences.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}s`).join(", ") || "none"}   lines starting before the previous ended: ${early}   unreadably brief lines: ${flashes}`);
   console.log(`language detection passes: ${detections}   windows skipped: ${skipped}`);
+  const afterRestartMade = restart && afterRestart
+    ? cues.filter((c) => c.start > afterRestart.through + 1).length
+    : 0;
+  if (restart) {
+    console.log(
+      `after the second Start: ${afterRestartMade} line${afterRestartMade === 1 ? "" : "s"} for audio past ` +
+        `${(afterRestart?.through ?? 0).toFixed(1)}s, the moment Stop was pressed -- only the second session recorded that`,
+    );
+  }
   if (probePopup) {
     const beats = await control.evaluate(() => window.__beats ?? []);
     const stalls = beats.filter((b) => b > 500).sort((a, b) => b - a);
@@ -644,10 +741,19 @@ try {
 
   const fails = [];
   if (!present) fails.push(`no content script in the page (${receiver}; no overlay either)`);
+  if (restart && !afterRestart) fails.push("never reached three lines, so Stop and Start were not exercised");
+  if (restart && afterRestart && afterRestartMade < 3) {
+    fails.push(`only ${afterRestartMade} lines after pressing Start again without reloading`);
+  }
   if (firstCueAt === null) fails.push("no subtitle ever arrived");
   else if (firstCueAt > 60) fails.push(`first subtitle took ${firstCueAt.toFixed(0)}s, over the 60s the task allows`);
   if (skipped > maxSkipped) fails.push(`${skipped} window(s) skipped to keep up`);
-  if (coverage < minCoverage) fails.push(`coverage ${(coverage * 100).toFixed(0)}% of speech, under ${(minCoverage * 100).toFixed(0)}%`);
+  // A --restart run stops on purpose and loses the seconds between Stop and
+  // the second Start, so full coverage is not what it is asking about: the
+  // question there is whether the second session reads anything at all.
+  if (!restart && coverage < minCoverage) {
+    fails.push(`coverage ${(coverage * 100).toFixed(0)}% of speech, under ${(minCoverage * 100).toFixed(0)}%`);
+  }
   if (early > 0) fails.push(`${early} line(s) start before the previous one ends -- a window on the wrong clock`);
   if (flashes > 0) fails.push(`${flashes} line(s) of several words on screen for under half a second`);
   if (fails.length) {
