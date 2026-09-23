@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Live-Untertitel, lokale Whisper-KI - OpenSubs"
+  },
+  "description": {
+    "message": "Erstellt Live-Untertitel für Video oder Audio im aktuellen Tab mit einem lokalen Whisper-Modell. Nichts wird hochgeladen."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Sous-titres en direct pour toute vidéo - IA Whisper locale - OpenSubs"
+  },
+  "description": {
+    "message": "Sous-titres en direct pour la vidéo ou l'audio de l'onglet actif, via un modèle Whisper local. Rien n'est envoyé en ligne."
+  }
+}

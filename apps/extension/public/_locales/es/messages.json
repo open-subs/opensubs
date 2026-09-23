@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Subtítulos en directo para cualquier vídeo - Whisper local - OpenSubs"
+  },
+  "description": {
+    "message": "Genera subtítulos en directo para el vídeo o audio de la pestaña actual con un modelo Whisper local. No se sube nada."
+  }
+}

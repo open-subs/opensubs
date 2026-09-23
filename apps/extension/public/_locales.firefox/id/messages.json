@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "Subtitle langsung, AI Whisper lokal - OpenSubs"
+  },
+  "description": {
+    "message": "Membuat subtitle langsung untuk video atau audio yang diputar di tab aktif memakai model Whisper lokal. Tidak ada yang diunggah."
+  }
+}
