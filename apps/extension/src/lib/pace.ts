@@ -71,3 +71,77 @@ export function behindNote(waiting: number, model: string): string {
 export function startsOnCpu(s: Support): boolean {
   return Boolean(s.integrated || s.cpuFirst);
 }
+
+/**
+ * How far the subtitles may trail the picture before the overlay stops
+ * looking for the line that belongs to this moment.
+ *
+ * Live transcription is always behind: a twenty-second window is only
+ * complete when it has played, and reading it takes seconds more. So the
+ * line for 0:40 is ready when the film is at 1:20, and an overlay that asks
+ * "what belongs at 1:20?" is handed nothing, for ever -- the subtitles were
+ * there, in the exported file, and never on the video (APP-139).
+ *
+ * Five seconds separates that from an ordinary pause in speech, where there
+ * genuinely is no line and the overlay should stay empty.
+ */
+export const BEHIND_S = 5;
+
+/** How long one line stays up while catching up, in seconds. */
+const MIN_HOLD_S = 1.2;
+const MAX_HOLD_S = 5;
+/** Lines still unseen past this, and each is held for the minimum. */
+const BACKLOG_HURRY = 6;
+
+/** Which line the overlay is showing while it catches up. */
+export interface Catchup {
+  /** Index into the cues, or -1 before anything has been shown. */
+  index: number;
+  /** Show it at least until this moment (ms, from the same clock as `now`). */
+  until: number;
+}
+
+export interface Shown {
+  index: number;
+  until: number;
+  /** Seconds between this line's end and where the video is now. */
+  lag: number;
+}
+
+/**
+ * The line to put on the video: the one that belongs to this moment if there
+ * is one, otherwise the next one the viewer has not seen yet.
+ *
+ * Returning null means show nothing -- no lines at all, or a real silence.
+ * Lines are held long enough to read and no longer, and a backlog is gone
+ * through faster, so the overlay walks up to the newest rather than sitting
+ * on the oldest.
+ */
+export function liveLine(
+  cues: { start: number; end: number }[],
+  at: number,
+  now: number,
+  state: Catchup,
+): Shown | null {
+  if (!cues.length) return null;
+
+  for (let i = cues.length - 1; i >= 0; i -= 1) {
+    if (cues[i].start <= at && at < cues[i].end) return { index: i, until: now, lag: 0 };
+    if (cues[i].end <= at) break;
+  }
+
+  const last = cues.length - 1;
+  const lag = at - cues[last].end;
+  if (lag <= BEHIND_S) return null;
+
+  if (state.index >= 0 && state.index <= last && now < state.until) {
+    return { index: state.index, until: state.until, lag: at - cues[state.index].end };
+  }
+  const next = Math.min(Math.max(state.index + 1, 0), last);
+  const cue = cues[next];
+  const behind = last - next;
+  const hold = behind > BACKLOG_HURRY
+    ? MIN_HOLD_S
+    : Math.min(Math.max(cue.end - cue.start, MIN_HOLD_S), MAX_HOLD_S);
+  return { index: next, until: now + hold * 1000, lag: at - cue.end };
+}

@@ -293,6 +293,50 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("a window under a second is not sent (the ad's last instant)", MIN_WINDOW_MS === 1000);
 }
 
+// --- what goes on the video while transcription trails it (APP-139) ------
+{
+  const { liveLine, BEHIND_S } = await import("../src/lib/pace.ts");
+  // Lines for the first 40 seconds, while the video plays on past them --
+  // the reported shape: 27 lines made, the picture at 1:20, nothing shown.
+  const cues = Array.from({ length: 8 }, (_, i) => ({ start: i * 5, end: i * 5 + 5 }));
+  const fresh = { index: -1, until: 0 };
+
+  ok("nothing yet means nothing on screen", liveLine([], 10, 1000, fresh) === null);
+
+  const behind = liveLine(cues, 80, 1000, fresh);
+  ok("trailing far behind, the first unseen line is shown", behind?.index === 0, JSON.stringify(behind));
+  ok("and it says how far back it is", Math.round(behind.lag) === 75, String(behind?.lag));
+
+  // It is held long enough to read, then the next one goes up.
+  const held = liveLine(cues, 81, 1500, { index: 0, until: 3000 });
+  ok("a line stays up while it is being read", held?.index === 0, JSON.stringify(held));
+  const moved = liveLine(cues, 82, 3001, { index: 0, until: 3000 });
+  ok("then the next one takes its place", moved?.index === 1, JSON.stringify(moved));
+
+  // With only a few unseen, each line is held for its own length, so they
+  // read at the pace they were spoken.
+  ok("a line is held for about as long as it was spoken", moved.until - 3001 === 5000, String(moved.until - 3001));
+
+  // A long backlog is gone through faster, so the overlay reaches the newest
+  // instead of sitting minutes behind it.
+  const many = Array.from({ length: 30 }, (_, i) => ({ start: i * 5, end: i * 5 + 5 }));
+  const hurried = liveLine(many, 200, 3001, { index: 0, until: 3000 });
+  ok("a long backlog holds each line briefly", hurried.until - 3001 <= 1200, String(hurried.until - 3001));
+
+  // At the newest line it stays there rather than blanking.
+  const newest = liveLine(cues, 90, 9000, { index: 7, until: 8000 });
+  ok("it rests on the newest line", newest?.index === 7, JSON.stringify(newest));
+
+  // Seeking back to a line's own moment shows that line, as it always did.
+  const exact = liveLine(cues, 12, 9000, { index: 7, until: 99999 });
+  ok("seeking back shows the line for that moment", exact?.index === 2 && exact.lag === 0, JSON.stringify(exact));
+
+  // A real pause in speech is not a backlog: nothing is shown.
+  const quiet = liveLine(cues, 42, 9000, { index: 7, until: 0 });
+  ok("a short silence after the last line shows nothing", quiet === null, JSON.stringify(quiet));
+  ok("the threshold between the two is five seconds", BEHIND_S === 5);
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
