@@ -166,6 +166,28 @@ try {
   ok("what follows joins the same file", both.count === 4, `count ${both.count}`);
   ok("in one timeline, in order", /Gold Rush[\s\S]*gold mining customers/.test(both.srt));
 
+  // --- two readings of one seam, in the installed package (APP-154) -------
+  // thea's own lines, from Firefox 156 on YouTube: the end of one window and
+  // the start of the next are the same words, and the file had them twice.
+  // Handed over the way the engine hands them over, so this is the shipped
+  // background doing the stitching, not the module in isolation.
+  await send({ kind: "clear", tabId });
+  await hand([{ start: 40, end: 44, text: "Nothing is ever what it seems, given a simple command. Don't look" }]);
+  await hand([{ start: 44, end: 47, text: "Don't look back." }]);
+  await hand([{ start: 47, end: 51, text: "back. Just keep walking forward." }]);
+  const seam = await saved();
+  const lines = seam.srt.split(/\n\n+/).map((b) => b.split("\n").slice(2).join(" ")).filter(Boolean);
+  ok("the exported file does not repeat a phrase across the join",
+    (lines.join(" ").toLowerCase().match(/don't look/g) ?? []).length === 1, JSON.stringify(lines));
+  ok("nor a single word across the next one",
+    (lines.join(" ").toLowerCase().match(/\bback\b/g) ?? []).length === 1, JSON.stringify(lines));
+  await send({ kind: "clear", tabId });
+  await hand([
+    { start: 0, end: 3, text: "It's the height of the Gold Rush," },
+    { start: 3, end: 6, text: "1850s, California." },
+    { start: 6, end: 9, text: "A young tailor named Jacob Davis notices" },
+  ]);
+
   // --- another video, same page (APP-153) ---------------------------------
   // What YouTube does when you click the next video: the address changes and
   // the player is swapped, with no navigation. The lines from the video

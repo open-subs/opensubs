@@ -744,12 +744,24 @@ try {
   // sentence it continued.
   const text = srt.split(/\n\n+/).map((b) => b.split("\n").slice(2).join(" "));
   const flashes = cues.filter((c, i) => c.end - c.start < 0.5 && (text[i] ?? "").trim().split(/\s+/).length >= 3).length;
+  // Adjacent lines that repeat each other: the end of one written again as
+  // the start of the next, which is what a window seam produces when the two
+  // readings of the overlap are not settled into one (APP-154).
+  const bare_ = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, "").split(/\s+/).filter(Boolean);
+  const repeats = [];
+  for (let i = 1; i < text.length; i += 1) {
+    const a = bare_(text[i - 1] ?? "");
+    const b = bare_(text[i] ?? "");
+    for (let k = Math.min(a.length, b.length, 12); k >= 2; k -= 1) {
+      if (a.slice(-k).join(" ") === b.slice(0, k).join(" ")) { repeats.push(`${i}: "${a.slice(-k).join(" ")}"`); break; }
+    }
+  }
   const skipped = Math.max(0, ...statuses.map((s) => Number(/\((\d+) windows? skipped/.exec(s.note)?.[1] ?? 0)));
   const detections = statuses.filter((s) => s.note === "Listening for the language").length;
   const device = statuses.find((s) => s.device)?.device ?? "?";
 
   console.log(`\n${count} subtitle lines, covering ${(coverage * 100).toFixed(0)}% of the ${speechSeconds.length}s with speech in them  (device ${device})`);
-  console.log(`silences: ${silences.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}s`).join(", ") || "none"}   lines starting before the previous ended: ${early}   unreadably brief lines: ${flashes}`);
+  console.log(`silences: ${silences.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}s`).join(", ") || "none"}   lines starting before the previous ended: ${early}   unreadably brief lines: ${flashes}   lines repeating the one before: ${repeats.length}`);
   console.log(`language detection passes: ${detections}   windows skipped: ${skipped}`);
   const afterRestartMade = restart && afterRestart
     ? cues.filter((c) => c.start > afterRestart.through + 1).length
@@ -803,6 +815,7 @@ try {
     fails.push(`coverage ${(coverage * 100).toFixed(0)}% of speech, under ${(minCoverage * 100).toFixed(0)}%`);
   }
   if (early > 0) fails.push(`${early} line(s) start before the previous one ends -- a window on the wrong clock`);
+  if (repeats.length) fails.push(`${repeats.length} pair(s) of lines repeat each other at the join: ${repeats.slice(0, 3).join("; ")}`);
   if (flashes > 0) fails.push(`${flashes} line(s) of several words on screen for under half a second`);
   if (fails.length) {
     exitCode = 1;
