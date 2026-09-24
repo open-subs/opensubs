@@ -589,8 +589,7 @@ pub fn to_ass_bilingual_karaoke(
 
         for (start, end, text) in karaoke_events(
             &spoken, style, play_res, font_size, strength, glow, accent, lit_scale,
-        )
-        {
+        ) {
             let body = match effect_on {
                 EffectOn::Top => format!("{text}\\N{quiet}"),
                 EffectOn::Bottom => format!("{quiet}\\N{text}"),
@@ -1739,7 +1738,10 @@ mod tests {
         for doc in &docs {
             let (borders, colours) = overrides(doc);
             assert!(!borders.is_empty(), "no \\bord to check in:\n{doc}");
-            assert!(borders.iter().all(|b| *b > 0.0), "a zero \\bord: {borders:?}");
+            assert!(
+                borders.iter().all(|b| *b > 0.0),
+                "a zero \\bord: {borders:?}"
+            );
             for c in colours.iter().filter(|c| **c != accent.to_ass()) {
                 assert_eq!(*c, s.back_color.to_ass(), "box recoloured in:\n{doc}");
             }
@@ -2032,7 +2034,10 @@ mod tests {
     #[test]
     fn fitted_lines_are_balanced_rather_than_filled() {
         let doc = to_ass(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL);
-        let counts: Vec<usize> = rendered_lines(&doc).iter().map(|l| l.chars().count()).collect();
+        let counts: Vec<usize> = rendered_lines(&doc)
+            .iter()
+            .map(|l| l.chars().count())
+            .collect();
         let (lo, hi) = (counts.iter().min().unwrap(), counts.iter().max().unwrap());
         assert!(hi - lo <= 2, "unbalanced lines: {counts:?}");
     }
@@ -2047,7 +2052,8 @@ mod tests {
     fn english_is_left_for_libass_to_wrap() {
         // It has spaces, and libass already breaks at them measuring the
         // real glyphs -- which is why English was never cut off.
-        let text = "Today we are introducing a free tool that makes subtitles right in your browser";
+        let text =
+            "Today we are introducing a free tool that makes subtitles right in your browser";
         let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), VERTICAL);
         assert_eq!(rendered_lines(&doc), vec![text.to_string()]);
     }
@@ -2061,13 +2067,17 @@ mod tests {
 
     #[test]
     fn no_fitted_line_starts_on_closing_punctuation() {
-        let text = "我们今天，要介绍的是，一个可以在浏览器里，直接生成字幕的，免费工具。真的很好用。";
+        let text =
+            "我们今天，要介绍的是，一个可以在浏览器里，直接生成字幕的，免费工具。真的很好用。";
         for width in [300u32, 330, 360, 390, 420] {
             let doc = to_ass(&[cue(1.0, 4.0, &[text])], &style(), (width, 640));
             let lines = rendered_lines(&doc);
             for line in lines.iter().skip(1) {
                 let first = line.chars().next().unwrap();
-                assert!(!NO_LINE_START.contains(first), "{width}px: a line starts with {first}: {lines:?}");
+                assert!(
+                    !NO_LINE_START.contains(first),
+                    "{width}px: a line starts with {first}: {lines:?}"
+                );
             }
             assert_eq!(lines.concat(), text);
         }
@@ -2089,8 +2099,22 @@ mod tests {
 
     #[test]
     fn karaoke_still_lights_every_character_once_when_fitted() {
-        let wide = to_ass_karaoke(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), (1920, 1080), 0.3, 0.5, ACCENT);
-        let narrow = to_ass_karaoke(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL, 0.3, 0.5, ACCENT);
+        let wide = to_ass_karaoke(
+            &[cue(1.0, 4.0, &[LONG_ZH])],
+            &style(),
+            (1920, 1080),
+            0.3,
+            0.5,
+            ACCENT,
+        );
+        let narrow = to_ass_karaoke(
+            &[cue(1.0, 4.0, &[LONG_ZH])],
+            &style(),
+            VERTICAL,
+            0.3,
+            0.5,
+            ACCENT,
+        );
         assert_eq!(
             dialogue(&wide).len(),
             dialogue(&narrow).len(),
@@ -2099,7 +2123,10 @@ mod tests {
         assert_eq!(dialogue(&narrow).len(), LONG_ZH.chars().count());
         // And every beat breaks the line in the same places, or the text
         // would jump between lines as the highlight moves.
-        let shape: Vec<usize> = dialogue(&narrow).iter().map(|e| e.matches("\\N").count()).collect();
+        let shape: Vec<usize> = dialogue(&narrow)
+            .iter()
+            .map(|e| e.matches("\\N").count())
+            .collect();
         assert!(shape.iter().all(|n| *n == shape[0] && *n >= 1), "{shape:?}");
         assert!(!narrow.contains('\u{E0B0}'));
     }
@@ -2109,7 +2136,13 @@ mod tests {
         // A Chinese sentence is one whitespace word, so one level. A break
         // counted as a word boundary would make that two, and the effect
         // would silently switch off.
-        let doc = to_ass_emphasised(&[cue(1.0, 4.0, &[LONG_ZH])], &style(), VERTICAL, &[vec![1.0]], 0.5);
+        let doc = to_ass_emphasised(
+            &[cue(1.0, 4.0, &[LONG_ZH])],
+            &style(),
+            VERTICAL,
+            &[vec![1.0]],
+            0.5,
+        );
         let event = dialogue(&doc)[0];
         assert!(event.contains("\\fs"), "emphasis was dropped: {event}");
         assert!(event.contains("\\N"), "no break: {event}");
@@ -2117,11 +2150,19 @@ mod tests {
 
     #[test]
     fn a_bilingual_translation_is_fitted_under_its_own_size() {
-        let top = [cue(1.0, 4.0, &["Today we introduce a free tool that makes subtitles"])];
+        let top = [cue(
+            1.0,
+            4.0,
+            &["Today we introduce a free tool that makes subtitles"],
+        )];
         let bottom = [cue(1.0, 4.0, &[LONG_ZH])];
         let doc = to_ass_bilingual(&top, &bottom, &style(), VERTICAL, 0.7, 1.0);
         // One separator between the languages, and more inside the Chinese.
-        assert!(dialogue(&doc)[0].matches("\\N").count() >= 2, "{}", dialogue(&doc)[0]);
+        assert!(
+            dialogue(&doc)[0].matches("\\N").count() >= 2,
+            "{}",
+            dialogue(&doc)[0]
+        );
         assert!(!doc.contains('\u{E0B0}'));
     }
 }
