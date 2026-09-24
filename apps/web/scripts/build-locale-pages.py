@@ -238,6 +238,24 @@ def translate_page(raw, page, locale, catalogue, stats):
             span = S.attr_span(tree, node, "content")
             edits.append((span[0], span[1], OG_LOCALE[locale]))
 
+    # 6. The switcher says which language you are reading. In the source
+    #    that is English, because the source is the English page; on every
+    #    other copy the mark has to move, or all eight pages claim to be
+    #    the English one -- to a screen reader, which reads aria-current,
+    #    and to anyone using the highlight to see where they are.
+    for node in tree.root.walk():
+        if node.tag != "a" or "hreflang" not in node.attrs:
+            continue
+        is_here = node.attrs.get("hreflang") == locale
+        span = S.attr_span(tree, node, "aria-current")
+        if span and not is_here:
+            # Take the whole attribute out, spaces and all.
+            start = raw.rindex(" aria-current", node.tag_start, span[0])
+            edits.append((start, raw.index('"', span[1]) + 1, ""))
+        elif is_here and not span:
+            close = raw.index(">", node.tag_start)
+            edits.append((close, close, ' aria-current="page"'))
+
     # In-site links are moved *after* the splice rather than as more
     # edits. A translated block carries its own <a href> along with it --
     # the footer is one block containing four links -- so rewriting them
@@ -245,12 +263,19 @@ def translate_page(raw, page, locale, catalogue, stats):
     # inside. The translations keep every href verbatim, so one pass over
     # the finished document reaches both.
     return ANCHOR.sub(
-        lambda m: m.group(1) + localise_link(m.group(2), locale) + m.group(3),
+        lambda m: m.group(0) if SPEAKS_FOR_ITSELF.search(m.group(0)) else
+        m.group(1) + localise_link(m.group(2), locale) + m.group(3),
         S.splice(raw, edits),
     )
 
 
-ANCHOR = re.compile(r"""(<a\b[^>]*?\shref=")([^"]*)(")""")
+# The whole opening tag, so the rule below can see the attributes on either
+# side of `href`.
+ANCHOR = re.compile(r"""(<a\b[^>]*?\shref=")([^"]*)("[^>]*>)""")
+# A link that says which language it points at is already pointing where it
+# means to: the switcher's own links name all eight, and moving them into
+# this locale would leave every page offering only itself (APP-151).
+SPEAKS_FOR_ITSELF = re.compile(r"\shreflang=")
 
 
 def escape_attr(text):
