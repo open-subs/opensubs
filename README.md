@@ -1,5 +1,7 @@
 # OpenSubs
 
+**The open-source alternative to VEED and Kapwing auto-subtitles — your video never leaves your machine.** [opensubs.app](https://opensubs.app)
+
 Subtitle any video without uploading it anywhere. OpenSubs transcribes the
 speech, translates it, styles it and burns it into the picture — and the
 video file never leaves your machine, because there is nowhere for it to
