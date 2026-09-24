@@ -65,7 +65,15 @@ export type Command =
   | { kind: "settings"; tabId?: number; settings: Settings }
   | { kind: "stop"; tabId?: number }
   | { kind: "state"; tabId?: number }
-  | { kind: "cues"; tabId?: number };
+  | { kind: "cues"; tabId?: number }
+  /** Throw away the lines held for this tab -- the popup's Clear (APP-153). */
+  | { kind: "clear"; tabId?: number }
+  /**
+   * Write the .srt, from wherever the download will survive being started
+   * (APP-152). Answered `{ok:false}` where the background cannot make an
+   * object URL, and then the popup does it itself.
+   */
+  | { kind: "save"; tabId?: number };
 
 /**
  * One recorded window of audio, as it crosses a message boundary.
@@ -118,8 +126,11 @@ export type BeginAnswer =
    * `url`: the page's own address, which says whether the subtitles kept
    * from an earlier Start were made from this same page (APP-146). It comes
    * from the page because the background has no `tabs` permission to ask.
+   * `video`: which video, within that page. A player that swaps the film
+   * without navigating -- YouTube's next video -- is the same page, and the
+   * lines from the one before belong to a different clock (APP-153).
    */
-  | { found: true; duration: number; waiting?: string; url?: string }
+  | { found: true; duration: number; waiting?: string; url?: string; video?: string }
   | { found: false; reason: string };
 
 /** Sent by the background down to the content script. */

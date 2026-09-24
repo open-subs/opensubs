@@ -226,7 +226,7 @@ async function begin(next: Settings): Promise<BeginAnswer> {
   }
   if ("stream" in opened) {
     void adopt({ el, stream: opened.stream }, false);
-    return { found: true, duration: el.duration || 0, url: location.href };
+    return { found: true, duration: el.duration || 0, url: location.href, video: fingerprint(el) };
   }
   // Unreadable, and about to end: an ad. Answer now, wait it out, and move
   // to what plays next -- or say why not, if nothing readable does.
@@ -241,9 +241,24 @@ async function begin(next: Settings): Promise<BeginAnswer> {
     halt();
   })();
   return {
-    found: true, duration: 0, url: location.href,
+    found: true, duration: 0, url: location.href, video: fingerprint(el),
     waiting: "Waiting for the ad to finish -- its audio cannot be read",
   };
+}
+
+/**
+ * Which video this is, as well as the page can tell (APP-153).
+ *
+ * Its length, to the second, and its source. A player swapping to the next
+ * film changes both; changing quality on the same film changes the source
+ * and keeps the length, which is why the length is what decides and the
+ * source only sharpens it. A live stream has no length, and then only the
+ * source is left -- two videos are called the same there, which errs
+ * towards keeping subtitles rather than dropping them.
+ */
+function fingerprint(el: HTMLMediaElement): string {
+  const length = Number.isFinite(el.duration) ? Math.round(el.duration) : 0;
+  return `${length}|${el.currentSrc || el.src || ""}`;
 }
 
 /**

@@ -59,6 +59,14 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 const videoName = basename(video);
 const body = readFileSync(video);
 const server = createServer((req, res) => {
+  if (req.url === "/second.mp4") {
+    // A different video: the same file cut short, so its duration differs the
+    // way another video's would.
+    const half = body.subarray(0, Math.floor(body.length / 3));
+    res.writeHead(200, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-length": half.length });
+    res.end(half);
+    return;
+  }
   if (req.url === `/${videoName}`) {
     res.writeHead(200, { "content-type": "video/mp4", "accept-ranges": "bytes", "content-length": body.length });
     res.end(body);
@@ -157,6 +165,44 @@ try {
   const both = await saved();
   ok("what follows joins the same file", both.count === 4, `count ${both.count}`);
   ok("in one timeline, in order", /Gold Rush[\s\S]*gold mining customers/.test(both.srt));
+
+  // --- another video, same page (APP-153) ---------------------------------
+  // What YouTube does when you click the next video: the address changes and
+  // the player is swapped, with no navigation. The lines from the video
+  // before must not join the new one's file -- they are a different clock.
+  await send({ kind: "stop", tabId });
+  await page.evaluate(() => {
+    history.pushState({}, "", "/?v=second");
+    const v = document.querySelector("video");
+    const fresh = v.cloneNode(false);
+    v.replaceWith(fresh);
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  await send({ kind: "start", tabId, settings });
+  await new Promise((r) => setTimeout(r, 2500));
+  const onSecond = await state();
+  ok("another video in the same page starts a new file", onSecond.count === 0, `count ${onSecond.count}`);
+  await hand([{ start: 0, end: 4, text: "This is the second video." }]);
+  const secondFile = await saved();
+  ok("and saving writes only the second video's lines",
+    /second video/.test(secondFile.srt) && !/Gold Rush/.test(secondFile.srt), `${secondFile.count} lines`);
+
+  // --- another video, same address (APP-153) ------------------------------
+  // The harder half of the same case: a player that swaps the video without
+  // the address changing at all. The page is the same page, so the lines
+  // were carried on -- into a file whose two halves both start at 00:00.
+  await send({ kind: "stop", tabId });
+  await page.evaluate(() => {
+    const v = document.querySelector("video");
+    v.src = "/second.mp4";
+    v.load();
+  });
+  await page.waitForFunction(() => document.querySelector("video").readyState >= 1);
+  await send({ kind: "start", tabId, settings });
+  await new Promise((r) => setTimeout(r, 2500));
+  const sameUrl = await state();
+  ok("a different video at the same address starts a new file too",
+    sameUrl.count === 0, `count ${sameUrl.count}`);
 
   // --- the page goes ------------------------------------------------------
   await send({ kind: "stop", tabId });

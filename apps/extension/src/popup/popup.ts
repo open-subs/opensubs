@@ -26,6 +26,7 @@ const statusEl = $<HTMLDivElement>("status");
 const deviceEl = $<HTMLParagraphElement>("device");
 const goEl = $<HTMLButtonElement>("go");
 const saveEl = $<HTMLButtonElement>("save");
+const clearEl = $<HTMLButtonElement>("clear");
 
 /**
  * A short list, chosen rather than exhaustive.
@@ -132,6 +133,7 @@ function showStatus(status: Status, count: number) {
         : "Running on the processor, on this machine.";
   }
   saveEl.disabled = count === 0;
+  clearEl.disabled = count === 0;
 }
 
 function setRunning(on: boolean) {
@@ -183,13 +185,29 @@ goEl.addEventListener("click", async () => {
 });
 
 saveEl.addEventListener("click", async () => {
-  const got = (await tell({ kind: "cues", tabId: await activeTab() })) as { srt: string; count: number } | undefined;
+  const tabId = await activeTab();
+  // Firefox closes the popup the moment the save dialog opens, and a blob URL
+  // made here dies with the page that made it: the download appeared in the
+  // panel with a "retry" arrow and no file (APP-152). Where the background is
+  // a document -- which on Firefox it is -- it makes the URL and drives the
+  // download itself, and outlives the dialog. On Chromium the background is a
+  // service worker, which has no createObjectURL at all, and the popup's own
+  // path has always worked there.
+  const handled = (await tell({ kind: "save", tabId })) as { ok?: boolean } | undefined;
+  if (handled?.ok) return;
+
+  const got = (await tell({ kind: "cues", tabId })) as { srt: string; count: number } | undefined;
   if (!got?.count) return;
   const url = URL.createObjectURL(new Blob([got.srt], { type: "text/plain" }));
-  await api.downloads.download({ url, filename: "subtitles.srt", saveAs: true });
+  await api.downloads.download({ url, filename: "subtitles.srt" });
   // Revoking immediately cancels the download on Chromium; the object is
   // small and the popup is about to close anyway.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+});
+
+clearEl.addEventListener("click", async () => {
+  await tell({ kind: "clear", tabId: await activeTab() });
+  await refresh();
 });
 
 for (const el of [modelEl, languageEl, windowEl, overlayEl, backendEl, sizeEl]) {
