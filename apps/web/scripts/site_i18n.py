@@ -217,7 +217,7 @@ def copy_blocks(tree):
         )
 
     def visit(node):
-        if node.tag in OPAQUE or node.attrs.get("translate") == "no":
+        if node.tag in OPAQUE or node.attrs.get("translate") == "no" or is_switcher(node):
             return
         text = _inner(tree, node)
         if node is not tree.root and all_inline(node) and HAS_LETTER.search(text):
@@ -228,6 +228,21 @@ def copy_blocks(tree):
 
     visit(tree.root)
     return out
+
+
+# The language switcher, in both its shapes. Its links are endonyms, which
+# are never translated in any language, and they carry `translate="no"`
+# individually -- but the row *around* them is still a run of inline
+# elements with letters in it, so the sentence extractor offered the whole
+# row up as one string to translate, once per page and per locale. It is
+# structure, not copy. Its `aria-label` is copy and is still translated,
+# which is why this is not simply `translate="no"` on the row.
+SWITCHER = ("lang-row", "lang-menu")
+
+
+def is_switcher(node):
+    classes = (node.attrs.get("class") or "").split()
+    return any(c in SWITCHER for c in classes)
 
 
 def copy_attrs(tree):
