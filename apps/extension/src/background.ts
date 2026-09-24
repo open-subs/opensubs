@@ -53,6 +53,8 @@ interface Session {
   take: number;
   /** The page's own address, from its answer to "begin". See `kept`. */
   url?: string;
+  /** Which video in that page is being read. See `kept`. */
+  video?: string;
 }
 
 let session: Session | null = null;
@@ -69,7 +71,7 @@ let session: Session | null = null;
  * one. The page says which page it is, because this extension asks for no
  * `tabs` permission and so cannot look a tab's address up.
  */
-let kept: { tabId: number; url?: string; cues: Cue[] } | null = null;
+let kept: { tabId: number; url?: string; video?: string; cues: Cue[] } | null = null;
 
 /** The lines held for this tab, if any -- what Save .srt would write. */
 function held(tabId?: number): Cue[] {
@@ -253,9 +255,15 @@ async function start(tabId: number, next: Settings) {
   }
   session.take = 1;
   session.url = answer.url;
-  // Start again on the page the kept lines came from and it is one file,
-  // carried on where it left off; on any other page it is a new one (APP-146).
-  const carried = kept && kept.tabId === tabId && kept.url === answer.url ? kept.cues : [];
+  session.video = answer.video;
+  // Start again on the same video and it is one file, carried on where it
+  // left off (APP-146); on another page, or another video within the same
+  // page -- YouTube's next film, which never navigates -- it is a new one,
+  // because the two clocks both begin at zero and the lines would interleave
+  // into a file nobody can use (APP-153).
+  const sameVideo = kept && kept.tabId === tabId && kept.url === answer.url
+    && kept.video === answer.video;
+  const carried = sameVideo ? kept!.cues : [];
   kept = null;
   if (carried.length) {
     session.cues = carried;
@@ -273,7 +281,9 @@ async function start(tabId: number, next: Settings) {
 async function stop(tabId: number) {
   if (session?.tabId === tabId) {
     await page(tabId, { kind: "halt" });
-    kept = session.cues.length ? { tabId, url: session.url, cues: session.cues } : null;
+    kept = session.cues.length
+      ? { tabId, url: session.url, video: session.video, cues: session.cues }
+      : null;
     session = null;
     holdAwake(false);
   }
@@ -391,6 +401,56 @@ api.runtime.onMessage.addListener(
           return respond({ ok: true });
 
         case "ended":
+          return respond({ ok: true });
+
+        // Save .srt, from here rather than from the popup -- where that is
+        // possible. Firefox's background is a document, so it has
+        // createObjectURL and, unlike the popup, it is still there after the
+        // save dialog opens (APP-152). Chromium's is a service worker, which
+        // has neither, and says so: the popup then downloads it itself.
+        case "save": {
+          const lines = session?.cues ?? held(tabId);
+          if (!lines.length) return respond({ ok: false });
+          const make = (globalThis as { URL?: { createObjectURL?: (b: Blob) => string } }).URL;
+          if (typeof make?.createObjectURL !== "function" || typeof Blob === "undefined") {
+            return respond({ ok: false });
+          }
+          const url = make.createObjectURL(new Blob([toSrt(lines)], { type: "text/plain" }));
+          // Not awaited: `saveAs` opens a dialog, and the promise waits for
+          // the person to answer it. The popup is already closing -- on
+          // Firefox the dialog is what closes it -- so waiting would only
+          // hold a reply nobody is left to hear.
+          // `saveAs` is left out on purpose: then each browser follows its
+          // own "ask where to save each file" setting, which is the answer
+          // the person has already given once. Asking always meant a dialog
+          // on every save for people who had said they did not want one --
+          // and on Firefox that dialog is what closed the popup and killed
+          // the download (APP-152).
+          void api.downloads.download({ url, filename: "subtitles.srt" })
+            .catch((e: unknown) => {
+              const why = e instanceof Error ? e.message : String(e);
+              // Closing the dialog is an answer, not a fault.
+              if (/cancel/i.test(why)) return;
+              setStatus({ stage: "error", fraction: null, note: `The subtitles could not be saved: ${why}` });
+            })
+            // Long after the dialog: the URL has to outlive the person
+            // deciding where to put the file, and this page is not going
+            // anywhere.
+            .finally(() => setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000));
+          return respond({ ok: true });
+        }
+
+        // The popup's Clear: the lines go, whether a session is running or
+        // not, and the overlay stops showing them (APP-153).
+        case "clear":
+          if (kept && (tabId === undefined || kept.tabId === tabId)) kept = null;
+          if (session && (tabId === undefined || session.tabId === tabId)) {
+            session.cues = [];
+            await page(session.tabId, { kind: "cues", cues: [] });
+            setStatus({ ...session.status, note: "Subtitles cleared" });
+          } else {
+            setStatus({ stage: "idle", fraction: null, note: "Subtitles cleared" });
+          }
           return respond({ ok: true });
 
         // The page has gone: the lines were that page's, so they go too.
