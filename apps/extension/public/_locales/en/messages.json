@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Live Subtitles & Captions for Any Video - Local Whisper AI - OpenSubs"
+    "message": "Live Subtitles in Your Browser - Local AI | OpenSubs"
   },
   "description": {
-    "message": "Generates live subtitles for any video or audio playing in your tab, using a local Whisper AI model. Nothing is uploaded."
+    "message": "Free, open-source live subtitles for videos playing in your tab. Local Whisper AI — no account, no upload, no API key required."
   }
 }

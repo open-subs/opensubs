@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: vi) =====
+Chú thích tự động
+Giọng nói thành chữ
+Whisper AI
+Phiên âm offline
+Xuất SRT
+Nhận dạng giọng
+Extension phiên âm
+
+===== OVERVIEW (CHROME) (locale: vi) =====
+OpenSubs là công cụ phụ đề miễn phí, mã nguồn mở: nó phiên âm mọi thứ đang phát trong tab của bạn ngay khi phát, sử dụng mô hình Whisper cục bộ. Âm thanh không bao giờ rời khỏi thiết bị của bạn.
+
+Rất dễ sử dụng: bắt đầu video, nhấp vào biểu tượng OpenSubs, nhấn Start. Phụ đề xuất hiện trên trang khi từng phần được phiên âm, và lớp phủ hiển thị mức độ chậm trễ so với lời nói.
+
+Tính năng
+• Không truy cập trang web khi cài đặt — chỉ được cấp cho trang hiện tại, và chỉ khi bạn nhấn Start
+• Chạy trên WebGPU hoặc CPU — mô hình Tiny, Base hoặc Small
+• Không cần tài khoản, không cần đăng ký, không cần API key
+• Hoạt động trên các trang phát video hoặc âm thanh ngay trên trang: trang web video, bản ghi bài giảng, các buổi nói chuyện được ghi lại
+• Tự động nhận diện ngôn ngữ, hoặc tự chọn
+• Lớp phủ phụ đề có thể tắt
+• Xuất dưới dạng SRT
+• Mã nguồn mở theo giấy phép AGPL-3.0
+
+OpenSubs được xây dựng cho những người không muốn gửi âm thanh lên đám mây: sinh viên xem lại bản ghi bài giảng, người xem theo dõi nội dung bằng ngôn ngữ khác, bất kỳ ai đang ở trong phòng ồn ào, và bất kỳ ai quan tâm đến quyền riêng tư.
+
+Ngoài tiện ích mở rộng, OpenSubs còn có phiên bản ứng dụng desktop cho macOS, Windows và Linux, cũng như ứng dụng web tại opensubs.app. Mọi thứ chạy trên máy của riêng bạn đều miễn phí.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: vi) =====
+OpenSubs là công cụ phụ đề miễn phí, mã nguồn mở: nó phiên âm mọi thứ đang phát trong tab của bạn ngay khi phát, sử dụng mô hình Whisper cục bộ. Âm thanh không bao giờ rời khỏi thiết bị của bạn.
+
+Rất dễ sử dụng: bắt đầu video, nhấp vào biểu tượng OpenSubs, nhấn Start. Phụ đề xuất hiện trên trang khi từng phần được phiên âm, và lớp phủ hiển thị mức độ chậm trễ so với lời nói.
+
+Tính năng
+- Không truy cập trang web khi cài đặt — chỉ được cấp cho trang hiện tại, và chỉ khi bạn nhấn Start
+- Chạy trên WebGPU hoặc CPU — mô hình Tiny, Base hoặc Small
+- Không cần tài khoản, không cần đăng ký, không cần API key
+- Hoạt động trên các trang phát video hoặc âm thanh ngay trên trang: trang web video, bản ghi bài giảng, các buổi nói chuyện được ghi lại
+- Tự động nhận diện ngôn ngữ, hoặc tự chọn
+- Lớp phủ phụ đề có thể tắt
+- Xuất dưới dạng SRT
+- Mã nguồn mở theo giấy phép AGPL-3.0
+
+OpenSubs được xây dựng cho những người không muốn gửi âm thanh lên đám mây: sinh viên xem lại bản ghi bài giảng, người xem theo dõi nội dung bằng ngôn ngữ khác, bất kỳ ai đang ở trong phòng ồn ào, và bất kỳ ai quan tâm đến quyền riêng tư.
+
+Ngoài tiện ích mở rộng, OpenSubs còn có phiên bản ứng dụng desktop cho macOS, Windows và Linux, cũng như ứng dụng web tại opensubs.app. Mọi thứ chạy trên máy của riêng bạn đều miễn phí.
+
+GitHub: https://github.com/open-subs/opensubs

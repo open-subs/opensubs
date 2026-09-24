@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: id) =====
+Generator teks otomatis
+Ucapan ke teks
+Transkripsi Whisper
+Transkripsi offline
+Ekspor SRT
+Pengenalan suara
+Ekstensi transkripsi
+
+===== OVERVIEW (CHROME) (locale: id) =====
+OpenSubs adalah alat subtitle gratis dan open-source: alat ini mentranskripsi apa pun yang diputar di tab Anda secara langsung, menggunakan model Whisper lokal. Audio tidak pernah meninggalkan perangkat Anda.
+
+Mudah digunakan: putar video, klik ikon OpenSubs, tekan Start. Subtitle muncul di atas halaman saat setiap bagian selesai ditranskripsi, dan overlay menunjukkan seberapa jauh subtitle tertinggal dari ucapan.
+
+Fitur
+• Tidak ada akses situs web saat instalasi — hanya diberikan untuk situs saat ini, dan hanya saat Anda menekan Start
+• Berjalan di WebGPU atau CPU — model Tiny, Base, atau Small
+• Tanpa akun, tanpa pendaftaran, tanpa API key
+• Berfungsi di halaman yang memutar video atau audio langsung di halaman itu sendiri: situs video, rekaman kuliah, rekaman ceramah
+• Deteksi bahasa otomatis, atau pilih sendiri
+• Overlay subtitle yang bisa Anda matikan
+• Ekspor sebagai SRT
+• Open source di bawah AGPL-3.0
+
+OpenSubs dibuat untuk orang-orang yang lebih memilih tidak mengirim audio ke cloud: mahasiswa yang menonton ulang rekaman kuliah, penonton yang memahami konten dalam bahasa lain, siapa pun di ruangan yang bising, dan siapa pun yang peduli privasi.
+
+Selain sebagai ekstensi, OpenSubs juga tersedia sebagai aplikasi desktop untuk macOS, Windows, dan Linux, serta sebagai aplikasi web di opensubs.app. Semua yang berjalan di perangkat Anda sendiri gratis.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: id) =====
+OpenSubs adalah alat subtitle gratis dan open-source: alat ini mentranskripsi apa pun yang diputar di tab Anda secara langsung, menggunakan model Whisper lokal. Audio tidak pernah meninggalkan perangkat Anda.
+
+Mudah digunakan: putar video, klik ikon OpenSubs, tekan Start. Subtitle muncul di atas halaman saat setiap bagian selesai ditranskripsi, dan overlay menunjukkan seberapa jauh subtitle tertinggal dari ucapan.
+
+Fitur
+- Tidak ada akses situs web saat instalasi — hanya diberikan untuk situs saat ini, dan hanya saat Anda menekan Start
+- Berjalan di WebGPU atau CPU — model Tiny, Base, atau Small
+- Tanpa akun, tanpa pendaftaran, tanpa API key
+- Berfungsi di halaman yang memutar video atau audio langsung di halaman itu sendiri: situs video, rekaman kuliah, rekaman ceramah
+- Deteksi bahasa otomatis, atau pilih sendiri
+- Overlay subtitle yang bisa Anda matikan
+- Ekspor sebagai SRT
+- Open source di bawah AGPL-3.0
+
+OpenSubs dibuat untuk orang-orang yang lebih memilih tidak mengirim audio ke cloud: mahasiswa yang menonton ulang rekaman kuliah, penonton yang memahami konten dalam bahasa lain, siapa pun di ruangan yang bising, dan siapa pun yang peduli privasi.
+
+Selain sebagai ekstensi, OpenSubs juga tersedia sebagai aplikasi desktop untuk macOS, Windows, dan Linux, serta sebagai aplikasi web di opensubs.app. Semua yang berjalan di perangkat Anda sendiri gratis.
+
+GitHub: https://github.com/open-subs/opensubs

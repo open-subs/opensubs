@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Her video için canlı altyazı - Yerel Whisper AI - OpenSubs"
+    "message": "Tarayıcıda Canlı Altyazı | OpenSubs"
   },
   "description": {
-    "message": "Geçerli sekmedeki video veya sesin canlı altyazısını yerel bir Whisper modeliyle oluşturur. Hiçbir şey yüklenmez."
+    "message": "Sekmenizde oynatılan videolar için ücretsiz, açık kaynaklı canlı altyazı. Yerel Whisper AI — hesap veya API anahtarı gerekmez."
   }
 }

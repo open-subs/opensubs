@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "任意视频实时字幕生成 - 本地Whisper AI、音频不上传 | OpenSubs"
+    "message": "浏览器内实时字幕 - 本地AI | OpenSubs"
   },
   "description": {
-    "message": "为当前标签页播放的视频或音频实时生成字幕，使用本地运行的Whisper模型，音频不会上传。"
+    "message": "为标签页中正在播放的视频免费生成实时字幕，基于本地Whisper AI，无需账号、无需上传、无需API key。"
   }
 }

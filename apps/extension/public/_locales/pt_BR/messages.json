@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Legendas ao vivo para qualquer vídeo - IA Whisper local - OpenSubs"
+    "message": "Legenda ao Vivo no Navegador | OpenSubs"
   },
   "description": {
-    "message": "Gera legendas ao vivo para o vídeo ou áudio da aba atual usando um modelo Whisper local. Nada é enviado para a nuvem."
+    "message": "Legenda ao vivo e gratuita para vídeos reproduzidos na aba, gerada com IA Whisper local. Sem conta nem chave de API."
   }
 }

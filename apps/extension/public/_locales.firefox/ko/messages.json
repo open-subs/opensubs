@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "실시간 자막, 로컬 Whisper AI - OpenSubs"
+    "message": "브라우저에서 실시간 자막 - 로컬 AI | OpenSubs"
   },
   "description": {
-    "message": "현재 탭에서 재생 중인 동영상·오디오에 로컬 Whisper 모델로 실시간 자막을 생성합니다. 아무것도 업로드되지 않습니다."
+    "message": "탭에서 재생 중인 동영상에 무료로 실시간 자막을 표시합니다. 로컬 Whisper AI로 계정이나 API 키 없이 작동합니다."
   }
 }
