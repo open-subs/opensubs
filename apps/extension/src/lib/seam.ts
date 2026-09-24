@@ -83,16 +83,113 @@ function tokens(text: string): { raw: string; key: string }[] {
  * How many tokens end `a` and also begin `b`, comparing only the ones that
  * carry letters or digits -- a comma where the other reading had a full stop
  * is the same phrase.
+ *
+ * Not word for word, past a couple of words. The two readings of a seam are
+ * two passes over the same audio and they disagree about the odd word: "the
+ * ones crying out an agony" against "ones crying out in agony" is one phrase
+ * heard twice, and a rule that wanted every token to match left both on
+ * screen (APP-154). One word in four may differ, which is loose enough for
+ * a misheard preposition and tight enough that two different sentences do
+ * not match: they disagree about nearly every word, not one in four.
  */
 function tailIsHead(a: string, b: string): number {
   const x = tokens(a).filter((t) => t.key);
   const y = tokens(b).filter((t) => t.key);
   for (let k = Math.min(x.length, y.length); k > 0; k -= 1) {
-    let same = true;
-    for (let i = 0; i < k && same; i += 1) same = x[x.length - k + i].key === y[i].key;
-    if (same) return k;
+    let wrong = 0;
+    for (let i = 0; i < k; i += 1) {
+      if (x[x.length - k + i].key !== y[i].key) wrong += 1;
+    }
+    if (wrong === 0) return k;
+    // A near miss counts only for a phrase long enough to be recognisable.
+    if (k >= 4 && wrong <= Math.floor(k / 4)) return k;
   }
   return 0;
+}
+
+/** Whether `k` repeated tokens are enough to call it the same phrase. */
+function worthTrimming(text: string, k: number): boolean {
+  if (k <= 0) return false;
+  const spaced = /\s/.test(text.trim());
+  if (!spaced) return k >= MIN_REPEAT.characters;
+  if (k >= MIN_REPEAT.words) return true;
+  // One word, if it is a word rather than a joining noise: "back." ending a
+  // line and beginning the next is the seam; "the" twice is a coincidence.
+  const last = tokens(text).filter((t) => t.key).pop();
+  return (last?.key.length ?? 0) >= 4;
+}
+
+/** Whether two words are the same word, misheard or mis-spelt by a letter. */
+function alike(a: string, b: string): boolean {
+  if (a === b) return true;
+  const long = a.length >= b.length ? a : b;
+  const short = a.length >= b.length ? b : a;
+  if (long.length < 5 || long.length - short.length > 1) return false;
+  // One edit: a substitution, or a letter dropped. "Explaner" for
+  // "explainer", "an" for "in" -- the two passes over a seam disagree like
+  // this constantly, and a phrase is still the same phrase.
+  let edits = 0;
+  for (let i = 0, j = 0; i < long.length; i += 1, j += 1) {
+    if (long[i] === short[j]) continue;
+    edits += 1;
+    if (edits > 1) return false;
+    if (long.length === short.length) continue;   // a substitution
+    j -= 1;                                        // a letter the short one lacks
+  }
+  return true;
+}
+
+/**
+ * How much of the shorter phrase is echoed by the longer, in order.
+ *
+ * Words rather than characters, and in order rather than contiguous: the two
+ * readings of a seam drop a word, add one, and mishear another, so neither
+ * "the same characters in a row" nor "every word matches" finds them. This
+ * asks the question that matters -- is most of this phrase said again, in
+ * this order -- and `alike` forgives the single-letter disagreements.
+ */
+function echoes(before: { key: string }[], after: { key: string }[]): number {
+  if (!before.length || !after.length) return 0;
+  let prev = new Array<number>(after.length + 1).fill(0);
+  for (const b of before) {
+    const cur = [0];
+    for (let j = 1; j <= after.length; j += 1) {
+      cur[j] = alike(b.key, after[j - 1].key)
+        ? prev[j - 1] + 1
+        : Math.max(prev[j], cur[j - 1]);
+    }
+    prev = cur;
+  }
+  return prev[after.length] / Math.min(before.length, after.length);
+}
+
+/** Most of a phrase said again is the same phrase said again. */
+const ECHO = 0.75;
+
+/**
+ * A line that says the same thing twice in a row, said once (APP-154).
+ *
+ * Whisper writes the tail of the window before it and then writes it again,
+ * properly, as the sentence it belongs to: "We'll touch on this later. We'll
+ * touch on this later, but for now..." -- one line, out of one window, with
+ * the repeat inside it. The later reading is the one that continues, so the
+ * earlier copy goes.
+ */
+export function unstutter(text: string): string {
+  const all = tokens(text);
+  const words = all.filter((t) => t.key);
+  if (words.length < 6) return text;
+  const spaced = /\s/.test(text.trim());
+  for (let cut = Math.floor(words.length / 2); cut >= 3; cut -= 1) {
+    for (let at = cut; at + cut <= words.length; at += 1) {
+      if (echoes(words.slice(at - cut, at), words.slice(at, at + cut)) < ECHO) continue;
+      // Drop the first copy, keeping whatever came before it.
+      const head = words.slice(0, at - cut).map((t) => t.raw).join(spaced ? " " : "");
+      const tail = words.slice(at).map((t) => t.raw).join(spaced ? " " : "");
+      return `${head}${head && spaced ? " " : ""}${tail}`.trim();
+    }
+  }
+  return text;
 }
 
 /** `text` without its last `k` compared tokens, and any punctuation after them. */
@@ -132,12 +229,18 @@ const MIN_REPEAT = { words: 2, characters: 4 };
  * is left.
  */
 function settle(prev: Cue, next: Cue): Cue | null {
-  if (!(next.start > prev.start && next.start < prev.end + 0.5)) return prev;
-  const spaced = /\s/.test(prev.text.trim());
+  // Anywhere from overlapping to a couple of seconds apart. It used to be
+  // only where the two overlapped in time, and the seams that did not --
+  // one line ending exactly where the next begins, which is what the
+  // trimming above produces -- kept their repeat (APP-154).
+  if (!(next.start > prev.start && next.start < prev.end + NEAR_S)) return prev;
   const k = tailIsHead(prev.text, next.text);
-  if (k >= (spaced ? MIN_REPEAT.words : MIN_REPEAT.characters)) {
+  if (worthTrimming(prev.text, k)) {
     const left = dropTail(prev.text, k);
-    return left ? { ...prev, text: left, end: Math.min(prev.end, next.start) } : null;
+    // What is left has to be a line, not the stub of one: where the repeat
+    // was nearly the whole of it, the later reading says all of it anyway.
+    const words = tokens(left).filter((t) => t.key).length;
+    return left && words >= 2 ? { ...prev, text: left, end: Math.min(prev.end, next.start) } : null;
   }
   return prev;
 }
@@ -151,8 +254,11 @@ export function stitch(kept: Cue[], incoming: Cue[]): Cue[] {
   // where it would hurt.
   const reach = Math.min(...incoming.map((c) => c.start)) - NEAR_S;
 
-  for (const cue of incoming) {
-    if (!cue.text.trim()) continue;
+  for (const raw of incoming) {
+    if (!raw.text.trim()) continue;
+    // A window whose opening seconds were also the end of the window before
+    // can come back with the phrase written twice inside one line (APP-154).
+    const cue = { ...raw, text: unstutter(raw.text) };
     let replaced = -1;
     for (let i = out.length - 1; i >= 0; i -= 1) {
       const old = out[i];
@@ -208,10 +314,17 @@ export function stitch(kept: Cue[], incoming: Cue[]): Cue[] {
     // a flash: "a dry goods merchant" came out on screen for 0.2 s, ahead of
     // "by the name of Levi Strauss", before this.
     const spaced = /\s/.test(out[i].text.trim()) || /\s/.test(out[i - 1].text.trim());
+    // Joined, with the join settled: these are two readings of overlapping
+    // audio, so the end of one is often the start of the other, and running
+    // them together wrote the phrase twice into a single line (APP-154).
+    const head = out[i - 1].text.trim();
+    const tail = out[i].text.trim();
+    const shared = tailIsHead(head, tail);
+    const kept = worthTrimming(head, shared) ? dropTail(head, shared) : head;
     out[i] = {
       start: out[i - 1].start,
       end: out[i].end,
-      text: `${out[i - 1].text.trim()}${spaced ? " " : ""}${out[i].text.trim()}`,
+      text: unstutter(`${kept}${kept && spaced ? " " : ""}${tail}`),
     };
     out.splice(i - 1, 1);
     i -= 1;

@@ -350,6 +350,65 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("two windows waiting is the point of giving up on Base", AUTO_BEHIND === 2);
 }
 
+// --- adjacent lines must not repeat each other (APP-154) -----------------
+//
+// Reported on rc.14 and rc.15, from three machines and three videos. Every
+// sample below is verbatim from the report.
+{
+  // Firefox 156 on YouTube: the tail of one line is the head of the next,
+  // and the two cues only touch -- they do not overlap in time, which is
+  // what the seam logic was keyed on.
+  let out = stitch(
+    [{ start: 10, end: 14, text: "Nothing is ever what it seems, given a simple command. Don't look" }],
+    [{ start: 14, end: 17, text: "Don't look back." }],
+  );
+  ok("a phrase at the end of one line is not repeated at the start of the next",
+    !/Don't look[\s\S]*Don't look/i.test(out.map((c) => c.text).join(" ")),
+    JSON.stringify(out.map((c) => c.text)));
+
+  // One word is enough to read twice, when it is the whole of the overlap.
+  out = stitch(
+    [{ start: 14, end: 17, text: "Don't look back." }],
+    [{ start: 17, end: 21, text: "back. Just keep walking forward." }],
+  );
+  ok("nor a single word at the join",
+    !/back[\s\S]*back/i.test(out.map((c) => c.text).join(" ")),
+    JSON.stringify(out.map((c) => c.text)));
+
+  // The same seam with the readings disagreeing about a word or two, which
+  // is the usual shape: "crying out an agony" against "crying out in agony".
+  out = stitch(
+    [{ start: 30, end: 35, text: "the ones crying out an agony. Just keep" }],
+    [{ start: 35, end: 40, text: "ones crying out in agony. Just keep walking." }],
+  );
+  ok("a near-miss repeat at the seam is settled too",
+    out.map((c) => c.text).join(" ").toLowerCase().split("crying out").length - 1 === 1,
+    JSON.stringify(out.map((c) => c.text)));
+
+  // Edge 146 on YouTube: one line that says the same sentence twice. Nothing
+  // follows it -- the repetition is inside the line itself.
+  out = stitch([], [{ start: 0, end: 6,
+    text: "We'll touch a little bit more on this later. We'll touch a little bit more on this later, but for now, let's keep going." }]);
+  ok("a line does not say the same sentence twice",
+    out[0].text.toLowerCase().split("touch a little bit more").length - 1 === 1,
+    JSON.stringify(out.map((c) => c.text)));
+
+  // The automated run's first line, same shape with the repeat inexact.
+  out = stitch([], [{ start: 0, end: 7,
+    text: "And explainer video is a short In Explaner Video, a short video that can explain a company," }]);
+  ok("...even when the two readings of it differ slightly",
+    out[0].text.toLowerCase().split("a short").length - 1 === 1,
+    JSON.stringify(out.map((c) => c.text)));
+
+  // And the case this must not break: a chorus, said twice on purpose, far
+  // enough apart that it is two utterances rather than one seam.
+  out = stitch(
+    [{ start: 0, end: 2, text: "Here we go again" }],
+    [{ start: 90, end: 92, text: "Here we go again" }],
+  );
+  ok("a line genuinely said twice, a minute apart, is still two lines", out.length === 2);
+}
+
 // --- the subtitle sizes (APP-147) ----------------------------------------
 {
   const { SIZES, DEFAULT_SIZE, nearestSize } = await import("../src/lib/pace.ts");
