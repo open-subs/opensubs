@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Live ondertiteling, lokale Whisper-AI - OpenSubs"
+    "message": "Live Ondertiteling in je Browser | OpenSubs"
   },
   "description": {
-    "message": "Genereert live ondertiteling voor de video of audio in je huidige tab met een lokaal Whisper-model. Niets wordt geüpload."
+    "message": "Gratis, open source live ondertiteling voor video's die in je tabblad spelen. Lokale Whisper AI — geen account of API-key nodig."
   }
 }

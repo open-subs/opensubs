@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Sous-titres en direct, IA locale - OpenSubs"
+    "message": "Sous-titres en Direct au Navigateur | OpenSubs"
   },
   "description": {
-    "message": "Sous-titres en direct pour la vidéo ou l'audio de l'onglet actif, via un modèle Whisper local. Rien n'est envoyé en ligne."
+    "message": "Sous-titres en direct et gratuits pour les vidéos lues dans votre onglet, générés par IA Whisper locale. Sans compte ni clé API."
   }
 }

@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: nl) =====
+Ondertitelgenerator
+Spraak naar tekst
+Whisper-transcriptie
+Offline transcriptie
+SRT exporteren
+Spraakherkenning
+Transcriptie-extensie
+
+===== OVERVIEW (CHROME) (locale: nl) =====
+OpenSubs is een gratis, open-source ondertitelingstool: het transcribeert alles wat in je tabblad wordt afgespeeld, terwijl het speelt, met een lokaal Whisper-model. Audio verlaat nooit je apparaat.
+
+Eenvoudig in gebruik: start de video, klik op het OpenSubs-icoon, druk op Start. Ondertitels verschijnen op de pagina zodra elk deel is getranscribeerd, en de overlay toont hoeveel ze achterlopen op de spraak.
+
+Functies
+• Geen website-toegang bij installatie — alleen verleend voor de huidige site, en pas wanneer je op Start klikt
+• Werkt op WebGPU of CPU — Tiny-, Base- of Small-modellen
+• Geen account, geen registratie, geen API-sleutel nodig
+• Werkt op pagina's die zelf video of audio afspelen: videosites, collegeopnames, opgenomen lezingen
+• Automatische taaldetectie, of kies zelf
+• Ondertitel-overlay die je kunt uitschakelen
+• Exporteren als SRT
+• Open source onder AGPL-3.0
+
+OpenSubs is gemaakt voor mensen die liever geen audio naar de cloud sturen: studenten die collegeopnames terugkijken, kijkers die inhoud in een andere taal volgen, iedereen in een rumoerige ruimte en iedereen die om privacy geeft.
+
+Naast de extensie is OpenSubs ook beschikbaar als desktop-app voor macOS, Windows en Linux, en als webapp op opensubs.app. Alles wat op je eigen apparaat draait, is gratis.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: nl) =====
+OpenSubs is een gratis, open-source ondertitelingstool: het transcribeert alles wat in je tabblad wordt afgespeeld, terwijl het speelt, met een lokaal Whisper-model. Audio verlaat nooit je apparaat.
+
+Eenvoudig in gebruik: start de video, klik op het OpenSubs-icoon, druk op Start. Ondertitels verschijnen op de pagina zodra elk deel is getranscribeerd, en de overlay toont hoeveel ze achterlopen op de spraak.
+
+Functies
+- Geen website-toegang bij installatie — alleen verleend voor de huidige site, en pas wanneer je op Start klikt
+- Werkt op WebGPU of CPU — Tiny-, Base- of Small-modellen
+- Geen account, geen registratie, geen API-sleutel nodig
+- Werkt op pagina's die zelf video of audio afspelen: videosites, collegeopnames, opgenomen lezingen
+- Automatische taaldetectie, of kies zelf
+- Ondertitel-overlay die je kunt uitschakelen
+- Exporteren als SRT
+- Open source onder AGPL-3.0
+
+OpenSubs is gemaakt voor mensen die liever geen audio naar de cloud sturen: studenten die collegeopnames terugkijken, kijkers die inhoud in een andere taal volgen, iedereen in een rumoerige ruimte en iedereen die om privacy geeft.
+
+Naast de extensie is OpenSubs ook beschikbaar als desktop-app voor macOS, Windows en Linux, en als webapp op opensubs.app. Alles wat op je eigen apparaat draait, is gratis.
+
+GitHub: https://github.com/open-subs/opensubs

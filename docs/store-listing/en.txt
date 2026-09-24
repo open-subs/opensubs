@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: en) =====
+auto captions
+caption generator
+speech to text
+whisper transcription
+offline transcription
+srt export
+browser captions
+
+===== OVERVIEW (CHROME) (locale: en) =====
+OpenSubs is a free, open-source subtitle tool: it transcribes whatever plays in your tab as it plays, using a local Whisper model. Audio never leaves your device.
+
+Simple to use: start the video, click the OpenSubs icon, hit Start. Subtitles appear over the page as each part is transcribed, and the overlay shows how far behind the speech they are.
+
+Features
+• No website access at install — granted for the current site only, and only when you hit Start
+• Runs on WebGPU or CPU — Tiny, Base, or Small models
+• No account, no sign-up, no API key
+• Works on pages that play video or audio in the page itself: video sites, lecture recordings, recorded talks
+• Automatic language detection, or pick it yourself
+• Subtitle overlay you can turn off
+• Export as SRT
+• AGPL-3.0 open source
+
+OpenSubs is built for people who would rather not send audio to the cloud: students rewatching lecture recordings, viewers working through content in another language, anyone in a noisy room, and anyone who cares about privacy.
+
+Beyond the extension, OpenSubs is also available as a desktop app for macOS, Windows and Linux, and as a web app at opensubs.app. Everything that runs on your own machine is free.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: en) =====
+OpenSubs is a free, open-source subtitle tool: it transcribes whatever plays in your tab as it plays, using a local Whisper model. Audio never leaves your device.
+
+Simple to use: start the video, click the OpenSubs icon, hit Start. Subtitles appear over the page as each part is transcribed, and the overlay shows how far behind the speech they are.
+
+Features
+- No website access at install — granted for the current site only, and only when you hit Start
+- Runs on WebGPU or CPU — Tiny, Base, or Small models
+- No account, no sign-up, no API key
+- Works on pages that play video or audio in the page itself: video sites, lecture recordings, recorded talks
+- Automatic language detection, or pick it yourself
+- Subtitle overlay you can turn off
+- Export as SRT
+- AGPL-3.0 open source
+
+OpenSubs is built for people who would rather not send audio to the cloud: students rewatching lecture recordings, viewers working through content in another language, anyone in a noisy room, and anyone who cares about privacy.
+
+Beyond the extension, OpenSubs is also available as a desktop app for macOS, Windows and Linux, and as a web app at opensubs.app. Everything that runs on your own machine is free.
+
+GitHub: https://github.com/open-subs/opensubs

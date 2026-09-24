@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Phụ đề trực tiếp, AI Whisper cục bộ - OpenSubs"
+    "message": "Phụ Đề Trực Tiếp Trong Trình Duyệt | OpenSubs"
   },
   "description": {
-    "message": "Tạo phụ đề trực tiếp cho video hoặc âm thanh đang phát trong tab hiện tại bằng mô hình Whisper cục bộ. Không tải lên đâu cả."
+    "message": "Phụ đề trực tiếp miễn phí, mã nguồn mở cho video đang phát trên tab, dùng AI Whisper cục bộ. Không cần tài khoản hay API key."
   }
 }

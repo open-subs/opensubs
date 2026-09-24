@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Subtítulos en directo para cualquier vídeo - Whisper local - OpenSubs"
+    "message": "Subtítulos en Vivo en tu Navegador | OpenSubs"
   },
   "description": {
-    "message": "Genera subtítulos en directo para el vídeo o audio de la pestaña actual con un modelo Whisper local. No se sube nada."
+    "message": "Subtítulos en vivo y gratuitos para los vídeos que se reproducen en tu pestaña, con IA Whisper local. Sin cuenta ni API key."
   }
 }

@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: it) =====
+Generatore di didascalie
+Trascrizione vocale
+Trascrizione Whisper
+Trascrizione offline
+Esporta SRT
+Riconoscimento vocale
+Estensione di trascrizione
+
+===== OVERVIEW (CHROME) (locale: it) =====
+OpenSubs è uno strumento di sottotitolazione gratuito e open source: trascrive tutto ciò che viene riprodotto nella tua scheda, in tempo reale, usando un modello Whisper locale. L'audio non lascia mai il tuo dispositivo.
+
+Semplice da usare: avvia il video, clicca sull'icona di OpenSubs, premi Start. I sottotitoli appaiono sulla pagina man mano che ogni parte viene trascritta, e l'overlay mostra quanto sono in ritardo rispetto al parlato.
+
+Funzionalità
+• Nessun accesso ai siti web all'installazione — concesso solo per il sito corrente, e solo quando premi Start
+• Funziona su WebGPU o CPU — modelli Tiny, Base o Small
+• Nessun account, nessuna registrazione, nessuna chiave API
+• Funziona su pagine che riproducono video o audio direttamente nella pagina: siti video, registrazioni di lezioni, conferenze registrate
+• Rilevamento automatico della lingua, oppure selezione manuale
+• Overlay dei sottotitoli disattivabile
+• Esportazione in SRT
+• Open source con licenza AGPL-3.0
+
+OpenSubs è pensato per chi preferisce non inviare l'audio al cloud: studenti che rivedono registrazioni di lezioni, spettatori che seguono contenuti in un'altra lingua, chiunque si trovi in una stanza rumorosa e chiunque tenga alla privacy.
+
+Oltre all'estensione, OpenSubs è disponibile anche come app desktop per macOS, Windows e Linux, e come app web su opensubs.app. Tutto ciò che gira sul tuo computer è gratuito.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: it) =====
+OpenSubs è uno strumento di sottotitolazione gratuito e open source: trascrive tutto ciò che viene riprodotto nella tua scheda, in tempo reale, usando un modello Whisper locale. L'audio non lascia mai il tuo dispositivo.
+
+Semplice da usare: avvia il video, clicca sull'icona di OpenSubs, premi Start. I sottotitoli appaiono sulla pagina man mano che ogni parte viene trascritta, e l'overlay mostra quanto sono in ritardo rispetto al parlato.
+
+Funzionalità
+- Nessun accesso ai siti web all'installazione — concesso solo per il sito corrente, e solo quando premi Start
+- Funziona su WebGPU o CPU — modelli Tiny, Base o Small
+- Nessun account, nessuna registrazione, nessuna chiave API
+- Funziona su pagine che riproducono video o audio direttamente nella pagina: siti video, registrazioni di lezioni, conferenze registrate
+- Rilevamento automatico della lingua, oppure selezione manuale
+- Overlay dei sottotitoli disattivabile
+- Esportazione in SRT
+- Open source con licenza AGPL-3.0
+
+OpenSubs è pensato per chi preferisce non inviare l'audio al cloud: studenti che rivedono registrazioni di lezioni, spettatori che seguono contenuti in un'altra lingua, chiunque si trovi in una stanza rumorosa e chiunque tenga alla privacy.
+
+Oltre all'estensione, OpenSubs è disponibile anche come app desktop per macOS, Windows e Linux, e come app web su opensubs.app. Tutto ciò che gira sul tuo computer è gratuito.
+
+GitHub: https://github.com/open-subs/opensubs

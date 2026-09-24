@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: fr) =====
+Générateur de légendes vidéo
+Transcription vocale
+Transcription Whisper
+Transcription hors ligne
+Export SRT
+Reconnaissance vocale
+Extension de transcription
+
+===== OVERVIEW (CHROME) (locale: fr) =====
+OpenSubs est un outil de sous-titrage gratuit et open source : il transcrit tout ce qui est lu dans votre onglet, en direct, à l'aide d'un modèle Whisper local. L'audio ne quitte jamais votre appareil.
+
+Simple à utiliser : lancez la vidéo, cliquez sur l'icône OpenSubs, appuyez sur Start. Les sous-titres apparaissent sur la page au fur et à mesure de la transcription, et l'incrustation indique leur retard par rapport à la parole.
+
+Fonctionnalités
+• Aucun accès aux sites web à l'installation — accordé uniquement pour le site actuel, et seulement quand vous appuyez sur Start
+• Fonctionne avec WebGPU ou le CPU — modèles Tiny, Base ou Small
+• Aucun compte, aucune inscription, aucune clé API
+• Fonctionne sur les pages qui lisent vidéo ou audio directement sur la page : sites vidéo, enregistrements de cours, conférences enregistrées
+• Détection automatique de la langue, ou choix manuel
+• Incrustation de sous-titres que vous pouvez désactiver
+• Export au format SRT
+• Open source sous licence AGPL-3.0
+
+OpenSubs est conçu pour celles et ceux qui préfèrent ne pas envoyer d'audio vers le cloud : étudiants qui revisionnent des enregistrements de cours, spectateurs qui suivent un contenu dans une autre langue, toute personne dans une pièce bruyante, et toute personne soucieuse de sa vie privée.
+
+Au-delà de l'extension, OpenSubs est aussi disponible en application de bureau pour macOS, Windows et Linux, ainsi qu'en application web sur opensubs.app. Tout ce qui tourne sur votre propre machine est gratuit.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: fr) =====
+OpenSubs est un outil de sous-titrage gratuit et open source : il transcrit tout ce qui est lu dans votre onglet, en direct, à l'aide d'un modèle Whisper local. L'audio ne quitte jamais votre appareil.
+
+Simple à utiliser : lancez la vidéo, cliquez sur l'icône OpenSubs, appuyez sur Start. Les sous-titres apparaissent sur la page au fur et à mesure de la transcription, et l'incrustation indique leur retard par rapport à la parole.
+
+Fonctionnalités
+- Aucun accès aux sites web à l'installation — accordé uniquement pour le site actuel, et seulement quand vous appuyez sur Start
+- Fonctionne avec WebGPU ou le CPU — modèles Tiny, Base ou Small
+- Aucun compte, aucune inscription, aucune clé API
+- Fonctionne sur les pages qui lisent vidéo ou audio directement sur la page : sites vidéo, enregistrements de cours, conférences enregistrées
+- Détection automatique de la langue, ou choix manuel
+- Incrustation de sous-titres que vous pouvez désactiver
+- Export au format SRT
+- Open source sous licence AGPL-3.0
+
+OpenSubs est conçu pour celles et ceux qui préfèrent ne pas envoyer d'audio vers le cloud : étudiants qui revisionnent des enregistrements de cours, spectateurs qui suivent un contenu dans une autre langue, toute personne dans une pièce bruyante, et toute personne soucieuse de sa vie privée.
+
+Au-delà de l'extension, OpenSubs est aussi disponible en application de bureau pour macOS, Windows et Linux, ainsi qu'en application web sur opensubs.app. Tout ce qui tourne sur votre propre machine est gratuit.
+
+GitHub: https://github.com/open-subs/opensubs

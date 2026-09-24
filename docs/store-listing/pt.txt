@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: pt) =====
+Subtítulos automáticos
+Voz em texto
+Transcrição Whisper
+Transcrição offline
+Exportar SRT
+Reconhecimento de voz
+Extensão de transcrição
+
+===== OVERVIEW (CHROME) (locale: pt) =====
+O OpenSubs é uma ferramenta de legendagem gratuita e de código aberto: transcreve tudo o que é reproduzido no teu separador à medida que é reproduzido, usando um modelo Whisper local. O áudio nunca sai do teu dispositivo.
+
+Simples de usar: inicia o vídeo, clica no ícone do OpenSubs, carrega em Start. As legendas aparecem sobre a página à medida que cada parte é transcrita, e a sobreposição mostra o atraso em relação à fala.
+
+Funcionalidades
+• Sem acesso a sites na instalação — concedido apenas para o site atual, e só quando carregas em Start
+• Funciona com WebGPU ou CPU — modelos Tiny, Base ou Small
+• Sem conta, sem registo, sem chave de API
+• Funciona em páginas que reproduzem vídeo ou áudio na própria página: sites de vídeo, gravações de aulas, palestras gravadas
+• Deteção automática de idioma, ou escolhe tu mesmo
+• Sobreposição de legendas que podes desativar
+• Exportação em SRT
+• Código aberto sob licença AGPL-3.0
+
+O OpenSubs foi criado para quem prefere não enviar áudio para a nuvem: estudantes a rever gravações de aulas, espectadores a acompanhar conteúdos noutro idioma, qualquer pessoa numa sala ruidosa e qualquer pessoa que valorize a privacidade.
+
+Além da extensão, o OpenSubs também está disponível como aplicação de ambiente de trabalho para macOS, Windows e Linux, e como aplicação web em opensubs.app. Tudo o que corre no teu próprio computador é gratuito.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: pt) =====
+O OpenSubs é uma ferramenta de legendagem gratuita e de código aberto: transcreve tudo o que é reproduzido no teu separador à medida que é reproduzido, usando um modelo Whisper local. O áudio nunca sai do teu dispositivo.
+
+Simples de usar: inicia o vídeo, clica no ícone do OpenSubs, carrega em Start. As legendas aparecem sobre a página à medida que cada parte é transcrita, e a sobreposição mostra o atraso em relação à fala.
+
+Funcionalidades
+- Sem acesso a sites na instalação — concedido apenas para o site atual, e só quando carregas em Start
+- Funciona com WebGPU ou CPU — modelos Tiny, Base ou Small
+- Sem conta, sem registo, sem chave de API
+- Funciona em páginas que reproduzem vídeo ou áudio na própria página: sites de vídeo, gravações de aulas, palestras gravadas
+- Deteção automática de idioma, ou escolhe tu mesmo
+- Sobreposição de legendas que podes desativar
+- Exportação em SRT
+- Código aberto sob licença AGPL-3.0
+
+O OpenSubs foi criado para quem prefere não enviar áudio para a nuvem: estudantes a rever gravações de aulas, espectadores a acompanhar conteúdos noutro idioma, qualquer pessoa numa sala ruidosa e qualquer pessoa que valorize a privacidade.
+
+Além da extensão, o OpenSubs também está disponível como aplicação de ambiente de trabalho para macOS, Windows e Linux, e como aplicação web em opensubs.app. Tudo o que corre no teu próprio computador é gratuito.
+
+GitHub: https://github.com/open-subs/opensubs

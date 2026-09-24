@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Sottotitoli in diretta per qualsiasi video - IA Whisper locale - OpenSubs"
+    "message": "Sottotitoli Live nel Browser | OpenSubs"
   },
   "description": {
-    "message": "Genera sottotitoli in diretta per il video o l'audio della scheda attiva con un modello Whisper locale. Nulla viene caricato online."
+    "message": "Sottotitoli live e gratuiti per i video riprodotti nella scheda, generati con IA Whisper locale. Senza account né API key."
   }
 }

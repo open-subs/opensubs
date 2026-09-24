@@ -1,0 +1,50 @@
+===== EDGE SEARCH TERMS (locale: tr) =====
+Otomatik metin oluşturucu
+Sesi metne çevirme
+Whisper transkripsiyon
+Çevrimdışı transkripsiyon
+SRT dışa aktar
+Konuşma tanıma
+Transkripsiyon eklentisi
+
+===== OVERVIEW (CHROME) (locale: tr) =====
+OpenSubs, ücretsiz ve açık kaynaklı bir altyazı aracıdır: sekmenizde oynatılan her şeyi, oynatıldığı anda, yerel bir Whisper modeli kullanarak yazıya döker. Ses hiçbir zaman cihazınızdan çıkmaz.
+
+Kullanımı basit: videoyu başlatın, OpenSubs simgesine tıklayın, Start'a basın. Her bölüm yazıya döküldükçe altyazılar sayfanın üzerinde belirir ve kaplama, konuşmadan ne kadar geride olduklarını gösterir.
+
+Özellikler
+• Kurulumda web sitesi erişimi yok — yalnızca geçerli site için ve yalnızca Start'a bastığınızda verilir
+• WebGPU veya CPU üzerinde çalışır — Tiny, Base veya Small modeller
+• Hesap yok, kayıt yok, API anahtarı gerekmiyor
+• Sayfanın kendisinde video veya ses oynatan sayfalarda çalışır: video siteleri, ders kayıtları, kaydedilmiş konuşmalar
+• Otomatik dil algılama veya kendiniz seçin
+• Kapatabileceğiniz altyazı kaplaması
+• SRT olarak dışa aktarma
+• AGPL-3.0 lisansıyla açık kaynak
+
+OpenSubs, sesini buluta göndermek istemeyen kişiler için tasarlandı: ders kayıtlarını tekrar izleyen öğrenciler, başka bir dildeki içeriği takip eden izleyiciler, gürültülü bir odada olan herkes ve gizliliğe önem veren herkes.
+
+Uzantının ötesinde, OpenSubs macOS, Windows ve Linux için masaüstü uygulaması olarak ve opensubs.app adresinde web uygulaması olarak da mevcuttur. Kendi cihazınızda çalışan her şey ücretsizdir.
+
+GitHub: https://github.com/open-subs/opensubs
+
+===== OVERVIEW (EDGE/FIREFOX) (locale: tr) =====
+OpenSubs, ücretsiz ve açık kaynaklı bir altyazı aracıdır: sekmenizde oynatılan her şeyi, oynatıldığı anda, yerel bir Whisper modeli kullanarak yazıya döker. Ses hiçbir zaman cihazınızdan çıkmaz.
+
+Kullanımı basit: videoyu başlatın, OpenSubs simgesine tıklayın, Start'a basın. Her bölüm yazıya döküldükçe altyazılar sayfanın üzerinde belirir ve kaplama, konuşmadan ne kadar geride olduklarını gösterir.
+
+Özellikler
+- Kurulumda web sitesi erişimi yok — yalnızca geçerli site için ve yalnızca Start'a bastığınızda verilir
+- WebGPU veya CPU üzerinde çalışır — Tiny, Base veya Small modeller
+- Hesap yok, kayıt yok, API anahtarı gerekmiyor
+- Sayfanın kendisinde video veya ses oynatan sayfalarda çalışır: video siteleri, ders kayıtları, kaydedilmiş konuşmalar
+- Otomatik dil algılama veya kendiniz seçin
+- Kapatabileceğiniz altyazı kaplaması
+- SRT olarak dışa aktarma
+- AGPL-3.0 lisansıyla açık kaynak
+
+OpenSubs, sesini buluta göndermek istemeyen kişiler için tasarlandı: ders kayıtlarını tekrar izleyen öğrenciler, başka bir dildeki içeriği takip eden izleyiciler, gürültülü bir odada olan herkes ve gizliliğe önem veren herkes.
+
+Uzantının ötesinde, OpenSubs macOS, Windows ve Linux için masaüstü uygulaması olarak ve opensubs.app adresinde web uygulaması olarak da mevcuttur. Kendi cihazınızda çalışan her şey ücretsizdir.
+
+GitHub: https://github.com/open-subs/opensubs

@@ -1,8 +1,8 @@
 {
   "name": {
-    "message": "Live-Untertitel, lokale Whisper-KI - OpenSubs"
+    "message": "Live-Untertitel im Browser - Lokale KI | OpenSubs"
   },
   "description": {
-    "message": "Erstellt Live-Untertitel für Video oder Audio im aktuellen Tab mit einem lokalen Whisper-Modell. Nichts wird hochgeladen."
+    "message": "Kostenlose Open-Source-Untertitel für Videos, die im Tab laufen. Lokale Whisper-KI – kein Konto, kein API-Key nötig."
   }
 }
