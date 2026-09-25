@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs</title>
-  <meta name="description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <title>Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs</title>
+  <meta name="description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta name="theme-color" content="#f2f2f2" />
   <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -14,15 +14,15 @@
   <link rel="canonical" href="https://opensubs.app/styles" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="OpenSubs" />
-  <meta property="og:title" content="Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs" />
-  <meta property="og:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <meta property="og:title" content="Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs" />
+  <meta property="og:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
   <meta property="og:url" content="https://opensubs.app/styles" />
   <meta property="og:image" content="https://opensubs.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Subtitle Styles — 12 Free Caption Presets, Rendered Live | OpenSubs" />
-  <meta name="twitter:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow, CJK, cinema, podcast bars and more. Every one rendered live, not a screenshot." />
+  <meta name="twitter:title" content="Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs" />
+  <meta name="twitter:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
   <meta name="twitter:image" content="https://opensubs.app/og-image.png" />
   <script type="application/ld+json">
 {
@@ -43,7 +43,7 @@
     }
   ]
 }
-  </script>
+</script>
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -54,7 +54,7 @@
       "name": "Can I change the subtitle font and colour?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. Every preset here is a starting point: font, size, colour, outline, shadow, box and position are all editable in the app, and a style can be exported as JSON and loaded back."
+        "text": "Colour, yes &mdash; by picking a different one. The twelve run white, broadcast yellow, neon cyan, cinema cream and dark-on-light, outlined or boxed. The typeface is the exception: eleven of the twelve are set in the same face, and the twelfth differs only because Latin fonts cannot draw Chinese, Japanese or Korean. There is no font picker, and no way to save a thirteenth style of your own &mdash; the engine reads a style file with all of that in it, but only the command-line tool takes one today. If a preset is close to what you need, say what is wrong with it; that is how these twelve got here."
       }
     },
     {
@@ -73,9 +73,10 @@
         "text": "The six in the core pack are free. The advanced pack is free too at the moment — the badge in the app says what a thing costs you today."
       }
     }
-  ]
+  ],
+  "inLanguage": "en"
 }
-  </script>
+</script>
   <style>
 
   /* The marketing page's own layout, unchanged apart from six class names.
@@ -206,6 +207,14 @@
   }
 
   .site-header .header-actions > a:not(.site-btn):hover { color: var(--text-strong); }
+  /* GitHub: the project is open source, so the repository is one click from every page */
+  .site-header .header-actions > a.header-gh {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: var(--radius-md);
+    color: var(--text-strong); transition: var(--transition-control);
+  }
+  .site-header .header-actions > a.header-gh:hover { background: var(--surface-hover); }
+  .site-header .header-gh svg { width: 20px; height: 20px; fill: currentColor; }
 
   .site-header nav a {
     color: var(--text-muted);
@@ -247,6 +256,42 @@
     section, .hero { scroll-margin-top: 7.5rem; }
   }
 
+  /* The language picker. Two of them, in fact: the home page and this one
+     mount the Svelte control from src/lib/LanguagePicker.svelte, while
+     /styles -- which deliberately loads tokens and no bundle -- gets a
+     plain <select> written into the markup. They are styled from here so
+     the two look the same and /styles stays free of app.css. */
+  .site-header .lang {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-header .lang select {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 1.6rem 0.3rem 0.5rem;
+    border: 1px solid var(--border-hairline, #dfe3e9);
+    border-radius: var(--radius-md, 8px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .site-header .lang select:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  }
+
+  .site-header .lang-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
   /* --- buttons --- */
 
@@ -522,6 +567,39 @@
   footer a { color: var(--text-muted); text-decoration: none; }
   footer a:hover { color: var(--text-strong); }
   footer .spacer { margin-left: auto; }
+  /* X / YouTube / GitHub: official brand marks, inline because the CSP admits no icon CDN.
+     Brand rules, not our icon scale: YouTube is its official red icon (#FF0033, white triangle),
+     X and GitHub are solid near-black; all at the 20px YouTube minimum, with clear space
+     around each at least the size of the YouTube triangle. Hover never recolours a mark. */
+  footer .socials { display: inline-flex; gap: var(--space-1); }
+  footer .social {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 36px; height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-md);
+    color: var(--text-strong);
+    transition: var(--transition-control);
+  }
+  footer .social:hover { background: var(--surface-hover); }
+  footer .source { display: inline-flex; align-items: center; gap: var(--space-2); }
+  footer .social svg, footer .source svg { width: 20px; height: 20px; fill: currentColor; }
+  footer .source svg { fill: var(--text-strong); }
+  footer .social .yt { width: auto; }
+  @media (pointer: coarse) { footer .social { min-width: 44px; height: 44px; } }
+  /* Downloads: Lucide download glyph on a 16% tint of the product accent */
+  footer .downloads { display: inline-flex; align-items: center; gap: var(--space-2); }
+  footer .dl-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: var(--radius-sm, 6px);
+    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
+    color: var(--app-opensubs);
+  }
+  footer .dl-chip svg { width: 14px; height: 14px; }
+  /* Narrow screens: X / YouTube / Source start their own row instead of splitting across two */
+  @media (max-width: 640px) {
+    footer .wrap { row-gap: var(--space-2); }
+    footer .spacer { flex-basis: 100%; height: 0; margin: 0; }
+    footer .socials { margin-left: -8px; }
+  }
+  @media (max-width: 640px) and (pointer: coarse) { footer .socials { margin-left: -12px; } }
 
   .sr-only {
     position: absolute;
@@ -545,67 +623,40 @@
      which is why this is a row of real links. The globe at the top right is
      for the reader who will not scroll, which on a phone is most of them.
      Both hold the same hrefs, and the current language is marked in both. */
-  .lang-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3, 12px);
-    align-items: center;
-  }
-  footer .lang-row {
-    width: 100%;
-    margin-top: var(--space-4, 16px);
-  }
+  .lang-row { display: flex; flex-wrap: wrap; gap: var(--space-3, 12px); align-items: center; }
+  footer .lang-row { width: 100%; margin-top: var(--space-4, 16px); }
   .lang-row a { color: var(--text-muted); text-decoration: none; }
   .lang-row a:hover { color: var(--text-strong); }
   .lang-row a[aria-current="page"] { color: var(--text-strong); font-weight: 600; }
 
   .lang-menu { position: relative; }
   .lang-menu > summary {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px;
-    color: var(--text-muted);
-    cursor: pointer;
-    list-style: none;
+    display: inline-flex; align-items: center; padding: 4px;
+    color: var(--text-muted); cursor: pointer; list-style: none;
   }
   .lang-menu > summary::-webkit-details-marker { display: none; }
   .lang-menu > summary:hover { color: var(--text-strong); }
   .lang-menu[open] > nav {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 6px);
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 160px;
-    padding: 6px;
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+    display: flex; flex-direction: column; gap: 2px; min-width: 160px; padding: 6px;
     border: var(--border-width, 1px) solid var(--border-hairline, #dfe3e9);
-    border-radius: var(--radius-md, 8px);
-    background: var(--bg-page, #fff);
+    border-radius: var(--radius-md, 8px); background: var(--bg-page, #fff);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
-  .lang-menu nav a {
-    padding: 6px 10px;
-    border-radius: 6px;
-    color: var(--text-muted);
-    text-decoration: none;
-  }
+  .lang-menu nav a { padding: 6px 10px; border-radius: 6px; color: var(--text-muted); text-decoration: none; }
   .lang-menu nav a:hover { background: var(--surface-hover, rgba(0, 0, 0, 0.04)); color: var(--text-strong); }
   .lang-menu nav a[aria-current="page"] { color: var(--text-strong); font-weight: 600; }
   /* On a phone the globe is close enough to the left edge that a menu hung
-     off its own right edge starts off-screen -- measured at 390px wide, the
-     first 28 pixels of it. Hung off the viewport instead, it cannot. */
+     off its own right edge starts off-screen. Hung off the viewport, it cannot. */
   @media (max-width: 640px) {
     .lang-menu[open] > nav {
-      position: fixed;
-      right: 12px;
-      left: auto;
-      top: 56px;
-      max-width: calc(100vw - 24px);
+      position: fixed; right: 12px; left: auto; top: 56px; max-width: calc(100vw - 24px);
     }
   }
 </style>
+  <script type="module" src="/src/styles-page.ts"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="stylesheet" crossorigin href="/assets/styles-i5_-DYtV.css">
 </head>
 <body>
 <!--
@@ -636,8 +687,10 @@
       <a href="/#pricing">Pricing</a>
       <a href="/#downloads">Downloads</a>
       <a href="/styles">Styles</a>
+      <a href="/blog">Blog</a>
     </nav>
     <div class="header-actions">
+      <a class="header-gh" href="https://github.com/open-subs/opensubs" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3.93.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a>
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
       <a class="site-btn site-btn-primary site-btn-sm" href="/#app">Open the app</a>
@@ -668,9 +721,10 @@
         app burns with &mdash; the sizes, colours and outlines are the preset&rsquo;s own.
       </p>
       <p class="lede">
-        Pick one in the app and it looks like this. Change the font, colour,
-        outline or position and it stops looking like this, which is rather the
-        point: a preset is a starting point, not a fixed set.
+        Pick one in the app and it looks like this. Between them the twelve
+        run white, broadcast yellow, neon cyan, cinema cream and dark-on-light;
+        outlined or boxed; from a discreet line at 4&nbsp;% of the frame height
+        to one at 8.5&nbsp;% that is meant to be read across a room.
       </p>
       <div class="cta">
         <a class="site-btn site-btn-primary btn-lg" href="/#app">Open the app</a>
@@ -815,6 +869,71 @@
     </div>
   </section>
 
+  <section id="why">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Twelve looks, one typeface</h2>
+        <p>
+          They differ by colour, weight, size, position and border, and almost
+          never by typeface. That is deliberate. In a browser libass has no
+          system fonts at all, so a preset whose whole identity is a face looks
+          like a bug on every machine that lacks it &mdash; and libass does not
+          warn you about a missing font, it quietly draws something else.
+        </p>
+      </div>
+      <div class="grid grid-4">
+        <div class="site-card">
+          <h3>The one exception, and why</h3>
+          <p>
+            CJK Clean uses a different face because it has to: the Latin font
+            the other eleven share has no Chinese, Japanese or Korean glyphs in
+            it at all.
+          </p>
+        </div>
+        <div class="site-card">
+          <h3>Non-Latin text gets a real font</h3>
+          <p>
+            Chinese, Japanese, Korean, Arabic, Hindi and Thai would otherwise
+            come out as rows of empty boxes &mdash; silently, while the .srt
+            export looked perfect the whole time. Each of those scripts ships
+            with a font of its own.
+          </p>
+        </div>
+        <div class="site-card">
+          <h3>Fetched only when the text needs it</h3>
+          <p>
+            Subtitle something in English and you never download the two
+            megabytes of Chinese and Japanese. The font arrives when the words
+            actually call for it, not on first load.
+          </p>
+        </div>
+        <div class="site-card">
+          <h3>The preview is the renderer</h3>
+          <p>
+            Not a CSS lookalike. The same libass that draws the captions on
+            this page draws the ones burned into your MP4, so outline widths,
+            margins and CJK line breaking are what you will get.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="effects">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Two things that sit on top of any preset</h2>
+        <p>
+          <strong>Karaoke highlight</strong> keeps the whole line on screen and
+          picks out the word being spoken as it is said. It runs off the cue
+          timings, so it works on a .srt you brought from somewhere else.
+          <strong>Size by loudness</strong> sets each word at a size taken from
+          how loud it actually was &mdash; measured from the audio while the
+          subtitles were being written, which is why it is offered only for
+          subtitles this app transcribed and not for an imported file.
+        </p>
+      </div>
+    </div>
+  </section>
   <section id="faq">
     <div class="wrap">
       <div class="section-head">
@@ -823,11 +942,11 @@
       <div class="faq">
         <details>
           <summary>Can I change the subtitle font and colour?</summary>
-          <p>Yes. Every preset here is a starting point: font, size, colour, outline, shadow, box and position are all editable in the app, and a style can be exported as JSON and loaded back.</p>
+          <p>Colour, yes &mdash; by picking a different one. The twelve run white, broadcast yellow, neon cyan, cinema cream and dark-on-light, outlined or boxed. The typeface is the exception: eleven of the twelve are set in the same face, and the twelfth differs only because Latin fonts cannot draw Chinese, Japanese or Korean. There is no font picker, and no way to save a thirteenth style of your own &mdash; the engine reads a style file with all of that in it, but only the command-line tool takes one today. If a preset is close to what you need, say what is wrong with it; that is how these twelve got here.</p>
         </details>
         <details>
           <summary>Which subtitle style should I use for TikTok or Reels?</summary>
-          <p>Shorts Safe Area and Reel Box sit high enough to clear the interface a vertical platform draws over the bottom of the frame. Both use a large size so the text survives being watched on a phone.</p>
+          <p>Shorts Safe Area and Reel Box sit high enough to clear the interface <a href="/blog/subtitles-for-reels-and-tiktok">a vertical platform draws over the bottom of the frame</a>. Both use a large size so the text survives being watched on a phone.</p>
         </details>
         <details>
           <summary>Are these styles free?</summary>
@@ -843,24 +962,28 @@
     <span>&copy; 2026 OpenSubs</span>
     <a href="/privacy.html">Privacy</a>
     <a href="/styles">Styles</a>
-    <a href="https://github.com/open-subs/opensubs/releases">Downloads</a>
+    <a href="/burn-subtitles-into-video">Burn subtitles in</a>
+    <a href="/translate-subtitles">Translate subtitles</a>
+    <a href="/subtitle-sites">Subtitle sites</a>
+    <a href="/blog">Blog</a>
+    <a class="downloads" href="https://github.com/open-subs/opensubs/releases"><span class="dl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></span>Downloads</a>
     <span class="spacer"></span>
-    <a href="https://github.com/open-subs/opensubs">Source, AGPL-3.0</a>
+    <span class="socials"><a class="social" href="https://x.com/OpenSubsApp" aria-label="X" title="X"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a><a class="social" href="https://www.youtube.com/@OpenSubsapp" aria-label="YouTube" title="YouTube"><svg class="yt" viewBox="0 0 396.53 277.78" aria-hidden="true" focusable="false"><path fill="#FF0033" d="M158.73 198.41L261.56 138.74L158.73 79.37ZM43.45 269.38C26.36 264.74 13.03 251.13 8.11 234.33C0 203.34 0 138.74 0 138.74C0 138.74 0 74.15 8.11 43.45C13.03 26.36 26.36 13.03 43.45 8.4C74.15 0 198.12 0 198.12 0C198.12 0 322.38 0 353.09 8.4C370.46 13.03 383.5 26.36 388.13 43.45C396.53 74.15 396.53 138.74 396.53 138.74C396.53 138.74 396.53 203.34 388.13 234.33C383.5 251.13 370.46 264.74 353.09 269.38C322.38 277.78 198.12 277.78 198.12 277.78C198.12 277.78 74.15 277.78 43.45 269.38"/><path fill="#FFFFFF" d="M158.73 198.41L261.56 138.74L158.73 79.37Z"/></svg></a></span>
+    <a class="source" href="https://github.com/open-subs/opensubs"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3.93.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>Source, AGPL-3.0</a>
   </div>
   <div class="wrap">
-  <nav class="lang-row" aria-label="Language">
-    <a href="/styles" hreflang="en" lang="en" translate="no" aria-current="page">English</a>
-    <a href="/zh-Hans/styles" hreflang="zh-Hans" lang="zh-Hans" translate="no">简体中文</a>
-    <a href="/zh-Hant/styles" hreflang="zh-Hant" lang="zh-Hant" translate="no">繁體中文</a>
-    <a href="/ja/styles" hreflang="ja" lang="ja" translate="no">日本語</a>
-    <a href="/ko/styles" hreflang="ko" lang="ko" translate="no">한국어</a>
-    <a href="/de/styles" hreflang="de" lang="de" translate="no">Deutsch</a>
-    <a href="/es/styles" hreflang="es" lang="es" translate="no">Español</a>
-    <a href="/pt/styles" hreflang="pt" lang="pt" translate="no">Português</a>
-  </nav>
+    <nav class="lang-row" aria-label="Language">
+      <a href="/styles" hreflang="en" lang="en" translate="no" aria-current="page">English</a>
+      <a href="/zh-Hans/styles" hreflang="zh-Hans" lang="zh-Hans" translate="no">简体中文</a>
+      <a href="/zh-Hant/styles" hreflang="zh-Hant" lang="zh-Hant" translate="no">繁體中文</a>
+      <a href="/ja/styles" hreflang="ja" lang="ja" translate="no">日本語</a>
+      <a href="/ko/styles" hreflang="ko" lang="ko" translate="no">한국어</a>
+      <a href="/de/styles" hreflang="de" lang="de" translate="no">Deutsch</a>
+      <a href="/es/styles" hreflang="es" lang="es" translate="no">Español</a>
+      <a href="/pt/styles" hreflang="pt" lang="pt" translate="no">Português</a>
+    </nav>
   </div>
 </footer>
 </div>
-<script type="module" src="/src/styles-page.ts"></script>
 </body>
 </html>

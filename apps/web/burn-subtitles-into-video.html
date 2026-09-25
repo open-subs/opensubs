@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Burn Subtitles Into Video &mdash; Free, In Your Browser | OpenSubs</title>
-<meta name="description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta name="description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 <meta name="theme-color" content="#f2f2f2" />
 
@@ -17,14 +17,14 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="OpenSubs" />
 <meta property="og:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
-<meta property="og:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta property="og:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
 <meta property="og:url" content="https://opensubs.app/burn-subtitles-into-video" />
 <meta property="og:image" content="https://opensubs.app/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
-<meta name="twitter:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account. Free and open source." />
+<meta name="twitter:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
 <meta name="twitter:image" content="https://opensubs.app/og-image.png" />
 
 <!-- Structured data. Three entities, each describing something already
@@ -42,7 +42,12 @@
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "OpenSubs",
-  "url": "https://opensubs.app/",
+  "url": "https://opensubs.app/burn-subtitles-into-video",
+  "sameAs": [
+    "https://github.com/open-subs/opensubs",
+    "https://x.com/OpenSubsApp",
+    "https://www.youtube.com/@OpenSubsapp"
+  ],
   "logo": {
     "@type": "ImageObject",
     "url": "https://opensubs.app/icon-192.png",
@@ -59,7 +64,7 @@
   "applicationCategory": "MultimediaApplication",
   "operatingSystem": "Any browser with WebAssembly — Chrome, Edge, Safari, Firefox",
   "browserRequirements": "A browser with WebAssembly. WebGPU makes transcription faster but is not required.",
-  "url": "https://opensubs.app/",
+  "url": "https://opensubs.app/burn-subtitles-into-video",
   "description": "A browser tool that transcribes speech to subtitles, translates them, styles them, and burns them into the video — all on the user's own machine. The video is never uploaded. Free with no account; optional paid translation on our own backend, priced before you run it.",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "offers": [
@@ -85,7 +90,57 @@
     "Word-by-word highlighting timed to the speech",
     "Burn subtitles into MP4",
     "Export SRT, VTT and ASS"
-  ]
+  ],
+  "inLanguage": "en"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I merge an SRT file with an MP4?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Load the MP4 in OpenSubs, open the .srt, and burn. The result is a new MP4 with the subtitles in the picture; your original file stays as it was."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can burned-in subtitles be turned off?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Once burned in, they are part of the picture. If viewers need to switch them off, export the subtitles as .srt or .vtt instead and add that file alongside the video."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which subtitle files can I open?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": ".srt and .vtt. OpenSubs writes .ass files but does not open them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I add an SRT to an MP4 without burning it in?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not here. OpenSubs either draws the subtitles into the picture or hands you the .srt, .vtt or .ass file to keep beside the video — it does not write a soft subtitle track into the MP4 itself. If you need subtitles a viewer can switch off, export the file and upload or ship it alongside."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does burning subtitles in reduce the video quality?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The picture is re-encoded, so strictly yes, but the bitrate is picked to match what the desktop build uses and the difference is not something you will see. The audio is not touched at all: its packets are copied across, so speech lands on exactly the same instants it did before."
+      }
+    }
+  ],
+  "inLanguage": "en"
 }
 </script>
 
@@ -218,6 +273,14 @@
   }
 
   .site-header .header-actions > a:not(.site-btn):hover { color: var(--text-strong); }
+  /* GitHub: the project is open source, so the repository is one click from every page */
+  .site-header .header-actions > a.header-gh {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: var(--radius-md);
+    color: var(--text-strong); transition: var(--transition-control);
+  }
+  .site-header .header-actions > a.header-gh:hover { background: var(--surface-hover); }
+  .site-header .header-gh svg { width: 20px; height: 20px; fill: currentColor; }
 
   .site-header nav a {
     color: var(--text-muted);
@@ -259,6 +322,42 @@
     section, .hero { scroll-margin-top: 7.5rem; }
   }
 
+  /* The language picker. Two of them, in fact: the home page and this one
+     mount the Svelte control from src/lib/LanguagePicker.svelte, while
+     /styles -- which deliberately loads tokens and no bundle -- gets a
+     plain <select> written into the markup. They are styled from here so
+     the two look the same and /styles stays free of app.css. */
+  .site-header .lang {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-header .lang select {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 1.6rem 0.3rem 0.5rem;
+    border: 1px solid var(--border-hairline, #dfe3e9);
+    border-radius: var(--radius-md, 8px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .site-header .lang select:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  }
+
+  .site-header .lang-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
   /* --- buttons --- */
 
@@ -520,6 +619,8 @@
   summary::after { content: "+"; color: var(--text-faint); font-weight: 400; }
   details[open] summary::after { content: "\2212"; }
   details p { color: var(--text-muted); margin: var(--space-3) 0 0; max-width: 46rem; }
+  /* Already have a subtitle file: several paragraphs under one section head */
+  #srt .section-head p + p { margin-top: var(--space-3); }
 
   /* --- footer --- */
 
@@ -534,6 +635,39 @@
   footer a { color: var(--text-muted); text-decoration: none; }
   footer a:hover { color: var(--text-strong); }
   footer .spacer { margin-left: auto; }
+  /* X / YouTube / GitHub: official brand marks, inline because the CSP admits no icon CDN.
+     Brand rules, not our icon scale: YouTube is its official red icon (#FF0033, white triangle),
+     X and GitHub are solid near-black; all at the 20px YouTube minimum, with clear space
+     around each at least the size of the YouTube triangle. Hover never recolours a mark. */
+  footer .socials { display: inline-flex; gap: var(--space-1); }
+  footer .social {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 36px; height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-md);
+    color: var(--text-strong);
+    transition: var(--transition-control);
+  }
+  footer .social:hover { background: var(--surface-hover); }
+  footer .source { display: inline-flex; align-items: center; gap: var(--space-2); }
+  footer .social svg, footer .source svg { width: 20px; height: 20px; fill: currentColor; }
+  footer .source svg { fill: var(--text-strong); }
+  footer .social .yt { width: auto; }
+  @media (pointer: coarse) { footer .social { min-width: 44px; height: 44px; } }
+  /* Downloads: Lucide download glyph on a 16% tint of the product accent */
+  footer .downloads { display: inline-flex; align-items: center; gap: var(--space-2); }
+  footer .dl-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: var(--radius-sm, 6px);
+    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
+    color: var(--app-opensubs);
+  }
+  footer .dl-chip svg { width: 14px; height: 14px; }
+  /* Narrow screens: X / YouTube / Source start their own row instead of splitting across two */
+  @media (max-width: 640px) {
+    footer .wrap { row-gap: var(--space-2); }
+    footer .spacer { flex-basis: 100%; height: 0; margin: 0; }
+    footer .socials { margin-left: -8px; }
+  }
+  @media (max-width: 640px) and (pointer: coarse) { footer .socials { margin-left: -12px; } }
 
   .sr-only {
     position: absolute;
@@ -556,68 +690,39 @@
      which is why this is a row of real links. The globe at the top right is
      for the reader who will not scroll, which on a phone is most of them.
      Both hold the same hrefs, and the current language is marked in both. */
-  .lang-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3, 12px);
-    align-items: center;
-  }
-  footer .lang-row {
-    width: 100%;
-    margin-top: var(--space-4, 16px);
-  }
+  .lang-row { display: flex; flex-wrap: wrap; gap: var(--space-3, 12px); align-items: center; }
+  footer .lang-row { width: 100%; margin-top: var(--space-4, 16px); }
   .lang-row a { color: var(--text-muted); text-decoration: none; }
   .lang-row a:hover { color: var(--text-strong); }
   .lang-row a[aria-current="page"] { color: var(--text-strong); font-weight: 600; }
 
   .lang-menu { position: relative; }
   .lang-menu > summary {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px;
-    color: var(--text-muted);
-    cursor: pointer;
-    list-style: none;
+    display: inline-flex; align-items: center; padding: 4px;
+    color: var(--text-muted); cursor: pointer; list-style: none;
   }
   .lang-menu > summary::-webkit-details-marker { display: none; }
   .lang-menu > summary:hover { color: var(--text-strong); }
   .lang-menu[open] > nav {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 6px);
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 160px;
-    padding: 6px;
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+    display: flex; flex-direction: column; gap: 2px; min-width: 160px; padding: 6px;
     border: var(--border-width, 1px) solid var(--border-hairline, #dfe3e9);
-    border-radius: var(--radius-md, 8px);
-    background: var(--bg-page, #fff);
+    border-radius: var(--radius-md, 8px); background: var(--bg-page, #fff);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
-  .lang-menu nav a {
-    padding: 6px 10px;
-    border-radius: 6px;
-    color: var(--text-muted);
-    text-decoration: none;
-  }
+  .lang-menu nav a { padding: 6px 10px; border-radius: 6px; color: var(--text-muted); text-decoration: none; }
   .lang-menu nav a:hover { background: var(--surface-hover, rgba(0, 0, 0, 0.04)); color: var(--text-strong); }
   .lang-menu nav a[aria-current="page"] { color: var(--text-strong); font-weight: 600; }
   /* On a phone the globe is close enough to the left edge that a menu hung
-     off its own right edge starts off-screen -- measured at 390px wide, the
-     first 28 pixels of it. Hung off the viewport instead, it cannot. */
+     off its own right edge starts off-screen. Hung off the viewport, it cannot. */
   @media (max-width: 640px) {
     .lang-menu[open] > nav {
-      position: fixed;
-      right: 12px;
-      left: auto;
-      top: 56px;
-      max-width: calc(100vw - 24px);
+      position: fixed; right: 12px; left: auto; top: 56px; max-width: calc(100vw - 24px);
     }
   }
 </style>
-  </head>
+    <script type="module" src="/src/main.ts"></script>
+</head>
   <body>
     <!-- One ground for the whole page.
          The design system runs marketing surfaces dark and product
@@ -631,7 +736,7 @@
     <div class="site-chrome">
 <header class="site-header">
   <div class="wrap">
-    <a class="site-brand" href="#top">
+    <a class="site-brand" href="/">
       <span class="brand-tile" aria-hidden="true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
           <rect x="2" y="4.5" width="20" height="15" rx="2.6" stroke="currentColor" stroke-width="2"/>
@@ -642,13 +747,15 @@
       <span class="brand-word" translate="no"><span class="muted">Open</span>Subs<span class="dot">.</span></span>
     </a>
     <nav class="site-nav" aria-label="Primary">
-      <a href="#how">How it works</a>
+      <a href="/#how">How it works</a>
       <a href="/#privacy">Privacy</a>
       <a href="/#pricing">Pricing</a>
       <a href="/#downloads">Downloads</a>
       <a href="/styles">Styles</a>
+      <a href="/blog">Blog</a>
     </nav>
     <div class="header-actions">
+      <a class="header-gh" href="https://github.com/open-subs/opensubs" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3.93.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a>
       <!-- APP-48: #app had no link anywhere on the site, so the one
            URL that opens the tool directly could not be reached from it. -->
       <a class="site-btn site-btn-primary site-btn-sm" href="/#app">Open the app</a>
@@ -786,6 +893,99 @@
     </div>
   </div>
 </section>
+<section id="output">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>What comes out</h2>
+      <p>
+        One new file, next to nothing else changed. The picture is
+        re-encoded because it has to be &mdash; the words are in it now
+        &mdash; and everything else is carried across as it was.
+      </p>
+    </div>
+    <div class="grid grid-4">
+      <div class="site-card">
+        <h3>H.264 in an MP4, by default</h3>
+        <p>
+          The format every phone, editor and social platform takes without
+          re-encoding it again. Where a browser has no H.264 encoder,
+          OpenSubs falls back to VP9 in a WebM, and checks before it offers
+          you the button rather than failing halfway through.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>A quality target, not a size target</h3>
+        <p>
+          The bitrate is picked to match what the desktop build encodes at,
+          which is generous enough that subtitle edges stay crisp instead of
+          turning to mush in the first dark scene.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>Variable frame rate survives</h3>
+        <p>
+          Output timestamps come from the source&rsquo;s own samples rather
+          than a synthetic clock, so a screen recording that drifts between
+          frame rates stays in sync.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>When the audio cannot come along</h3>
+        <p>
+          AAC cannot live in a WebM. Re-encoding it would break the one
+          promise this makes about audio, so OpenSubs drops the track and
+          tells you, rather than quietly degrading it.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="limits">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>What it does not preserve</h2>
+      <p>
+        Colour metadata. A browser hands over a decoded frame without the
+        container&rsquo;s colour tags, so an HDR source is tone-mapped by the
+        decoder in a way this page cannot control or even describe. Rather
+        than mangle it quietly, OpenSubs flags an HDR file and points you at
+        the desktop app or the command line, which read the real file and get
+        it right. For ordinary SDR video &mdash; which is nearly all of it
+        &mdash; this never comes up.
+      </p>
+    </div>
+  </div>
+</section>
+<section id="srt">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Already have an SRT file?</h2>
+      <p>You don&rsquo;t have to generate the subtitles here to burn them. Load the video, then <a href="/blog/subtitle-file-formats">open the .srt or .vtt you already have</a> &mdash; from a translator, an editor or another tool. If the characters come out garbled, choose the file&rsquo;s text encoding and it is read again.</p>
+      <p>Pick a style, check the preview and burn. OpenSubs saves a new MP4, named after your video with .subbed.mp4 on the end: the picture with the subtitles drawn into it, and the audio copied across untouched.</p>
+      <p>Word-by-word highlighting works on imported subtitles too, because it runs off the cue timings. Sizing words by how loud they were does not: that needs the audio this app transcribed.</p>
+    </div>
+    <details>
+      <summary>How do I merge an SRT file with an MP4?</summary>
+      <p>Load the MP4 in OpenSubs, open the .srt, and burn. The result is a new MP4 with the subtitles in the picture; your original file stays as it was.</p>
+    </details>
+    <details>
+      <summary>Can burned-in subtitles be turned off?</summary>
+      <p>No. Once burned in, they are part of the picture. If viewers need to switch them off, export the subtitles as .srt or .vtt instead and add that file alongside the video.</p>
+    </details>
+    <details>
+      <summary>Which subtitle files can I open?</summary>
+      <p>.srt and .vtt. OpenSubs writes .ass files but does not open them.</p>
+    </details>
+    <details>
+      <summary>Can I add an SRT to an MP4 without burning it in?</summary>
+      <p>Not here. OpenSubs either draws the subtitles into the picture or hands you the .srt, .vtt or .ass file to keep beside the video &mdash; it does not write a soft subtitle track into the MP4 itself. If you need subtitles a viewer can switch off, export the file and upload or ship it alongside.</p>
+    </details>
+    <details>
+      <summary>Does burning subtitles in reduce the video quality?</summary>
+      <p>The picture is re-encoded, so strictly yes, but the bitrate is picked to match what the desktop build uses and the difference is not something you will see. The audio is not touched at all: its packets are copied across, so speech lands on exactly the same instants it did before.</p>
+    </details>
+  </div>
+</section>
       </main>
 
 <footer>
@@ -793,24 +993,28 @@
     <span>&copy; 2026 OpenSubs</span>
     <a href="/privacy.html">Privacy</a>
     <a href="/styles">Styles</a>
-    <a href="https://github.com/open-subs/opensubs/releases">Downloads</a>
+    <a href="/burn-subtitles-into-video">Burn subtitles in</a>
+    <a href="/translate-subtitles">Translate subtitles</a>
+    <a href="/subtitle-sites">Subtitle sites</a>
+    <a href="/blog">Blog</a>
+    <a class="downloads" href="https://github.com/open-subs/opensubs/releases"><span class="dl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></span>Downloads</a>
     <span class="spacer"></span>
-    <a href="https://github.com/open-subs/opensubs">Source, AGPL-3.0</a>
+    <span class="socials"><a class="social" href="https://x.com/OpenSubsApp" aria-label="X" title="X"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a><a class="social" href="https://www.youtube.com/@OpenSubsapp" aria-label="YouTube" title="YouTube"><svg class="yt" viewBox="0 0 396.53 277.78" aria-hidden="true" focusable="false"><path fill="#FF0033" d="M158.73 198.41L261.56 138.74L158.73 79.37ZM43.45 269.38C26.36 264.74 13.03 251.13 8.11 234.33C0 203.34 0 138.74 0 138.74C0 138.74 0 74.15 8.11 43.45C13.03 26.36 26.36 13.03 43.45 8.4C74.15 0 198.12 0 198.12 0C198.12 0 322.38 0 353.09 8.4C370.46 13.03 383.5 26.36 388.13 43.45C396.53 74.15 396.53 138.74 396.53 138.74C396.53 138.74 396.53 203.34 388.13 234.33C383.5 251.13 370.46 264.74 353.09 269.38C322.38 277.78 198.12 277.78 198.12 277.78C198.12 277.78 74.15 277.78 43.45 269.38"/><path fill="#FFFFFF" d="M158.73 198.41L261.56 138.74L158.73 79.37Z"/></svg></a></span>
+    <a class="source" href="https://github.com/open-subs/opensubs"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3.93.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>Source, AGPL-3.0</a>
   </div>
   <div class="wrap">
-  <nav class="lang-row" aria-label="Language">
-    <a href="/burn-subtitles-into-video" hreflang="en" lang="en" translate="no" aria-current="page">English</a>
-    <a href="/zh-Hans/burn-subtitles-into-video" hreflang="zh-Hans" lang="zh-Hans" translate="no">简体中文</a>
-    <a href="/zh-Hant/burn-subtitles-into-video" hreflang="zh-Hant" lang="zh-Hant" translate="no">繁體中文</a>
-    <a href="/ja/burn-subtitles-into-video" hreflang="ja" lang="ja" translate="no">日本語</a>
-    <a href="/ko/burn-subtitles-into-video" hreflang="ko" lang="ko" translate="no">한국어</a>
-    <a href="/de/burn-subtitles-into-video" hreflang="de" lang="de" translate="no">Deutsch</a>
-    <a href="/es/burn-subtitles-into-video" hreflang="es" lang="es" translate="no">Español</a>
-    <a href="/pt/burn-subtitles-into-video" hreflang="pt" lang="pt" translate="no">Português</a>
-  </nav>
+    <nav class="lang-row" aria-label="Language">
+      <a href="/burn-subtitles-into-video" hreflang="en" lang="en" translate="no" aria-current="page">English</a>
+      <a href="/zh-Hans/burn-subtitles-into-video" hreflang="zh-Hans" lang="zh-Hans" translate="no">简体中文</a>
+      <a href="/zh-Hant/burn-subtitles-into-video" hreflang="zh-Hant" lang="zh-Hant" translate="no">繁體中文</a>
+      <a href="/ja/burn-subtitles-into-video" hreflang="ja" lang="ja" translate="no">日本語</a>
+      <a href="/ko/burn-subtitles-into-video" hreflang="ko" lang="ko" translate="no">한국어</a>
+      <a href="/de/burn-subtitles-into-video" hreflang="de" lang="de" translate="no">Deutsch</a>
+      <a href="/es/burn-subtitles-into-video" hreflang="es" lang="es" translate="no">Español</a>
+      <a href="/pt/burn-subtitles-into-video" hreflang="pt" lang="pt" translate="no">Português</a>
+    </nav>
   </div>
 </footer>
     </div>
-    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
