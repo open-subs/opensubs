@@ -30,10 +30,15 @@ Anything with no entry in a catalogue falls back to English, so a gap is
 survivable; `--check` is what makes it loud.
 """
 
+import glob
+import datetime
+import html
+import unicodedata
 import io
 import json
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +71,23 @@ PAGES = {
     "styles.html": ("styles", "2026-09-10", "monthly", "0.8"),
     "privacy.html": ("privacy.html", "2026-08-29", "yearly", "0.3"),
 }
+
+# Which languages a page exists in, where that is not all of them.
+#
+# A ring may only name pages that exist: Google's requirement is that every
+# version declared is real, not that every language is present. The
+# Portuguese guide is the first page written in one language and not the
+# other six, and a ring auto-filled to eight would have declared six
+# addresses that 404 -- worse than having no ring at all (APP-180).
+#
+# The footer row still offers all eight: a language with no copy of *this*
+# page links to that language's home, which exists, and the reader gets
+# where they were going.
+PAGE_LOCALES = {}
+
+
+def locales_for(page):
+    return PAGE_LOCALES.get(page, LOCALES)
 
 # og:locale wants a POSIX-ish tag, not BCP 47.
 OG_LOCALE = {
@@ -148,7 +170,7 @@ def hreflang_ring(page):
     """
     lines = [
         f'<link rel="alternate" hreflang="{code}" href="{url_for(code, page)}" />'
-        for code in LOCALES
+        for code in locales_for(page)
     ]
     lines.append(f'<link rel="alternate" hreflang="x-default" href="{url_for("en", page)}" />')
     return "\n".join(lines)
@@ -304,6 +326,99 @@ def retarget_ld(data, page, locale):
 
 # --- sitemap ------------------------------------------------------------
 
+def last_changed(path, fallback):
+    """When this page last changed, as its repository records it.
+
+    A date typed into the table above is right on the day it is typed and
+    wrong from then on: the home page said 2026-09-10 while the copy on it
+    had been rewritten twice since (APP-180). `git log` knows, and it knows
+    per file, so a page that has not changed keeps its old date -- which is
+    the point of the field. Falls back to the table where git cannot answer,
+    as in a tarball with no history.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", os.path.dirname(path) or ".", "log", "-1", "--format=%cs", "--", os.path.basename(path)],
+            capture_output=True, text=True, timeout=10)
+        stamp = out.stdout.strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp):
+            return stamp
+    except Exception:
+        pass
+    return fallback
+
+
+def handwritten():
+    """The pages this script does not generate, read off the build itself.
+
+    The blog, the two landing pages and the Portuguese guide are written by
+    hand into the deploy directory; this script writes the sitemap. Listing
+    only its own pages dropped eleven URLs from it -- including the whole
+    blog -- every time it ran (APP-180). Rather than a second list to keep
+    in step, each page is read for what it already declares: its canonical,
+    its own hreflang ring, and whether it asks to be indexed at all.
+    """
+    out = []
+    for path in sorted(glob.glob(os.path.join(DIST, "**", "*.html"), recursive=True)):
+        rel = os.path.relpath(path, DIST)
+        if rel in PAGES or any(rel == os.path.join(loc, p) or rel == f"{loc}.html"
+                               for loc in LOCALES for p in PAGES):
+            continue
+        raw = io.open(path, encoding="utf-8", errors="replace").read()
+        if re.search(r'<meta name="robots"[^>]*noindex', raw):
+            continue
+        canonical = re.search(r'<link rel="canonical" href="([^"]+)"', raw)
+        if not canonical:
+            continue
+        ring = [(code, href) for code, href in
+                re.findall(r'<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"', raw)]
+        when = last_changed(path, datetime.date.fromtimestamp(os.path.getmtime(path)).isoformat())
+        out.append((canonical.group(1), when, ring))
+    return out
+
+
+# What a search result has room for. Google measures pixels; columns are the
+# workable stand-in, and the two disagreements that matter are both handled
+# below: a CJK character occupies two columns, and `&mdash;` is seven
+# characters of source that a reader sees as one (APP-180).
+TITLE_COLUMNS = 60
+DESCRIPTION_COLUMNS = (100, 170)
+
+
+def columns(text):
+    """How wide `text` renders, in columns."""
+    shown = html.unescape(re.sub(r"<[^>]+>", "", text))
+    wide = sum(1 for c in shown if unicodedata.east_asian_width(c) in ("W", "F"))
+    return len(shown) + wide
+
+
+def too_long(page, locale, raw):
+    """Titles and descriptions a search result would cut off."""
+    faults = []
+    title = re.search(r"<title>(.*?)</title>", raw, re.S)
+    if title:
+        width = columns(title.group(1))
+        if width > TITLE_COLUMNS:
+            faults.append(f"{locale}/{page}: title is {width} columns, over {TITLE_COLUMNS} -- "
+                          f"Google cuts it mid-sentence")
+    description = re.search(r'<meta name="description" content="([^"]*)"', raw)
+    if description:
+        width = columns(description.group(1))
+        low, high = DESCRIPTION_COLUMNS
+        if not low <= width <= high:
+            faults.append(f"{locale}/{page}: description is {width} columns, outside {low}-{high}")
+    return faults
+
+
+def page_source(page):
+    """Where this page is written, which is not always in this repository."""
+    site = os.environ.get("SITE_SOURCE") or os.path.join(WEB, "..", "..", "..", "opensubs-website")
+    at = {"index.html": ("template", "index.html"), "privacy.html": ("public", "privacy.html")}
+    if page in at and os.path.isdir(site):
+        return os.path.join(site, *at[page])
+    return os.path.join(WEB, page)
+
+
 def sitemap():
     """Every page in every language, each listing the whole ring.
 
@@ -325,18 +440,28 @@ def sitemap():
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            'xmlns:xhtml="http://www.w3.org/1999/xhtml">']
     for page, (_, lastmod, changefreq, priority) in PAGES.items():
-        for locale in LOCALES:
+        lastmod = last_changed(page_source(page), lastmod)
+        for locale in locales_for(page):
             out.append("  <url>")
             out.append(f"    <loc>{url_for(locale, page)}</loc>")
             out.append(f"    <lastmod>{lastmod}</lastmod>")
             out.append(f"    <changefreq>{changefreq}</changefreq>")
             out.append(f"    <priority>{priority}</priority>")
-            for other in LOCALES:
+            for other in locales_for(page):
                 out.append(f'    <xhtml:link rel="alternate" hreflang="{other}" '
                            f'href="{url_for(other, page)}" />')
             out.append('    <xhtml:link rel="alternate" hreflang="x-default" '
                        f'href="{url_for("en", page)}" />')
             out.append("  </url>")
+    for url, lastmod, ring in handwritten():
+        out.append("  <url>")
+        out.append(f"    <loc>{url}</loc>")
+        out.append(f"    <lastmod>{lastmod}</lastmod>")
+        out.append("    <changefreq>monthly</changefreq>")
+        out.append("    <priority>0.7</priority>")
+        for code, href in ring:
+            out.append(f'    <xhtml:link rel="alternate" hreflang="{code}" href="{href}" />')
+        out.append("  </url>")
     out.append("</urlset>")
     return "\n".join(out) + "\n"
 
@@ -376,6 +501,7 @@ def main():
 
     stats = {"seen": set(), "missing": {}}
     written = 0
+    overlong = []
     for page, path in sources.items():
         raw = io.open(path, encoding="utf-8").read()
         for locale in LOCALES:
@@ -392,6 +518,7 @@ def main():
                 target = os.path.join(DIST, locale, page)
             io.open(target, "w", encoding="utf-8").write(out)
             written += 1
+            overlong.extend(too_long(page, locale, out))
 
     if not check_only:
         io.open(os.path.join(DIST, "sitemap.xml"), "w", encoding="utf-8").write(sitemap())
@@ -425,9 +552,17 @@ def main():
             for key in same[:6]:
                 print(f"      {key[:88]}")
 
-    print(f"{written} pages, {len(keys)} keys, {gaps} gaps, {echoes} untouched")
+    if overlong:
+        print(f"  {len(overlong)} title(s) or description(s) a search result would cut:")
+        for fault in overlong[:8]:
+            print(f"      {fault}")
+
+    print(f"{written} pages, {len(keys)} keys, {gaps} gaps, {echoes} untouched, "
+          f"{len(overlong)} over length")
     if (gaps or echoes) and "--strict" in sys.argv:
         raise SystemExit("untranslated copy would ship; refusing")
+    if overlong and "--strict" in sys.argv:
+        raise SystemExit("a title or description would be cut off in the results; refusing")
 
 
 if __name__ == "__main__":
