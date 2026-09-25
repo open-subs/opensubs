@@ -136,9 +136,31 @@ IDENTICAL = {
     "Talking Head", "Business", "Credits", "Clips", "clips", "Film",
     "Gaming Neon Cyan", "cinema", "trailer",
     "<span>Paris, 1968</span>", "<span>\u5b57\u5e55\u306f\u81ea\u52d5\u3067\u4f5c\u308c\u307e\u3059</span>",
+    # Names of things, and the one English word German, Spanish and
+    # Portuguese all borrowed. Translating any of these would be wrong.
+    "GitHub", "X", "YouTube", "opensubs.app", "&copy; 2026 OpenSubs", "Blog",
 }
 
 ASSET_HREF = re.compile(r"\.(png|ico|svg|txt|xml|json|wasm|webmanifest|jpg|webp)$")
+
+
+def has_page(locale, path):
+    """Does `locale` have its own copy of the page at this site path?
+
+    Two sources, because neither alone is complete while the build is
+    running: the pages this script generates may not be on disk yet -- the
+    home page is written before `styles.html` -- and the hand-written ones
+    are never in PAGES. Clean URLs, so `blog/srt-to-vtt` is the file
+    `blog/srt-to-vtt.html`.
+    """
+    if locale == "en":
+        return True
+    if path in {PAGES[p][0] for p in PAGES if locale in locales_for(p)}:
+        return True
+    if not path:
+        return os.path.exists(os.path.join(DIST, f"{locale}.html"))
+    rel = path if path.endswith(".html") else path + ".html"
+    return os.path.exists(os.path.join(DIST, locale, rel))
 
 
 def localise_link(href, locale):
@@ -158,7 +180,30 @@ def localise_link(href, locale):
             return href
     if path == "/":
         path = ""
+    if not has_page(locale, path.lstrip("/")):
+        # No copy of that page in this language. The English one exists and
+        # says something; `/zh-Hant/blog/srt-to-vtt` is a 404. The seven
+        # blog posts and the two landing pages are English-only, and the
+        # home page links all of them (APP-180).
+        return href
     return f"/{locale}{path}{sep}{fragment}"
+
+
+ALTERNATE = re.compile(
+    r'\s*<link rel="alternate" hreflang="[^"]*" href="[^"]*" />')
+
+
+def end_of_ring(raw, at):
+    """Where the alternates that already follow `at` stop.
+
+    `at` is just past the canonical link. Returns `at` itself when no ring
+    is there yet, so the caller's edit is a plain insertion.
+    """
+    while True:
+        hit = ALTERNATE.match(raw, at)
+        if not hit:
+            return at
+        at = hit.end()
 
 
 def hreflang_ring(page):
@@ -250,9 +295,14 @@ def translate_page(raw, page, locale, catalogue, stats):
             span = S.attr_span(tree, node, "href")
             edits.append((span[0], span[1], url_for(locale, page)))
             # The ring goes in right after the canonical, where a reader
-            # of the source expects to find it.
+            # of the source expects to find it -- replacing a ring that is
+            # already there rather than adding a second one. That matters
+            # because the source and the target can be the same file: a
+            # second run over a built tree would otherwise stack rings, and
+            # nothing downstream complains about a page declaring the same
+            # alternate four times.
             close = raw.find(">", node.tag_start) + 1
-            edits.append((close, close, "\n" + hreflang_ring(page)))
+            edits.append((close, end_of_ring(raw, close), "\n" + hreflang_ring(page)))
         if node.tag == "meta" and node.attrs.get("property") == "og:url":
             span = S.attr_span(tree, node, "content")
             edits.append((span[0], span[1], url_for(locale, page)))
@@ -284,11 +334,50 @@ def translate_page(raw, page, locale, catalogue, stats):
     # in the source would collide with the rewrite of the block they sit
     # inside. The translations keep every href verbatim, so one pass over
     # the finished document reaches both.
-    return ANCHOR.sub(
+    out = ANCHOR.sub(
         lambda m: m.group(0) if SPEAKS_FOR_ITSELF.search(m.group(0)) else
         m.group(1) + localise_link(m.group(2), locale) + m.group(3),
         S.splice(raw, edits),
     )
+    return offer_locale_only(out, locale)
+
+
+# Pages that exist in one language and not in English, so the English
+# footer this generator translates cannot know about them. Without this the
+# Portuguese guide has nothing pointing at it from any Portuguese page --
+# which is the condition APP-180 was filed about, reintroduced one language
+# further in.
+LOCALE_ONLY = {
+    "pt": [("/pt/blog/how-to-add-captions-to-a-video", "Guia")],
+}
+
+
+def offer_locale_only(out, locale):
+    """Add this language's own pages to the footer row it just translated.
+
+    Scoped to the footer: the landing pages link the guide from their copy
+    too, and a link in the body is not a link in the footer -- the footers
+    of one language's pages have to agree with each other, which is what
+    `check.sh` reads. The privacy page carries a shorter footer with no
+    page links in it at all and is left alone.
+    """
+    extras = LOCALE_ONLY.get(locale, [])
+    at = out.find("<footer")
+    if not extras or at < 0:
+        return out
+    end = out.index("</footer>", at)
+    for href, label in extras:
+        if f'href="{href}"' in out[at:end]:
+            continue
+        after = f'<a href="/{locale}/burn-subtitles-into-video">'
+        found = out.find(after, at, end)
+        if found < 0:
+            continue
+        close = out.index("</a>", found) + len("</a>")
+        add = f'\n    <a href="{href}">{label}</a>'
+        out = out[:close] + add + out[close:]
+        end += len(add)
+    return out
 
 
 # The whole opening tag, so the rule below can see the attributes on either
@@ -300,9 +389,22 @@ ANCHOR = re.compile(r"""(<a\b[^>]*?\shref=")([^"]*)("[^>]*>)""")
 SPEAKS_FOR_ITSELF = re.compile(r"\shreflang=")
 
 
+# A `&` that already begins a character reference -- `&mdash;`, `&#8212;`,
+# `&amp;`. Escaping one of those again ships `&amp;mdash;`, and the reader
+# sees the entity spelt out in the middle of the sentence. The English
+# pages hold `&mdash;` in their meta descriptions, so every translation of
+# one arrives here carrying it.
+ENTITY = re.compile(r"&(?:#\d+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]{1,31});")
+
+
 def escape_attr(text):
-    return text.replace("&", "&amp;").replace('"', "&quot;").replace("&amp;#", "&#") \
-               .replace("&amp;amp;", "&amp;")
+    out, at = [], 0
+    for ref in ENTITY.finditer(text):
+        out.append(text[at:ref.start()].replace("&", "&amp;"))
+        out.append(ref.group(0))
+        at = ref.end()
+    out.append(text[at:].replace("&", "&amp;"))
+    return "".join(out).replace('"', "&quot;")
 
 
 def retarget_ld(data, page, locale):
@@ -346,6 +448,17 @@ def last_changed(path, fallback):
     except Exception:
         pass
     return fallback
+
+
+# changefreq and priority for the hand-written pages, where the default
+# below undersells them. Both are hints a search engine is free to ignore
+# and Google says it does -- kept only so the generated sitemap does not
+# silently walk back what was set by hand (APP-180).
+HINTS = {
+    "blog": ("weekly", "0.7"),
+    "subtitle-sites": ("monthly", "0.8"),
+    "translate-subtitles": ("monthly", "0.8"),
+}
 
 
 def handwritten():
@@ -454,11 +567,12 @@ def sitemap():
                        f'href="{url_for("en", page)}" />')
             out.append("  </url>")
     for url, lastmod, ring in handwritten():
+        changefreq, priority = HINTS.get(url[len(ORIGIN) + 1:], ("monthly", "0.7"))
         out.append("  <url>")
         out.append(f"    <loc>{url}</loc>")
         out.append(f"    <lastmod>{lastmod}</lastmod>")
-        out.append("    <changefreq>monthly</changefreq>")
-        out.append("    <priority>0.7</priority>")
+        out.append(f"    <changefreq>{changefreq}</changefreq>")
+        out.append(f"    <priority>{priority}</priority>")
         for code, href in ring:
             out.append(f'    <xhtml:link rel="alternate" hreflang="{code}" href="{href}" />')
         out.append("  </url>")
