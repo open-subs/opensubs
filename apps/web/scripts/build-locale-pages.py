@@ -69,7 +69,12 @@ PAGES = {
     "index.html": ("", "2026-09-10", "weekly", "1.0"),
     "burn-subtitles-into-video.html": ("burn-subtitles-into-video", "2026-09-09", "monthly", "0.8"),
     "styles.html": ("styles", "2026-09-10", "monthly", "0.8"),
-    "privacy.html": ("privacy.html", "2026-08-29", "yearly", "0.3"),
+    # The key is the file on disk; the first value is the address it answers
+    # on. They differ here, and only here: the page is served at /privacy,
+    # with nginx's `try_files $uri $uri.html` finding privacy.html, so that
+    # every page in the site has one extensionless address and not two
+    # (APP-151 §2.3). The old `/privacy.html` 301s to it.
+    "privacy.html": ("privacy", "2026-08-29", "yearly", "0.3"),
 }
 
 # Which languages a page exists in, where that is not all of them.
@@ -174,8 +179,9 @@ def localise_link(href, locale):
         return href
     path, sep, fragment = href.partition("#")
     if ASSET_HREF.search(path.split("?")[0]):
-        # ...except privacy.html, which is a page that happens to end in
-        # .html rather than an asset.
+        # ...except a page that happens to end in .html rather than being an
+        # asset. None ships that way today -- /privacy stopped being one in
+        # APP-151 -- but a link written by hand still can.
         if not path.endswith(".html"):
             return href
     if path == "/":
