@@ -200,7 +200,13 @@ export async function signNostrWithSecretKey(templateJson, nsec) {
     catch {
         throw new WalletError("server sent an unreadable Nostr challenge");
     }
-    const { nip19, finalizeEvent } = await import("nostr-tools");
+    // The two modules this needs, not the package index: the index also
+    // carries NIP-39's identity checks, which name third-party hosts in every
+    // bundle that includes this function, called or not.
+    const [nip19, { finalizeEvent }] = await Promise.all([
+        import("nostr-tools/nip19"),
+        import("nostr-tools/pure"),
+    ]);
     let secret;
     try {
         const decoded = nip19.decode(nsec.trim());
@@ -376,7 +382,7 @@ export async function signNostrWithBunker(templateJson, input, options = {}) {
     }
     // A fresh client key per attempt: it identifies this app to the bunker
     // and is worth nothing on its own, so there is no reason to keep it.
-    const signer = BunkerSigner.fromBunker(generateSecretKey(), pointer, {
+    const signer = BunkerSigner.fromBunker(options.clientSecret ?? generateSecretKey(), pointer, {
         onauth: (url) => options.onAuthUrl?.(url),
     });
     try {

@@ -46,6 +46,20 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     heading: string;
     description: string;
     mark: string;
+    /**
+     * Hand the Nostr signer used to sign in to the host page, as an
+     * `openapps-nostr-signer` event. Off by default.
+     *
+     * For a host whose own feature runs on the same key — OpenSync syncs as
+     * the npub a person signs in with — so signing in once is enough rather
+     * than signing in and then choosing the same signer again. The detail is
+     * `{ method: "nip07", pubkey }`, `{ method: "bunker", pubkey, bunker,
+     * clientSecret }` (32 bytes; the bunker already trusts it) or
+     * `{ method: "nsec", pubkey, nsec }`. The last hands a raw key to page
+     * script, which the pasted-key form already did while it was typed; only
+     * a host that asked for it, by setting this, receives it.
+     */
+    shareSigner: boolean;
     /** Wallets to choose between, once more than one has announced. */
     private wallets;
     /** Which Nostr fallback the user has opened, if any. */
@@ -66,7 +80,10 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     private loginWithBunker;
     /** Sign with a pasted `nsec1…`. The key stays in this browser. */
     private loginWithNsec;
-    private loginWithGoogle;
+    /** See `shareSigner`. The pubkey is read off the event that was signed,
+     * which the server has just verified. */
+    private shareNostrSigner;
+    private loginWithRedirect;
     private logout;
     render(): TemplateResult;
     /**

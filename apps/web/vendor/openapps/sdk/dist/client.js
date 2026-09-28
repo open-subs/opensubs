@@ -190,7 +190,7 @@ export class OpenApps {
             return result;
         },
         /**
-         * Where to send the browser for Google sign-in.
+         * Where to send the browser to sign in with Google or GitHub.
          *
          * Pass `returnTo` and the server redirects back there afterwards with a
          * one-time code, which {@link completeRedirect} turns into a session.
@@ -201,7 +201,7 @@ export class OpenApps {
          * the request is refused: that check is what stops the flow being used
          * as an open redirect.
          */
-        googleStartUrl: (returnTo, referralCode) => {
+        redirectStartUrl: (provider, returnTo, referralCode) => {
             const params = new URLSearchParams();
             if (returnTo)
                 params.set("return_to", returnTo);
@@ -212,8 +212,10 @@ export class OpenApps {
             if (referralCode)
                 params.set("ref", referralCode);
             const query = params.toString();
-            return `${this.baseUrl}/v1/auth/oidc/google/start${query ? `?${query}` : ""}`;
+            return `${this.baseUrl}/v1/auth/oidc/${provider}/start${query ? `?${query}` : ""}`;
         },
+        /** {@link redirectStartUrl} for Google. */
+        googleStartUrl: (returnTo, referralCode) => this.auth.redirectStartUrl("google", returnTo, referralCode),
         /**
          * Finish a redirect sign-in: exchange the `#code=…` fragment for a
          * session and clear it from the URL.
@@ -241,18 +243,17 @@ export class OpenApps {
                         accessToken: result.access_token,
                         refreshToken: result.refresh_token,
                     });
-                    // Drop the code from the address bar and from history. It is
-                    // already spent, but a URL carrying it should not be shareable.
-                    if (options.hash === undefined &&
-                        options.url === undefined &&
-                        typeof history !== "undefined" &&
-                        typeof location !== "undefined") {
-                        history.replaceState({}, "", location.pathname + location.search);
-                    }
                     return result;
                 }
                 finally {
                     this.#completing = null;
+                    // Drop the code from the address bar and from history, whether or
+                    // not the exchange worked. It is spent either way -- the server
+                    // rejected it or consumed it -- and a code that failed pollutes a
+                    // page-view report exactly as much as one that succeeded, which is
+                    // the harm this is here to prevent (APP-101). Leaving it also
+                    // means a reload retries a code that can never work.
+                    stripRedirectParams(options, ["code"]);
                 }
             })();
             return this.#completing;
@@ -271,6 +272,19 @@ export class OpenApps {
                 // Whatever the server said, this device is logged out.
                 this.#setSession(null);
             }
+        },
+        /**
+         * Delete the signed-in account, then forget the session locally.
+         *
+         * Permanent. The sign-in methods are released — signing in with one of
+         * them again starts a new, empty account — and any remaining credits
+         * are forfeited, so say both before calling this. App Store guideline
+         * 5.1.1(v) is why it exists: an app that creates accounts must let
+         * people delete them from inside it.
+         */
+        deleteAccount: async (signal) => {
+            await this.#request("/v1/me", { method: "DELETE", auth: "bearer", signal });
+            this.#setSession(null);
         },
         linkChallenge: (namespace, address, signal) => this.#request("/v1/auth/link/challenge", {
             method: "POST",
@@ -300,20 +314,21 @@ export class OpenApps {
             signal: options.signal,
         }),
         /**
-         * Begin connecting Google to the account already signed in here.
+         * Begin connecting Google or GitHub to the account already signed in
+         * here.
          *
-         * Wallet and Nostr link by signing in the page; Google needs a full
+         * Wallet and Nostr link by signing in the page; these need a full
          * redirect, which carries no bearer token — so this authenticated call
          * records the intent first and hands back a URL to navigate to. On
          * return, {@link completeLinkRedirect} reports what happened.
          *
          * Throws `identity_belongs_to_another_account` semantics via the
-         * redirect rather than here: the conflict is only discovered after
-         * Google has verified the identity, so it comes back in the fragment
+         * redirect rather than here: the conflict is only discovered after the
+         * provider has verified the identity, so it comes back in the fragment
          * and you re-run this with `{ merge: true }`.
          */
-        googleLinkStart: async (returnTo, options = {}) => {
-            const result = await this.#request("/v1/auth/link/oidc/google/start", {
+        redirectLinkStart: async (provider, returnTo, options = {}) => {
+            const result = await this.#request(`/v1/auth/link/oidc/${provider}/start`, {
                 method: "POST",
                 auth: "bearer",
                 body: { return_to: returnTo, merge: options.merge ?? false },
@@ -321,6 +336,8 @@ export class OpenApps {
             });
             return result.auth_url;
         },
+        /** {@link redirectLinkStart} for Google. */
+        googleLinkStart: (returnTo, options = {}) => this.auth.redirectLinkStart("google", returnTo, options),
         /**
          * Read the outcome of a Google link out of the URL fragment and clear
          * it. Returns `null` when this was not a link redirect, so a page can
@@ -334,23 +351,24 @@ export class OpenApps {
             const error = params.get("link_error");
             if (!linked && !conflict && !blockedBy && !error)
                 return null;
-            if (options.hash === undefined &&
-                options.url === undefined &&
-                typeof history !== "undefined") {
-                history.replaceState({}, "", location.pathname + location.search);
-            }
+            stripRedirectParams(options, [
+                "linked",
+                "link_conflict",
+                "link_blocked",
+                "link_error",
+                "clashes",
+            ]);
             if (error)
                 return { status: "error", message: error };
             if (blockedBy) {
                 const namespaces = (params.get("clashes") ?? "").split(",").filter(Boolean);
-                const names = namespaces
-                    .map((n) => ({ google: "Google", eip155: "wallet", nostr: "Nostr" })[n] ?? n)
-                    .join(" and ");
+                const names = namespaces.map(providerName).join(" and ");
                 return {
                     status: "blocked",
                     namespaces,
-                    message: `That Google account belongs to another account which also has a ${names} ` +
-                        "sign-in, and so does this one. Disconnect it from the other account first.",
+                    message: `That ${providerName(blockedBy)} account belongs to another account which also ` +
+                        `has a ${names} sign-in, and so does this one. Disconnect it from the other ` +
+                        "account first.",
                 };
             }
             if (conflict) {
@@ -546,6 +564,52 @@ function currentPageUrl() {
  * searched. The server only ever writes the fragment; reading the query too
  * costs nothing and removes a class of platform-specific breakage.
  */
+/**
+ * Take the auth parameters back out of the address bar, and leave the rest.
+ *
+ * The code is spent the moment it is exchanged, so this is not a secret being
+ * protected -- it is the URL being put back the way the user left it. Two
+ * things go wrong when it is not:
+ *
+ *   - **The analytics see a page.** A page-view tag reports `location` as it
+ *     finds it, so every sign-in produces a unique "page" -- `/#code=oac_4fa4…`
+ *     -- with exactly one visitor, for ever. openpixels.app's report filled up
+ *     with them, and the funnel through `/#studio` was cut into slivers
+ *     (APP-101). Nothing errors; the only symptom is in a dashboard nobody
+ *     reads daily.
+ *   - **The code lands in browser history.**
+ *
+ * The previous version dropped the whole fragment:
+ *
+ *     history.replaceState({}, "", location.pathname + location.search)
+ *
+ * which is right for a `?code=` callback and wrong for a `#code=` one. Every
+ * app in this suite that routes on the hash -- `/#studio`, `/#models` -- was
+ * thrown back to the top of the app by its own sign-in. So this removes the
+ * named parameters from *both* the query and the fragment and puts whatever
+ * else was there back.
+ *
+ * It also no longer skips the cleanup when the caller passed `hash` or `url`.
+ * That condition had it backwards: a caller passes `hash` precisely because
+ * the parameters are in the fragment, which is the case that most needs
+ * clearing. `url` is still skipped -- that is a string the caller parsed, not
+ * the address bar, and there is nothing there to rewrite.
+ */
+function stripRedirectParams(options, names) {
+    if (options.url !== undefined)
+        return;
+    if (typeof history === "undefined" || typeof location === "undefined")
+        return;
+    const query = new URLSearchParams(location.search.replace(/^\?/, ""));
+    const fragment = new URLSearchParams(location.hash.replace(/^#/, ""));
+    for (const name of names) {
+        query.delete(name);
+        fragment.delete(name);
+    }
+    const q = query.toString();
+    const f = fragment.toString();
+    history.replaceState({}, "", location.pathname + (q ? `?${q}` : "") + (f ? `#${f}` : ""));
+}
 function redirectParams(options) {
     if (options.url !== undefined) {
         const url = options.url;
@@ -566,6 +630,10 @@ function redirectParams(options) {
 }
 function readRedirectParam(options, name) {
     return redirectParams(options).get(name);
+}
+/** How to name a sign-in method to a person. */
+function providerName(namespace) {
+    return ({ google: "Google", github: "GitHub", eip155: "wallet", nostr: "Nostr" }[namespace] ?? namespace);
 }
 function sleep(ms, signal) {
     return new Promise((resolve, reject) => {

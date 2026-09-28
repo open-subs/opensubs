@@ -21,8 +21,15 @@ import { OpenAppsError } from "@openapps/sdk";
 import { OpenAppsElement } from "./base.js";
 import { notify } from "./context.js";
 import { connectEthereum, discoverEthereumWallets, signNostr, signSiwe, } from "./wallet.js";
+/** Linked by leaving the page for the provider, not by signing in it. */
+const REDIRECT_PROVIDERS = ["apple", "google", "github"];
+function isRedirectProvider(namespace) {
+    return REDIRECT_PROVIDERS.includes(namespace);
+}
 const LABELS = {
+    apple: "Apple",
     google: "Google",
+    github: "GitHub",
     eip155: "Wallet",
     nostr: "Nostr",
 };
@@ -39,6 +46,8 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
          * Null while there is nothing to choose — one wallet connects straight
          * away rather than making the user confirm which of one. */
         this.wallets = null;
+        /** Whether the "delete this account" confirmation is showing. */
+        this.confirmingDelete = false;
     }
     connectedCallback() {
         super.connectedCallback();
@@ -55,7 +64,7 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
         // Yield first, so a host that configures its client right after the
         // elements upgrade has had its turn.
         await Promise.resolve();
-        // A Google link redirect lands back here with the outcome in the
+        // A Google or GitHub link redirect lands back here with the outcome in the
         // fragment. Read it before anything else so the result is on screen as
         // soon as the account renders.
         this.handleLinkRedirect();
@@ -81,20 +90,20 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
     get connectable() {
         return ["eip155", "nostr"].filter((ns) => this.enabled?.[ns] && !this.linked(ns));
     }
-    /** Google links by redirect rather than by signing in the page. */
-    get canConnectGoogle() {
-        return (this.enabled?.google ?? false) && !this.linked("google");
+    /** Google and GitHub link by redirect rather than by signing in the page. */
+    get redirectConnectable() {
+        return REDIRECT_PROVIDERS.filter((p) => this.enabled?.[p] && !this.linked(p));
     }
-    async connectGoogle(merge = false) {
+    async connectRedirect(provider, merge = false) {
         await this.run(async () => {
             // Come back to this page, minus any fragment — the server puts the
             // outcome there and refuses a return_to that already has one.
             const here = `${location.origin}${location.pathname}${location.search}`;
-            const authUrl = await this.sdk.auth.googleLinkStart(here, { merge });
+            const authUrl = await this.sdk.auth.redirectLinkStart(provider, here, { merge });
             window.location.href = authUrl;
         });
     }
-    /** Read the outcome of a Google link redirect, if we just came back. */
+    /** Read the outcome of a redirect link, if we just came back from one. */
     handleLinkRedirect() {
         let outcome;
         try {
@@ -111,14 +120,16 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
             case "linked":
                 this.notice = outcome.merged
                     ? `Accounts combined — ${outcome.credits.toLocaleString()} credits moved across.`
-                    : "Google connected.";
+                    : `${LABELS[outcome.namespace] ?? outcome.namespace} connected.`;
                 this.emit("openapps-identity-linked", outcome);
                 notify();
                 break;
             case "conflict":
                 // Same question as the in-page flows ask, arriving by redirect.
+                if (!isRedirectProvider(outcome.namespace))
+                    break;
                 this.pending = {
-                    namespace: "google",
+                    namespace: outcome.namespace,
                     other: { id: "", balance: outcome.balance },
                 };
                 break;
@@ -189,19 +200,20 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
         const pending = this.pending;
         if (!pending)
             return;
-        if (pending.namespace === "google") {
+        if (isRedirectProvider(pending.namespace)) {
             // Consent has to be given before the redirect, because the callback
             // has no way to ask mid-flight.
             this.pending = null;
-            await this.connectGoogle(true);
+            await this.connectRedirect(pending.namespace, true);
             return;
         }
+        const namespace = pending.namespace;
         // The challenge was consumed by the refused attempt, so a fresh one is
         // needed — challenges are single-use by design.
         await this.run(async () => {
-            const address = pending.namespace === "eip155" ? await connectEthereum() : undefined;
-            const challenge = await this.sdk.auth.linkChallenge(pending.namespace, address);
-            const proof = pending.namespace === "eip155"
+            const address = namespace === "eip155" ? await connectEthereum() : undefined;
+            const challenge = await this.sdk.auth.linkChallenge(namespace, address);
+            const proof = namespace === "eip155"
                 ? await signSiwe(challenge.message, address)
                 : await signNostr(challenge.message);
             const result = await this.sdk.auth.linkVerify(challenge.challenge_id, proof, {
@@ -226,6 +238,41 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
             this.emit("openapps-identity-unlinked", { caip10 });
             await this.load();
         });
+    }
+    async deleteAccount() {
+        await this.run(async () => {
+            await this.sdk.auth.deleteAccount();
+            this.confirmingDelete = false;
+            this.me = null;
+            this.emit("openapps-account-deleted", null);
+            notify();
+        });
+    }
+    /// At the foot, quiet, and two steps: nobody opens an account screen to
+    /// delete it by accident, and the step in between is where what is lost
+    /// gets said — the balance by number, because "your credits" is easy to
+    /// agree to without thinking about how many.
+    renderDelete() {
+        if (!this.confirmingDelete) {
+            return html `<button class="link danger-link" ?disabled=${this.busy}
+        @click=${() => (this.confirmingDelete = true)}>Delete account…</button>`;
+        }
+        const balance = this.me?.balance ?? 0;
+        return html `
+      <div class="confirm-delete" role="alertdialog" aria-label="Delete account">
+        <p><strong>Delete this account?</strong> This cannot be undone.</p>
+        <p class="muted small">
+          Your sign-in methods are removed from it${balance > 0
+            ? html `, and your <strong>${balance.toLocaleString()} credits</strong> are lost`
+            : nothing}. Signing in again later starts a new, empty account. It is the
+          same account in every one of our apps, so it is deleted from all of them.
+        </p>
+        <div class="row">
+          <button ?disabled=${this.busy} @click=${() => (this.confirmingDelete = false)}>Cancel</button>
+          <button class="danger" ?disabled=${this.busy} @click=${this.deleteAccount}>Delete my account</button>
+        </div>
+      </div>
+    `;
     }
     render() {
         // No client configured yet; configure() will notify and re-render.
@@ -273,15 +320,16 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
             `)}
         </ul>
 
-        ${this.connectable.length || this.canConnectGoogle
+        ${this.connectable.length || this.redirectConnectable.length
             ? html `
               <h3>Add another</h3>
               <div class="row">
-                ${this.canConnectGoogle
-                ? html `<button ?disabled=${this.busy} @click=${() => this.connectGoogle()}>
-                      Connect Google
-                    </button>`
-                : nothing}
+                ${this.redirectConnectable.map((provider) => html `<button
+                    ?disabled=${this.busy}
+                    @click=${() => this.connectRedirect(provider)}
+                  >
+                    Connect ${LABELS[provider]}
+                  </button>`)}
                 ${this.connectable.map((ns) => 
             // With several wallets installed, the one button becomes
             // one button per wallet — reusing this same shape rather
@@ -314,6 +362,8 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
             : nothing}
         ${this.notice ? html `<p class="notice">${this.notice}</p>` : nothing}
         ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
+
+        <div class="delete">${this.renderDelete()}</div>
       </div>
 
     `;
@@ -434,6 +484,30 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
         background: var(--warning-bg, #fef3c7);
         color: var(--warning-fg, #92400e);
       }
+      /* Deleting sits apart from everything else on the card, so it is not
+         read as one more sign-in option. The same danger tokens the base
+         styles use for errors, so a host's theme carries through. */
+      .delete {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-hairline, var(--fb-hairline));
+      }
+      button.danger-link {
+        color: var(--danger-fg, var(--fb-danger));
+      }
+      .confirm-delete {
+        padding: 0.7em 0.8em;
+        border-radius: var(--radius-lg, 12px);
+        background: var(--danger-bg, #fdecea);
+      }
+      .confirm-delete p {
+        margin: 0 0 0.5rem;
+      }
+      button.danger {
+        background: var(--danger-fg, var(--fb-danger));
+        border-color: var(--danger-fg, var(--fb-danger));
+        color: #fff;
+      }
     `,
     ]; }
 };
@@ -455,6 +529,9 @@ __decorate([
 __decorate([
     state()
 ], OpenAppsAccount.prototype, "wallets", void 0);
+__decorate([
+    state()
+], OpenAppsAccount.prototype, "confirmingDelete", void 0);
 OpenAppsAccount = __decorate([
     customElement("openapps-account")
 ], OpenAppsAccount);

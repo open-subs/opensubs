@@ -34,10 +34,10 @@ export declare class OpenAppsAccount extends OpenAppsElement {
      * there by the time the user clicks. Missing signers are reported then.
      */
     private get connectable();
-    /** Google links by redirect rather than by signing in the page. */
-    private get canConnectGoogle();
-    private connectGoogle;
-    /** Read the outcome of a Google link redirect, if we just came back. */
+    /** Google and GitHub link by redirect rather than by signing in the page. */
+    private get redirectConnectable();
+    private connectRedirect;
+    /** Read the outcome of a redirect link, if we just came back from one. */
     private handleLinkRedirect;
     /**
      * Start connecting a wallet.
@@ -53,6 +53,10 @@ export declare class OpenAppsAccount extends OpenAppsElement {
     private confirmMerge;
     private afterLink;
     private unlink;
+    /** Whether the "delete this account" confirmation is showing. */
+    private confirmingDelete;
+    private deleteAccount;
+    private renderDelete;
     render(): TemplateResult;
     private renderMergePrompt;
     static styles: import("lit").CSSResult[];

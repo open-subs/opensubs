@@ -1,8 +1,22 @@
 /** Wire types, mirroring docs/api.md. */
 export type Namespace = "eip155" | "nostr";
+/**
+ * Sign-ins that leave the page for the provider and come back with a
+ * one-time code, rather than being signed in the page.
+ */
+/** Sign-ins that leave the page for the provider and come back. */
+export type RedirectProvider = "google" | "github" | "apple";
 /** Login methods a given deployment has configured. */
 export interface AuthMethods {
     google: boolean;
+    /**
+     * Answered for the host that asked: GitHub needs an OAuth app per
+     * product, so it can be on for one product and off for another.
+     */
+    github: boolean;
+    /** Sign in with Apple — offered alongside Google, as App Store
+     *  guideline 4.8 requires of an app with a third-party sign-in. */
+    apple?: boolean;
     eip155: boolean;
     nostr: boolean;
 }
@@ -35,8 +49,8 @@ export interface LinkedAccount {
     caip10: string;
     namespace: string;
     /**
-     * What to show a person: the email for Google, the address or npub
-     * otherwise. `caip10` stays the stable key — an OIDC subject is not
+     * What to show a person: the email for Google, `@handle` for GitHub,
+     * the address or npub otherwise. `caip10` stays the stable key — an OIDC subject is not
      * something anyone recognises.
      */
     label?: string;
@@ -54,7 +68,7 @@ export interface OtherAccount {
     id: string;
     balance: number;
 }
-/** What a Google link redirect came back with. */
+/** What a Google or GitHub link redirect came back with. */
 export type LinkRedirect = {
     status: "linked";
     namespace: string;

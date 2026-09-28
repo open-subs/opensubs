@@ -157,6 +157,12 @@ export declare function signNostr(templateJson: string): Promise<Proof>;
 export declare function signNostrWithBunker(templateJson: string, input: string, options?: {
     onAuthUrl?: (url: string) => void;
     timeoutMs?: number;
+    /**
+     * This app's key towards the bunker. Normally a fresh one per attempt;
+     * a host that keeps using the bunker after sign-in (see `share-signer`
+     * on `<openapps-login>`) passes its own so the bunker already knows it.
+     */
+    clientSecret?: Uint8Array;
 }): Promise<Proof>;
 export {};
 //# sourceMappingURL=wallet.d.ts.map

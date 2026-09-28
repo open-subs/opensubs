@@ -120,28 +120,45 @@ log "$IPA ($(du -h "$IPA" | cut -f1))"
 [ -f "$CREDS" ] || die "$CREDS is missing -- see the header of this script"
 # shellcheck disable=SC1090
 set -a; . "$CREDS"; set +a
-[ -n "${APPLE_ID:-}" ]           || die "APPLE_ID is unset in $CREDS"
-[ -n "${APPLE_APP_PASSWORD:-}" ] || die "APPLE_APP_PASSWORD is unset in $CREDS"
 
-# Passed through the environment rather than on the command line: an
-# argument is visible to every process on the machine in `ps`.
-export ALTOOL_PASSWORD="$APPLE_APP_PASSWORD"
+# The API key first, the app-specific password only if there is no key.
+#
+# Both work with altool, but an app-specific password expires and is
+# revoked whenever the Apple ID's password changes, and it fails in a way
+# that reads like a signing problem:
+#
+#   ERROR: Please sign in with an app-specific password.
+#   ERROR: Could not determine provider public id from Bundle ID '...'.
+#
+# The second line sends you looking at the bundle id, which is fine. The
+# key in ~/.appstoreconnect/private_keys/ is the same one asc.py uses for
+# everything else here, so a machine that can cut a profile can also
+# upload; measured 2026-09-28, after the password had lapsed.
+if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ]; then
+  AUTH=(--apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID")
+  log "Authenticating with the App Store Connect API key $ASC_KEY_ID"
+else
+  [ -n "${APPLE_ID:-}" ]           || die "neither ASC_KEY_ID nor APPLE_ID is set in $CREDS"
+  [ -n "${APPLE_APP_PASSWORD:-}" ] || die "APPLE_APP_PASSWORD is unset in $CREDS"
+  # Passed through the environment rather than on the command line: an
+  # argument is visible to every process on the machine in `ps`.
+  export ALTOOL_PASSWORD="$APPLE_APP_PASSWORD"
+  AUTH=(--username "$APPLE_ID" --password @env:ALTOOL_PASSWORD)
+  log "Authenticating as $APPLE_ID with an app-specific password"
+fi
 
 if [ "$MODE" = validate ]; then
   log "Validating with Apple"
-  exec xcrun altool --validate-app -f "$IPA" -t ios \
-    --username "$APPLE_ID" --password @env:ALTOOL_PASSWORD
+  exec xcrun altool --validate-app -f "$IPA" -t ios "${AUTH[@]}"
 fi
 
 # Validate first even when uploading. A rejected upload still consumes the
 # build number; a failed validation does not.
 log "Validating with Apple"
-xcrun altool --validate-app -f "$IPA" -t ios \
-  --username "$APPLE_ID" --password @env:ALTOOL_PASSWORD
+xcrun altool --validate-app -f "$IPA" -t ios "${AUTH[@]}"
 
 log "Uploading build $BUILD_NUMBER"
-xcrun altool --upload-app -f "$IPA" -t ios \
-  --username "$APPLE_ID" --password @env:ALTOOL_PASSWORD
+xcrun altool --upload-app -f "$IPA" -t ios "${AUTH[@]}"
 
 echo
 echo "Uploaded. Processing takes a few minutes; the build appears under"

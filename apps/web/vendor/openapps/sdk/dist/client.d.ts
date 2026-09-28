@@ -1,5 +1,5 @@
 import { type Session, type TokenStore } from "./storage.js";
-import type { AuthMethods, Challenge, CreditPackage, DeductResult, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup } from "./types.js";
+import type { AuthMethods, Challenge, CreditPackage, DeductResult, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, RedirectProvider, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup } from "./types.js";
 /** Fetch implementations differ across runtimes; only this shape is used. */
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export interface OpenAppsOptions {
@@ -46,7 +46,7 @@ export declare class OpenApps {
             signal?: AbortSignal;
         }) => Promise<LoginResult>;
         /**
-         * Where to send the browser for Google sign-in.
+         * Where to send the browser to sign in with Google or GitHub.
          *
          * Pass `returnTo` and the server redirects back there afterwards with a
          * one-time code, which {@link completeRedirect} turns into a session.
@@ -57,6 +57,8 @@ export declare class OpenApps {
          * the request is refused: that check is what stops the flow being used
          * as an open redirect.
          */
+        redirectStartUrl: (provider: RedirectProvider, returnTo?: string, referralCode?: string) => string;
+        /** {@link redirectStartUrl} for Google. */
         googleStartUrl: (returnTo?: string, referralCode?: string) => string;
         /**
          * Finish a redirect sign-in: exchange the `#code=…` fragment for a
@@ -76,6 +78,16 @@ export declare class OpenApps {
         me: (signal?: AbortSignal) => Promise<Me>;
         /** Revoke the session server-side, then forget it locally. */
         logout: (signal?: AbortSignal) => Promise<void>;
+        /**
+         * Delete the signed-in account, then forget the session locally.
+         *
+         * Permanent. The sign-in methods are released — signing in with one of
+         * them again starts a new, empty account — and any remaining credits
+         * are forfeited, so say both before calling this. App Store guideline
+         * 5.1.1(v) is why it exists: an app that creates accounts must let
+         * people delete them from inside it.
+         */
+        deleteAccount: (signal?: AbortSignal) => Promise<void>;
         linkChallenge: (namespace: Namespace, address?: string, signal?: AbortSignal) => Promise<Challenge>;
         /**
          * Attach a verified identity to the signed-in account.
@@ -93,18 +105,24 @@ export declare class OpenApps {
             signal?: AbortSignal;
         }) => Promise<LinkResult>;
         /**
-         * Begin connecting Google to the account already signed in here.
+         * Begin connecting Google or GitHub to the account already signed in
+         * here.
          *
-         * Wallet and Nostr link by signing in the page; Google needs a full
+         * Wallet and Nostr link by signing in the page; these need a full
          * redirect, which carries no bearer token — so this authenticated call
          * records the intent first and hands back a URL to navigate to. On
          * return, {@link completeLinkRedirect} reports what happened.
          *
          * Throws `identity_belongs_to_another_account` semantics via the
-         * redirect rather than here: the conflict is only discovered after
-         * Google has verified the identity, so it comes back in the fragment
+         * redirect rather than here: the conflict is only discovered after the
+         * provider has verified the identity, so it comes back in the fragment
          * and you re-run this with `{ merge: true }`.
          */
+        redirectLinkStart: (provider: RedirectProvider, returnTo: string, options?: {
+            merge?: boolean;
+            signal?: AbortSignal;
+        }) => Promise<string>;
+        /** {@link redirectLinkStart} for Google. */
         googleLinkStart: (returnTo: string, options?: {
             merge?: boolean;
             signal?: AbortSignal;

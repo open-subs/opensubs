@@ -47,4 +47,20 @@ export declare const ethereumMark: SVGTemplateResult;
  * you like ... use them on your websites."
  */
 export declare const nostrMark: SVGTemplateResult;
+/**
+ * GitHub's mark, from primer/octicons (`mark-github-16`, MIT), verbatim.
+ *
+ * The one mark here drawn in `currentColor`. GitHub's logo guidelines allow
+ * it in black or white only, never a brand colour, so it takes the button's
+ * own text colour: black on a light surface, white on a dark one — which is
+ * exactly those two cases.
+ */
+export declare const githubMark: SVGTemplateResult;
+/**
+ * The Apple logo, for Sign in with Apple. `currentColor`, so it is black on
+ * a light button and white on a dark one — the two appearances Apple's
+ * Human Interface Guidelines allow — while the button itself stays as
+ * neutral as the others in the row. Path: Font Awesome Free, CC BY 4.0.
+ */
+export declare const appleMark: SVGTemplateResult;
 //# sourceMappingURL=provider-marks.d.ts.map

@@ -29,7 +29,33 @@
       <strong>{session.balance}</strong>
       {session.balance === 1 ? "credit" : "credits"}
     </span>
-    <openapps-signout></openapps-signout>
+    <!--
+      The same button opens the panel signed in as signed out, because the
+      panel is where the account lives either way.
+    -->
+    <button
+      type="button"
+      class="nav-signin"
+      aria-expanded={open}
+      aria-haspopup="menu"
+      onclick={() => (open = !open)}
+    >
+      {t("Account")}
+    </button>
+    <div class="nav-panel" class:open role="menu">
+      <!--
+        `<openapps-account>` is what carries account deletion, which App
+        Store guideline 5.1.1(v) requires to be reachable inside the app
+        for any app that can create an account. This app mounted only
+        `<openapps-login>` and `<openapps-signout>`, so there was nowhere
+        in it to delete one -- a rejection, and not a visible one: the
+        element existed in the vendored UI the whole time and simply was
+        never placed. It also shows which identities are attached and
+        lets another be added.
+      -->
+      <openapps-account></openapps-account>
+      <openapps-signout></openapps-signout>
+    </div>
   {:else}
     <button
       type="button"
@@ -99,5 +125,12 @@
 
   .nav-panel.open {
     display: block;
+  }
+
+  /* The signed-in panel stacks the account and the sign-out button; the
+     signed-out one holds a single element and needs no rule. */
+  .nav-panel :global(openapps-account) {
+    display: block;
+    margin-bottom: var(--space-3);
   }
 </style>

@@ -16,7 +16,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
-import { ethereumMark, googleMark, nostrMark } from "./provider-marks.js";
+import { appleMark, ethereumMark, githubMark, googleMark, nostrMark } from "./provider-marks.js";
 import { notify } from "./context.js";
 import { clearReferral, referralInUrl, storedReferral } from "./referral-code.js";
 import { connectEthereum, discoverEthereumWallets, nostrProviderNames, signNostr, signNostrWithBunker, signNostrWithSecretKey, signSiwe, waitForNostrProvider, } from "./wallet.js";
@@ -59,6 +59,20 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         this.heading = "Sign in to OpenApps";
         this.description = "One account for every app in the suite. Optional — the apps work without it.";
         this.mark = "O";
+        /**
+         * Hand the Nostr signer used to sign in to the host page, as an
+         * `openapps-nostr-signer` event. Off by default.
+         *
+         * For a host whose own feature runs on the same key — OpenSync syncs as
+         * the npub a person signs in with — so signing in once is enough rather
+         * than signing in and then choosing the same signer again. The detail is
+         * `{ method: "nip07", pubkey }`, `{ method: "bunker", pubkey, bunker,
+         * clientSecret }` (32 bytes; the bunker already trusts it) or
+         * `{ method: "nsec", pubkey, nsec }`. The last hands a raw key to page
+         * script, which the pasted-key form already did while it was typed; only
+         * a host that asked for it, by setting this, receives it.
+         */
+        this.shareSigner = false;
         /** Wallets to choose between, once more than one has announced. */
         this.wallets = null;
         /** Which Nostr fallback the user has opened, if any. */
@@ -145,6 +159,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             });
             clearReferral();
             this.emit("openapps-login", result);
+            this.shareNostrSigner(proof, { method: "nip07" });
             notify();
         });
     }
@@ -157,8 +172,11 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             return;
         this.authUrl = null;
         await this.run(async () => {
+            // Made here rather than inside the signer so it can be handed over.
+            const clientSecret = crypto.getRandomValues(new Uint8Array(32));
             const challenge = await this.sdk.auth.challenge("nostr");
             const proof = await signNostrWithBunker(challenge.message, value, {
+                clientSecret,
                 // Some bunkers need a one-off approval in a browser tab; surface
                 // the link rather than silently stalling.
                 onAuthUrl: (url) => {
@@ -172,6 +190,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             this.authUrl = null;
             clearReferral();
             this.emit("openapps-login", result);
+            this.shareNostrSigner(proof, { method: "bunker", bunker: value, clientSecret });
             notify();
         });
     }
@@ -192,6 +211,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
                 this.nostrFallback = "none";
                 clearReferral();
                 this.emit("openapps-login", result);
+                this.shareNostrSigner(proof, { method: "nsec", nsec });
                 notify();
             }
             finally {
@@ -201,7 +221,17 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             }
         });
     }
-    loginWithGoogle() {
+    /** See `shareSigner`. The pubkey is read off the event that was signed,
+     * which the server has just verified. */
+    shareNostrSigner(proof, detail) {
+        if (this.shareSigner) {
+            this.emit("openapps-nostr-signer", {
+                ...detail,
+                pubkey: JSON.parse(proof.event).pubkey,
+            });
+        }
+    }
+    loginWithRedirect(provider) {
         // A full-page redirect, not a popup: popups are blocked by default in
         // extensions and on mobile Safari. Come back to this exact page —
         // minus any fragment, which the server refuses because it needs to put
@@ -211,7 +241,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         // inside the callback, which never sees this page's query string, so a
         // code left only in `return_to` arrives one step too late to attribute
         // the signup.
-        window.location.href = this.sdk.auth.googleStartUrl(here, referralFromUrl());
+        window.location.href = this.sdk.auth.redirectStartUrl(provider, here, referralFromUrl());
     }
     async logout() {
         await this.run(() => this.sdk.auth.logout());
@@ -226,10 +256,12 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         // signer is discovered when the user clicks, because extensions inject
         // at unpredictable times and hiding a button the user could have used
         // is worse than showing one that explains itself.
+        const apple = this.enabled?.apple ?? false;
         const google = this.enabled?.google ?? false;
+        const github = this.enabled?.github ?? false;
         const wallet = this.enabled?.eip155 ?? false;
         const nostr = this.enabled?.nostr ?? false;
-        if (this.enabled && !google && !wallet && !nostr) {
+        if (this.enabled && !apple && !google && !github && !wallet && !nostr) {
             return this.frame(html `
         <p class="muted">This server has no login methods configured.</p>
         ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
@@ -242,13 +274,33 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         const block = this.variant === "panel" ? "block" : "";
         return this.frame(html `
       <div class="stack">
+        ${apple
+            ? // First, and the same size as the rest: Apple's guidelines ask
+                // that it be at least as prominent as any other sign-in offered.
+                html `<button
+              class="provider ${block}"
+              ?disabled=${this.busy}
+              @click=${() => this.loginWithRedirect("apple")}
+            >
+              ${appleMark}<span>Continue with Apple</span>
+            </button>`
+            : nothing}
         ${google
             ? html `<button
               class="provider ${block}"
               ?disabled=${this.busy}
-              @click=${this.loginWithGoogle}
+              @click=${() => this.loginWithRedirect("google")}
             >
               ${googleMark}<span>Continue with Google</span>
+            </button>`
+            : nothing}
+        ${github
+            ? html `<button
+              class="provider ${block}"
+              ?disabled=${this.busy}
+              @click=${() => this.loginWithRedirect("github")}
+            >
+              ${githubMark}<span>Continue with GitHub</span>
             </button>`
             : nothing}
         ${wallet && this.wallets
@@ -545,6 +597,9 @@ __decorate([
 __decorate([
     property({ type: String })
 ], OpenAppsLogin.prototype, "mark", void 0);
+__decorate([
+    property({ type: Boolean, attribute: "share-signer" })
+], OpenAppsLogin.prototype, "shareSigner", void 0);
 __decorate([
     state()
 ], OpenAppsLogin.prototype, "wallets", void 0);
