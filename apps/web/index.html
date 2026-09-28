@@ -41,22 +41,39 @@
            for more than a frame. It is not a mock-up: the copy, the
            heading and the control are the ones the app itself renders. -->
       <main class="screen">
-        <section class="card">
-          <h2 class="section-title">Video</h2>
-          <label class="drop-zone">
-            <p class="drop-zone-title">Drop a video here, or choose one</p>
-            <p class="oa-caption">It stays on your device. No upload, no account.</p>
-            <input type="file" accept="video/*" />
-          </label>
-        </section>
-
-        <section class="card">
-          <h2 class="section-title">Subtitles</h2>
-          <p class="oa-caption">
-            Whisper runs here, in your browser, and writes the subtitles from
-            the video&rsquo;s own audio. Nothing is uploaded and no account is
-            needed.
-          </p>
+        <section class="card card-start">
+          <div class="start">
+            <div class="start-say">
+              <h3 class="start-title">Start with a video</h3>
+              <p class="start-sub">
+                Its speech becomes subtitles here, on this machine. Nothing is
+                uploaded.
+              </p>
+              <div class="start-actions">
+                <label class="btn btn-primary btn-start">
+                  <input type="file" accept="video/*" aria-label="Choose a video" hidden />
+                  Choose a video
+                </label>
+                <label class="btn btn-secondary btn-start">
+                  <input
+                    type="file"
+                    accept=".srt,.vtt,text/vtt"
+                    aria-label="Open an .srt or .vtt"
+                    hidden
+                  />
+                  Open an .srt or .vtt
+                </label>
+              </div>
+              <p class="start-fine">
+                MP4, MOV, WebM and MKV. Free, no account. The speech model
+                downloads once, when you generate.
+              </p>
+            </div>
+            <label class="start-drop">
+              <input type="file" accept="video/*" hidden />
+              <span>or drop a video here</span>
+            </label>
+          </div>
         </section>
 
         <noscript>

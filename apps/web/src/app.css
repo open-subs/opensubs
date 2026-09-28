@@ -22,8 +22,14 @@ html {
   height: 100%;
 }
 
+/* Wider than the 640px it used to be, which made the tool 58% of the
+   width of the marketing copy above it and read as a secondary form on
+   the page it is the point of. Not much wider, though, and the content
+   inside still limits itself: a form stretched to 1100px is harder to
+   read, not easier. The extra room goes into the panel's own two columns
+   and its breathing space. */
 .screen {
-  max-width: 640px;
+  max-width: 940px;
   margin: 0 auto;
   padding: var(--space-8) var(--space-6) var(--space-12);
   display: flex;
@@ -151,41 +157,6 @@ html {
   word-break: break-all;
 }
 
-/* ---- drop zone ---- */
-
-.drop-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-10) var(--space-4);
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: var(--transition-control);
-}
-
-.drop-zone:hover {
-  background: var(--surface-hover);
-  border-color: var(--text-faint);
-}
-
-.drop-zone.active {
-  border-color: var(--brand);
-  background: var(--surface-selected);
-  color: var(--text-brand);
-}
-
-.drop-zone-title {
-  font: var(--type-ui);
-  color: var(--text-strong);
-  margin: 0;
-}
-
 /* ---- file summary ---- */
 
 .file-summary {
@@ -238,84 +209,6 @@ html {
   color: var(--orange-600);
   font: var(--type-eyebrow);
   letter-spacing: var(--tracking-caps);
-}
-
-/* ---- style picker ---- */
-
-/* Two columns, not three. A subtitle is a small part of a frame, so a
-   faithful full-frame thumbnail can only show legible letterforms if the
-   tile is reasonably large; cropping in would show the type but hide the
-   vertical position, which is half of what separates these presets. */
-.style-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
-}
-
-@media (max-width: 30rem) {
-  .style-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.style-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: var(--border-width) solid var(--border-hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-  cursor: pointer;
-  transition: var(--transition-control);
-  text-align: left;
-}
-
-.style-tile:hover {
-  background: var(--surface-hover);
-}
-
-.style-tile.selected {
-  background: var(--surface-selected);
-  border-color: var(--brand);
-}
-
-.style-tile:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* The libass-rendered thumbnail, or a coloured placeholder until it
-   arrives. Both occupy the same box so the grid never reflows. */
-/* No forced aspect ratio and no `object-fit: cover`: the thumbnail is a
-   crop of the source at the source's own shape, so constraining it here
-   squashed portrait video. Let the image's intrinsic size decide. */
-.style-shot {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
-}
-
-/* The placeholder has no intrinsic size, so it needs one to hold the row
-   open until the render lands. */
-.style-shot-pending {
-  aspect-ratio: 16 / 5;
-  opacity: 0.3;
-}
-
-.style-name {
-  font: var(--type-ui);
-  font-weight: var(--weight-regular);
-  color: var(--text-body);
-  padding-inline: var(--space-1);
-}
-
-.style-tile.selected .style-name {
-  font-weight: var(--weight-medium);
-  color: var(--text-strong);
 }
 
 /* ---- model picker ---- */
@@ -717,7 +610,9 @@ html {
   text-align: center;
   color: var(--text-muted);
   background: var(--bg-subtle);
-  border: var(--border-width) dashed var(--border-strong);
+  /* Solid. A dashed edge is how a wireframe says "something goes here",
+     and on a finished page it reads as unfinished. */
+  border: var(--border-width) solid var(--border-hairline);
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: var(--transition-control);
@@ -733,9 +628,10 @@ html {
   padding: var(--space-5) var(--space-6);
 }
 
-.screen.drag-over .dropzone {
-  border-color: var(--brand);
+.screen.drag-over .dropzone,
+.screen.drag-over .start-drop {
   background: var(--surface-selected);
+  border-color: var(--border-strong);
 }
 
 .cue-head {
@@ -900,20 +796,9 @@ html {
 
 /* --- style thumbnails --------------------------------------------------- */
 
-.style-shot {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
-}
 
 /* Shown until the libass render lands: the preset's own colours, so the
    tile is never empty and never shifts size when the image arrives. */
-.style-shot-pending {
-  opacity: 0.35;
-}
 
 .emphasis-row {
   align-items: center;
@@ -977,10 +862,12 @@ html {
 /* --- recovered work ---------------------------------------------------- */
 
 /* Marked out from the ordinary cards: it is an interruption, and it should
-   read as one rather than as another step in the flow. */
+   read as one rather than as another step in the flow. A tinted surface
+   says that; the brand-coloured double ring it used to have said it three
+   times, and this is the state a reader meets on their second visit. */
 .restore-card {
-  border-color: var(--brand);
-  box-shadow: inset 0 0 0 1px var(--brand);
+  background: var(--surface-selected);
+  border-color: var(--border-strong);
 }
 
 .restore-title {
@@ -1098,12 +985,17 @@ html {
 }
 
 /* Two signals rather than one. Colour alone fails for a third of readers
-   on a red/green axis and washes out on a projector; the weight of the
-   border carries the same information. */
+   on a red/green axis and washes out on a projector -- so the filled
+   surface carries the information, not a coloured outline.
+
+   It used to be `border-color` *plus* an inset shadow of the same colour,
+   which draws the line twice: a 2px brand ring around every selected
+   thing on the page. With three engine cards, twelve style tiles and a
+   restore banner, that was a lot of ring, and it is what the report
+   called "a lot of coloured outlines". The fill was always enough. */
 .route.selected {
-  border-color: var(--brand);
-  box-shadow: inset 0 0 0 1px var(--brand);
   background: var(--surface-selected);
+  border-color: var(--border-strong);
 }
 
 .route:disabled {
@@ -1226,4 +1118,109 @@ html {
 .cost-paid {
   color: var(--info-fg);
   background: var(--info-bg);
+}
+
+
+/* ---- the first screen ---- */
+
+/* One job: open a video. Everything that used to sit here -- three engine
+   cards, a model list, two language lists and a second file input -- is
+   a choice about a file, and waits for one now.
+
+   Two columns so the sentence and the button are beside the target rather
+   than stacked above it: the button was below the fold's midpoint on a
+   1440x765 screen, which is the shape of "I opened it and did not use
+   it". */
+.card-start {
+  padding: var(--space-8);
+}
+
+.start {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: var(--space-8);
+  align-items: center;
+}
+
+@media (max-width: 46rem) {
+  .start {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+}
+
+.start-say {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* The prose keeps a readable measure even though the panel is wide. */
+  max-width: 34rem;
+}
+
+.start-title {
+  font: var(--type-h3);
+  color: var(--text-strong);
+  margin: 0;
+  text-wrap: balance;
+}
+
+.start-sub {
+  font: var(--type-body);
+  color: var(--text-body);
+  margin: 0;
+}
+
+.start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+/* The measured problem, stated as a rule: the way in was a 15px/400 line
+   of grey inside a dashed box, lighter than the "Open the app" link in
+   the page header above it. A primary action is at least this big. */
+.btn-start {
+  min-height: 48px;
+  min-width: 11rem;
+  padding-inline: var(--space-6);
+  font-size: 1rem;
+  font-weight: var(--weight-medium);
+}
+
+.start-fine {
+  font: var(--type-caption);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* The second way in, for people who drag. Not the only way in, which is
+   what it used to be. */
+.start-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 11rem;
+  padding: var(--space-6);
+  text-align: center;
+  font: var(--type-caption);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.start-drop:hover {
+  background: var(--surface-hover);
+  color: var(--text-body);
+}
+
+@media (max-width: 46rem) {
+  .start-drop {
+    min-height: 7rem;
+  }
 }

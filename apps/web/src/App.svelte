@@ -48,7 +48,6 @@
     SUBTITLE_ENCODINGS,
     type Decoded,
   } from "./lib/decode";
-  import { captureFrame, renderStyleThumbnails } from "./lib/stylePreview";
   import { burnInBrowser, burnSupport, type BurnSupport } from "./lib/burn";
   import { isChinese, toSimplified, wantsTraditional } from "./lib/script";
   import { initLocale, t } from "./lib/i18n/index.svelte";
@@ -134,8 +133,6 @@
   let videoWidth = $state(0);
   let videoHeight = $state(0);
   let videoDuration = $state(0);
-  /** Bumped when a frame is actually decodable, so thumbnails can use one. */
-  let videoFrameReady = $state(0);
   let isDragOver = $state(false);
   /**
    * The video the last visit was working on, if this browser can hand it
@@ -189,18 +186,6 @@
 
   let styles = $state<Style[]>([]);
   let selectedStyle = $state("Clean");
-  /** Preset name -> a libass-rendered thumbnail, once they are ready. */
-  let thumbnails = $state<Record<string, string>>({});
-  /**
-   * Display-only. Deliberately never *read* inside the effect that starts
-   * a render: reading and writing the same `$state` there makes the effect
-   * invalidate itself, and the picker re-renders its twelve thumbnails
-   * forever. The guard below is a plain variable for exactly that reason.
-   */
-  let thumbnailsBusy = $state(false);
-  let thumbnailRun = 0;
-  let thumbnailsRunning = false;
-  let thumbnailsStale = false;
   const corePresets = $derived(styles.filter((s) => s.pack === "Core"));
   const advancedPresets = $derived(styles.filter((s) => s.pack === "Advanced"));
 
@@ -506,6 +491,19 @@
    */
   const hasDimensions = $derived(videoWidth > 0 && videoHeight > 0);
   const hasCues = $derived(cues.length > 0);
+
+  /**
+   * Nothing has been opened yet, so the page has exactly one thing to say.
+   *
+   * It used to say six: the drop zone, three engine cards, a model list, a
+   * language list and a second file input were all on screen before there
+   * was a video for any of them to act on. Measured against the sibling
+   * app with the same shape -- a WASM tool that needs a local file -- 48%
+   * of the people who opened this one ever used it, against 89% there. The
+   * difference is not taste; it is that the first screen did not say where
+   * to begin. Everything below now waits for a video.
+   */
+  const starting = $derived(!hasVideo && !hasCues);
 
   /** A translation is on screen, and the text it came from is still held. */
   const canShowBoth = $derived(
@@ -910,6 +908,31 @@
     await tick();
   }
 
+  /**
+   * Put the next thing to press where it can be seen.
+   *
+   * Choosing a video swaps the start panel for the player, and the button
+   * that acts on it lands roughly 300px below the fold -- so the reward
+   * for the first click was a screen that looked unchanged. Scrolls the
+   * generate button into view rather than the top of the page, because
+   * that button is the next decision.
+   *
+   * Only when it is actually out of sight. On a tall window everything is
+   * already visible, and a page that jumps when it did not need to is its
+   * own small insult.
+   */
+  function showNextStep() {
+    if (typeof document === "undefined") return;
+    const next = document.querySelector<HTMLElement>("[data-next-step]");
+    if (!next) return;
+    const box = next.getBoundingClientRect();
+    if (box.top >= 0 && box.bottom <= window.innerHeight) return;
+    // `prefers-reduced-motion` covers people for whom a moving page is a
+    // symptom, not a nicety; they still get taken there, instantly.
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    next.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
+  }
+
   /** Bring back the video the previous visit was working on. */
   async function reopenRememberedVideo() {
     const handle = rememberedVideoHandle;
@@ -981,94 +1004,15 @@
     videoWidth = videoEl.videoWidth;
     videoHeight = videoEl.videoHeight;
     videoDuration = videoEl.duration;
+    // Here rather than at the end of `loadVideo`: the player has no height
+    // until its metadata arrives, so a scroll computed before this point
+    // aims at a document that is about to grow by the height of a video.
+    void tick().then(showNextStep);
     // Ask about the real output size: an encoder can accept 720p and
     // refuse 4K, and finding that out after a long export is no use.
     void burnSupport(outputSize[0] || videoWidth, outputSize[1] || videoHeight).then(
       (s) => (support = s),
     );
-  }
-
-  /**
-   * Render the style thumbnails.
-   *
-   * Regenerated when the video or the first cue changes, so the tiles show
-   * the user's own footage and their own words rather than a stock sample.
-   * Runs are numbered because a second request can start while the first
-   * is still walking its twelve presets, and the stale one must not
-   * overwrite the fresh one's results.
-   */
-  /**
-   * Coalesce a burst of refresh requests into one.
-   *
-   * The delay is short enough to feel immediate after a single seek and
-   * long enough to swallow a scrub, which arrives as a seek every few
-   * frames.
-   */
-  let thumbnailTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function scheduleThumbnails() {
-    if (thumbnailTimer !== null) clearTimeout(thumbnailTimer);
-    thumbnailTimer = setTimeout(() => {
-      thumbnailTimer = null;
-      void refreshThumbnails();
-    }, 350);
-  }
-
-  async function refreshThumbnails() {
-    if (styles.length === 0) return;
-    if (thumbnailsRunning) {
-      // A request arriving mid-run must not be dropped, or the tiles keep
-      // showing the previous video's frame and the previous cue's words.
-      thumbnailsStale = true;
-      return;
-    }
-    const run = ++thumbnailRun;
-    thumbnailsRunning = true;
-    thumbnailsBusy = true;
-    try {
-      // Bounded, whatever happens inside.
-      //
-      // Every await in the renderer has its own timeout, and yet the
-      // "rendering previews..." label was still reported stuck in the
-      // field. Rather than keep guessing at which await can hang, this
-      // caps the whole operation: the tiles fall back to their colour
-      // swatches, which is a visible degradation, instead of a spinner
-      // that never stops, which is a broken-looking page.
-      //
-      // Generous, because twelve libass documents over a large frame is
-      // genuinely slow on a modest machine and cutting a working render
-      // short would be its own bug.
-      const rendered = await Promise.race([
-        renderStyleThumbnails({
-          styles: styles.map((s) => s.name),
-          background: await captureFrame(videoEl),
-          aspect: hasDimensions ? { width: videoWidth, height: videoHeight } : undefined,
-          text: cues[0]?.lines.join(" "),
-        }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 45000)),
-      ]);
-      if (run !== thumbnailRun) return;
-      if (rendered === null) {
-        console.warn("style thumbnails timed out; keeping the previous set");
-        return;
-      }
-      const next: Record<string, string> = {};
-      for (const t of rendered) next[t.name] = t.url;
-      thumbnails = next;
-    } catch (e) {
-      // A picker without thumbnails still works -- the tiles fall back to
-      // their colour swatch -- so this must never take the page down.
-      console.error("style thumbnails failed", e);
-    } finally {
-      if (run === thumbnailRun) {
-        thumbnailsRunning = false;
-        thumbnailsBusy = false;
-        if (thumbnailsStale) {
-          thumbnailsStale = false;
-          void refreshThumbnails();
-        }
-      }
-    }
   }
 
   /**
@@ -1463,28 +1407,6 @@
     });
   });
 
-  $effect(() => {
-    // The thumbnails depend on the preset list, a frame of the video and
-    // the first cue's text. Reading them here is what subscribes this
-    // effect to them.
-    const count = styles.length;
-    const ready = engineReady;
-    void videoName;
-    void hasDimensions;
-    void videoFrameReady;
-    void cues[0]?.lines.join(" ");
-    // `untrack` so the reads inside the renderer -- and the state it
-    // writes -- cannot feed back into this effect's dependencies.
-    // Debounced, not immediate. `videoFrameReady` ticks on every `seeked`,
-    // and scrubbing the video -- the natural thing to do while checking
-    // subtitles -- fires a burst of them. Each one restarts a walk through
-    // twelve presets, every preset awaiting a libass frame, so a few
-    // seconds of scrubbing queues more work than the renderer can retire:
-    // `thumbnailsStale` is set again before each run ends, the run loops
-    // forever, and "rendering previews..." never clears. Coalescing the
-    // burst into one run is the whole fix.
-    if (ready && count > 0) untrack(() => scheduleThumbnails());
-  });
 
   $effect(() => {
     // Re-check whenever the pair changes; the device translator's models
@@ -1886,7 +1808,8 @@
   <div class="field-row">
     <button
       type="button"
-      class="btn btn-primary btn-sm"
+      class="btn btn-primary"
+      data-next-step
       disabled={!canTranscribe || !asrAffordable}
       onclick={doTranscribe}
     >
@@ -2112,8 +2035,10 @@
   {/if}
 
   <!-- 1. the video -->
-  <section class="card">
-    <h2 class="section-title">{t("Video")}</h2>
+  <section class="card" class:card-start={starting}>
+    {#if !starting}
+      <h2 class="section-title">{t("Video")}</h2>
+    {/if}
     {#if hasVideo}
       <div class="stage">
         <!-- svelte-ignore a11y_media_has_caption -->
@@ -2121,8 +2046,6 @@
           bind:this={videoEl}
           src={videoUrl}
           onloadedmetadata={onVideoLoaded}
-          onloadeddata={() => (videoFrameReady += 1)}
-          onseeked={() => (videoFrameReady += 1)}
           controls
           playsinline
         ></video>
@@ -2180,22 +2103,63 @@
         </div>
       {/if}
       <!--
+        Two columns, and one job: open a video. What to say on the left,
+        where to put the file on the right.
+
         `showOpenFilePicker` is preferred because it yields a handle that
         outlives a sign-in redirect; `chooseVideo` steps aside on browsers
-        without it, and the plain input below does the work instead.
+        without it, and the plain input inside each label does the work.
       -->
-      <label class="dropzone">
-        <!--
-          The handler is on the input, not the label: a label click is
-          forwarded here, and so is a keyboard activation of the focused
-          input, so one listener covers both and `preventDefault` suppresses
-          the native dialog in either case.
-        -->
-        <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
-        <Icon name="film" size={22} />
-        <span>{touchOnly ? t("Choose a video") : t("Drop a video here, or choose one")}</span>
-        <span class="oa-caption">{t("It stays on your device. No upload, no account.")}</span>
-      </label>
+      <div class="start">
+        <div class="start-say">
+          <h3 class="start-title">{t("Start with a video")}</h3>
+          <p class="start-sub">
+            {t("Its speech becomes subtitles here, on this machine. Nothing is uploaded.")}
+          </p>
+          <div class="start-actions">
+            <!--
+              The handler is on the input, not the label: a label click is
+              forwarded here, and so is a keyboard activation of the
+              focused input, so one listener covers both and
+              `preventDefault` suppresses the native dialog either way.
+            -->
+            <label class="btn btn-primary btn-start">
+              <input
+                type="file"
+                accept="video/*"
+                aria-label={t("Choose a video")}
+                onclick={chooseVideo}
+                onchange={onVideoInput}
+                hidden
+              />
+              {t("Choose a video")}
+            </label>
+            <!--
+              The shortest path through the product, and it used to be
+              named nowhere on the first screen: someone who already has a
+              subtitle file waits for no model at all.
+            -->
+            <label class="btn btn-secondary btn-start">
+              <input
+                type="file"
+                accept=".srt,.vtt,text/vtt"
+                aria-label={t("Open an .srt or .vtt")}
+                onchange={onSubtitleInput}
+                hidden
+              />
+              {t("Open an .srt or .vtt")}
+            </label>
+          </div>
+          <p class="start-fine">
+            {t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
+          </p>
+        </div>
+        <label class="start-drop">
+          <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
+          <Icon name="film" size={26} />
+          <span>{touchOnly ? t("Tap to choose") : t("or drop a video here")}</span>
+        </label>
+      </div>
     {/if}
     {#if videoError}
       <p class="field-error">{videoError}</p>
@@ -2203,6 +2167,13 @@
   </section>
 
   <!-- 2. the subtitles -->
+  <!--
+    Held back until there is a video. The engine cards, the model list and
+    the two language lists are all choices *about* a file, and putting them
+    on the first screen asked people to decide five things before they had
+    opened anything.
+  -->
+  {#if !starting}
   <section class="card">
     <h2 class="section-title">{t("Subtitles")}</h2>
     {#if hasCues}
@@ -2318,6 +2289,7 @@
       <p class="field-error">{subtitleError}</p>
     {/if}
   </section>
+  {/if}
 
   {#if staleCues}
     <!--
@@ -2401,73 +2373,53 @@
       <div class="subsection-head">
         <h2 class="section-title">{t("Style")}</h2>
         <CostBadge cost="free" />
-        {#if thumbnailsBusy}
-          <span class="oa-caption">{t("rendering previews…")}</span>
-        {/if}
       </div>
-      <p class="oa-caption card-intro">
-        Every tile is rendered by libass &mdash; the same renderer that burns the
-        video{hasDimensions ? ", over a frame of your own footage" : ""}. What you
-        pick is what you get.
-      </p>
-      <div class="style-grid">
-        {#each corePresets as style (style.name)}
-          <button
-            type="button"
-            class="style-tile"
-            class:selected={selectedStyle === style.name}
-            onclick={() => {
-              selectedStyle = style.name;
+      <!--
+        A name, and the video above it.
+
+        The twelve presets used to be laid out here as twelve rendered
+        tiles, which meant the panel spent most of its height showing
+        stills of footage the reader was already looking at, and the
+        choice had to be made by comparing thumbnails rather than by
+        seeing the thing itself. Picking a name re-renders the preview
+        over the real frame immediately, which is the only comparison
+        that settles it. The twelve, side by side and full size, are on
+        /styles, where there is room for them.
+      -->
+      <div class="field-row">
+        <label class="field field-wide">
+          <span class="field-label">{t("Preset")}</span>
+          <select
+            class="input"
+            value={selectedStyle}
+            onchange={(e) => {
+              selectedStyle = (e.currentTarget as HTMLSelectElement).value;
               showACue();
             }}
           >
-            {#if thumbnails[style.name]}
-              <img class="style-shot" src={thumbnails[style.name]} alt="" loading="lazy" />
-            {:else}
-              <span
-                class="style-shot style-shot-pending"
-                style:background={style.primaryHex}
-                style:box-shadow={style.borderStyle === "box"
-                  ? `inset 0 0 0 4px ${style.backHex}`
-                  : `inset 0 0 0 2px ${style.backHex}`}
-              ></span>
+            <optgroup label={t("Core")}>
+              {#each corePresets as style (style.name)}
+                <option value={style.name}>{style.name}</option>
+              {/each}
+            </optgroup>
+            {#if advancedPresets.length > 0}
+              <optgroup label={t("Advanced pack")}>
+                {#each advancedPresets as style (style.name)}
+                  <option value={style.name}>{style.name}</option>
+                {/each}
+              </optgroup>
             {/if}
-            <span class="style-name">{style.name}</span>
-          </button>
-        {/each}
+          </select>
+        </label>
+        <a class="btn btn-ghost btn-sm" href="/styles" target="_blank" rel="noopener">
+          {t("See all twelve")}
+        </a>
       </div>
-      {#if advancedPresets.length > 0}
-        <div class="subsection-head">
-          <h3 class="subsection-title">{t("Advanced pack")}</h3>
-          <CostBadge cost="free" label="Included, free" />
-        </div>
-        <div class="style-grid">
-          {#each advancedPresets as style (style.name)}
-            <button
-              type="button"
-              class="style-tile"
-              class:selected={selectedStyle === style.name}
-              onclick={() => {
-              selectedStyle = style.name;
-              showACue();
-            }}
-            >
-              {#if thumbnails[style.name]}
-                <img class="style-shot" src={thumbnails[style.name]} alt="" loading="lazy" />
-              {:else}
-                <span
-                  class="style-shot style-shot-pending"
-                  style:background={style.primaryHex}
-                  style:box-shadow={style.borderStyle === "box"
-                    ? `inset 0 0 0 4px ${style.backHex}`
-                    : `inset 0 0 0 2px ${style.backHex}`}
-                ></span>
-              {/if}
-              <span class="style-name">{style.name}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
+      <p class="oa-caption card-intro">
+        {hasDimensions
+          ? t("The preview above is libass, the same renderer that burns the video. What you see is what you get.")
+          : t("Rendered by libass, the same renderer that burns the video. What you see is what you get.")}
+      </p>
       {#if hasCues}
         <div class="subsection-head">
           <h3 class="subsection-title">{t("Word effects")}</h3>

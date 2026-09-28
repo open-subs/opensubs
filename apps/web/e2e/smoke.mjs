@@ -673,11 +673,38 @@ check("multi-line cue keeps its break", secondCue.includes("\n"), JSON.stringify
 }
 
 console.log("styles");
-await page.waitForSelector(".style-tile", { timeout: 5000 });
-const styleNames = await page.$$eval(".style-name", (els) => els.map((e) => e.textContent.trim()));
+// A list of names, not a grid of rendered tiles. The twelve used to be laid
+// out here full-size, which spent most of the panel's height on stills of
+// footage already on screen a few centimetres above; picking a name renders
+// the real preview instead, and the side-by-side twelve live on /styles.
+const stylePicker = page.locator("select:has(optgroup)").first();
+await stylePicker.waitFor({ timeout: 5000 });
+const styleNames = await stylePicker.evaluate((s) =>
+  [...s.options].map((o) => o.textContent.trim()),
+);
 check("both style packs reach the page", styleNames.length === 12, `got ${styleNames.length}`);
 check("core preset present", styleNames.includes("Clean"));
 check("advanced preset present", styleNames.includes("Neon"));
+check(
+  "the packs are still named",
+  (await stylePicker.evaluate((s) =>
+    [...s.querySelectorAll("optgroup")].map((g) => g.label).join("|"),
+  )) === "Core|Advanced pack",
+);
+check(
+  "and the twelve are one link away",
+  (await page.locator('a[href="/styles"]').count()) > 0,
+);
+check(
+  "picking a name changes what the preview renders",
+  await (async () => {
+    const before = await stylePicker.inputValue();
+    await stylePicker.selectOption("Neon");
+    const after = await stylePicker.inputValue();
+    await stylePicker.selectOption(before);
+    return before !== after && after === "Neon";
+  })(),
+);
 
 if (FIXTURE) {
   console.log("libass preview");
@@ -1233,24 +1260,6 @@ if (FIXTURE) {
 
   }
 
-  console.log("style thumbnails");
-  // Each tile is a real libass render over a frame of the video, not a CSS
-  // approximation -- so the check is that images actually arrive.
-  await page
-    .waitForFunction(() => document.querySelectorAll("img.style-shot").length >= 12, {
-      timeout: 90000,
-    })
-    .catch(() => {});
-  const shots = await page.$$eval("img.style-shot", (els) =>
-    els.map((e) => (e.getAttribute("src") ?? "").length),
-  );
-  check("every preset gets a rendered thumbnail", shots.length >= 12, `${shots.length} tiles`);
-  check(
-    "thumbnails carry actual image data",
-    shots.every((len) => len > 1500),
-    `smallest was ${Math.min(...shots)} bytes of data URL`,
-  );
-
   console.log("style change re-renders the preview");
   // Assert the *pixels* change, not that the canvas still exists.
   //
@@ -1265,7 +1274,7 @@ if (FIXTURE) {
   // did nothing -- so selecting a style moves the playhead onto a cue.
   const lastCueEnd = 7.5;
   const beforeStyle = await shotAt(lastCueEnd, join(tmpdir(), "opensubs-style-before.png"));
-  await page.click('.style-tile:has(.style-name:text-is("Podcast"))');
+  await page.locator("select:has(optgroup)").first().selectOption("Podcast");
   await page.waitForTimeout(2500);
   await page.locator(".stage").screenshot({ path: join(tmpdir(), "opensubs-style-after.png") });
   const afterStyle = join(tmpdir(), "opensubs-style-after.png");
@@ -1436,27 +1445,28 @@ if (FIXTURE) {
       expectedConsoleError = "simulated picker failure";
       // Real clicks, not synthetic ones: opening a file dialog needs
       // transient user activation, which `element.click()` does not carry.
-      // `.dropzone` alone would also match the subtitle one.
+      // `.start-drop` is the first screen's drop target, beside the
+      // buttons; the subtitle import has its own and must not be hit.
       //
       // The first click is the one that discovers the breakage, and it
       // cannot be rescued in flight -- the gesture is spent by the time
       // the rejection arrives. What must hold is that the app says so and
       // the *next* click opens the ordinary dialog.
-      await page.click(".dropzone:not(.dropzone-sm)");
+      await page.click(".start-drop");
       await page.waitForTimeout(800);
       check(
         "a failing picker says so rather than doing nothing",
         (await page.locator(".field-error").count()) > 0,
-        "a silent dead dropzone is the failure this whole section is about",
+        "a silent dead drop target is the failure this whole section is about",
       );
-      await page.click(".dropzone:not(.dropzone-sm)");
+      await page.click(".start-drop");
       await page.waitForTimeout(1500);
       page.off("filechooser", onChooser);
       expectedConsoleError = null;
       check(
         "the click after a picker failure opens the ordinary file dialog",
         nativeDialogOpened,
-        "the dropzone stays dead, which is worse than the bug being fixed",
+        "the drop target stays dead, which is worse than the bug being fixed",
       );
 
       // Leave nothing behind for the checks that follow.
