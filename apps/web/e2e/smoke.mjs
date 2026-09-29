@@ -285,10 +285,15 @@ console.log("backend domain masking");
 
 /** Click something that downloads, and return the file's text. */
 async function downloadText(page, selector) {
+  // The download buttons are on the Export tab; go there and come back, the
+  // way someone checking a setting's effect on the file would.
+  const was = await page.getAttribute('[role="tab"][aria-selected="true"]', "id", { timeout: 1000 }).catch(() => null);
+  if (was) await page.click("#tab-export");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.click(selector),
   ]);
+  if (was) await page.click(`#${was}`);
   const to = join(tmpdir(), `opensubs-${Date.now()}-${await download.suggestedFilename()}`);
   await download.saveAs(to);
   return await readFile(to, "utf8");
@@ -299,6 +304,13 @@ const server = await serve(DIST);
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// The settings column is tabs once there are cues: one panel at a time.
+// Clicking the tab is what a person does; with no cues there are no tabs
+// and every card present is already showing.
+async function panel(id) {
+  const tab = page.locator(`#tab-${id}`);
+  if (await tab.count()) { await tab.click(); await page.waitForTimeout(150); }
+}
 
 const consoleErrors = [];
 /**
@@ -687,6 +699,7 @@ const secondCue = await page.$$eval(".cue-text", (els) => els[1].value);
 check("multi-line cue keeps its break", secondCue.includes("\n"), JSON.stringify(secondCue));
 
 {
+  await panel("subtitles");
   const card = page.locator('.card:has(> h2:text-is("Subtitles"))');
   check(
     "re-generating is offered once there are subtitles",
@@ -710,6 +723,7 @@ console.log("styles");
 // out here full-size, which spent most of the panel's height on stills of
 // footage already on screen a few centimetres above; picking a name renders
 // the real preview instead, and the side-by-side twelve live on /styles.
+await panel("style");
 const stylePicker = page.locator("select:has(optgroup)").first();
 await stylePicker.waitFor({ timeout: 5000 });
 const styleNames = await stylePicker.evaluate((s) =>
@@ -796,6 +810,7 @@ if (FIXTURE) {
   // Trimming lives behind "Other settings" now: it is a real control and a
   // rare one, and the first screen was three and a half screens long with
   // everything on it. Opening the disclosure is what a person does too.
+  await panel("clip");
   await page.evaluate(() => {
     for (const d of document.querySelectorAll("details.more")) d.open = true;
   });
@@ -816,6 +831,7 @@ if (FIXTURE) {
   // a short clip and checks the file that comes out is real video with the
   // subtitles actually in the pixels.
   await page.fill('.field input[placeholder="0"]', "0");
+  await panel("export");
   const burnButton = page.locator('button:has-text("Burn subtitles into the video")');
   const unsupported = await page.locator(".banner-danger").count();
   if (unsupported === 0 && (await burnButton.count()) > 0) {
@@ -865,6 +881,7 @@ if (FIXTURE) {
   }
 
   console.log("translation routes");
+  await panel("translate");
   // The three routes are columns, not a dropdown: the choice is between
   // three unlike bargains, and a menu made them look like three flavours
   // of one thing while hiding the price behind an interaction.
@@ -1007,6 +1024,7 @@ if (FIXTURE) {
       // words cannot be matched to the audio) taken to the wrong
       // conclusion, because the language that *was* spoken is still on
       // screen. It is the one that lights up.
+      await panel("style");
       await page
         .locator('label:has-text("Highlight each word as it is spoken") input')
         .check();
@@ -1034,9 +1052,11 @@ if (FIXTURE) {
           }),
         beats[0] ?? "no events",
       );
+      await panel("style");
       await page.locator('label:has-text("None") input[type=radio]').check();
       await page.waitForTimeout(600);
 
+      await panel("translate");
       await size.selectOption("1");
       await page.waitForTimeout(600);
 
@@ -1261,6 +1281,7 @@ if (FIXTURE) {
       const card = page.locator('.card:has-text("Translate")');
       await card.locator('.route:has-text("Your own API key")').click();
       await card.locator(".route-detail select").selectOption("openai");
+      await panel("translate");
       await card.locator('label:has(.field-label:text-is("Into")) select').selectOption("zh-Hans");
       await card.locator('label:has(.field-label:text-is("API key")) input').fill("test-key");
       await card.locator('label:has(.field-label:text-is("Server")) input').fill(`${base}/fake`);
@@ -1314,6 +1335,7 @@ if (FIXTURE) {
   // did nothing -- so selecting a style moves the playhead onto a cue.
   const lastCueEnd = 7.5;
   const beforeStyle = await shotAt(lastCueEnd, join(tmpdir(), "opensubs-style-before.png"));
+  await panel("style");
   await page.locator("select:has(optgroup)").first().selectOption("Podcast");
   await page.waitForTimeout(2500);
   await page.locator(".stage").screenshot({ path: join(tmpdir(), "opensubs-style-after.png") });
@@ -1545,6 +1567,7 @@ if (FIXTURE) {
   // moments must differ. A build where "karaoke" silently fell back to the
   // plain writer would pass any check that only compared effect-on against
   // effect-off.
+  await panel("style");
   await page.locator('label:has-text("Highlight each word as it is spoken") input').check();
   await page.waitForTimeout(1200);
   const early = gray(await shotAt(1.0, join(tmpdir(), "opensubs-karaoke-early.png")));
@@ -1558,11 +1581,13 @@ if (FIXTURE) {
     travelled > 200,
     `${travelled} pixels changed -- the highlight did not move, so this is not a time effect`,
   );
+  await panel("style");
   await page.locator('label:has-text("None") input[type=radio]').check();
   console.log("credits");
   // The hosted provider is only offered when its endpoint is configured,
   // so this build has to opt in the same way a developer would.
   {
+    await panel("translate");
     await page.selectOption('label:has(.field-label:text-is("Into")) select', { index: 1 });
     await page.click('.card:has-text("Translate") .route:has-text("OpenSubs")');
     await page.waitForTimeout(400);

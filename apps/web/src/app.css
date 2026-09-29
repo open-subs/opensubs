@@ -1260,6 +1260,49 @@ html {
   max-height: calc(100vh - var(--space-8));
 }
 
+/* One settings panel at a time once there are cues. Sticky, like the
+   output beside it, so switching panel never needs a scroll back up. */
+.panel-tabs {
+  position: sticky;
+  top: var(--space-5);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+.panel-tab {
+  flex: 1 1 auto;
+  font: inherit;
+  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.panel-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.panel-tab.selected {
+  background: var(--surface-selected);
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.workspace-controls > [hidden] {
+  display: none;
+}
+
 /* The cues are output you edit, so they live with the picture rather than
    with the settings -- and they scroll inside the panel instead of making
    the page long. */

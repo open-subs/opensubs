@@ -5,6 +5,8 @@
 // stop that fallback hiding a gap for a release or two.
 //
 //   node --experimental-strip-types e2e/i18n.mjs
+import fs from "node:fs";
+import path from "node:path";
 import { LOCALES } from "../src/lib/i18n/locales.ts";
 import zhHans from "../src/lib/i18n/zh-Hans.ts";
 import zhHant from "../src/lib/i18n/zh-Hant.ts";
@@ -100,6 +102,39 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
     differing / reference.length > 0.5,
     `${differing}/${reference.length} entries differ`,
   );
+}
+
+// 6. Every string the source asks to translate has an entry. Checks 2-5
+//    only compare the catalogues with each other, so a sentence wrapped in
+//    t() and never added to any of them passed all of them and shipped in
+//    English -- which is how the whole editing panel did.
+{
+  const root = new URL("../src/", import.meta.url).pathname;
+  const files = [];
+  (function walk(dir) {
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
+      if (fs.statSync(p).isDirectory()) {
+        if (!["i18n", "wasm-gen", "assets", "styles"].includes(name)) walk(p);
+      } else if (/\.(svelte|ts)$/.test(name)) files.push(p);
+    }
+  })(root);
+  const asked = new Set();
+  for (const f of files) {
+    const src = fs.readFileSync(f, "utf8");
+    for (const m of src.matchAll(/\bt\(\s*"((?:[^"\\]|\\.)*)"/g)) {
+      asked.add(JSON.parse(`"${m[1]}"`));
+    }
+    // t(cond ? "a" : "b") -- both arms are keys.
+    for (const m of src.matchAll(/\bt\(\s*[^"()]+?\?\s*"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"/g)) {
+      asked.add(JSON.parse(`"${m[1]}"`));
+      asked.add(JSON.parse(`"${m[2]}"`));
+    }
+  }
+  const absent = [...asked].filter((k) => !(k in zhHans));
+  ok("every t() string in the source is catalogued", absent.length === 0,
+    `${absent.length}: ${absent.slice(0, 3).join(" | ")}`);
+  if (process.env.LIST_MISSING) console.log(JSON.stringify(absent, null, 1));
 }
 
 console.log(`${pass} passed, ${fails.length} failed`);

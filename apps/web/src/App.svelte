@@ -52,6 +52,8 @@
   import { isChinese, toSimplified, wantsTraditional } from "./lib/script";
   import { initLocale, t } from "./lib/i18n/index.svelte";
   import LanguagePicker from "./lib/LanguagePicker.svelte";
+  import Rich from "./lib/Rich.svelte";
+  import { keepWorkAcrossLanguageLinks } from "./lib/i18n/inplace";
   import { humanRemaining, progressLabel, secondsRemaining } from "./lib/eta";
   import {
     ASR_ENGINES,
@@ -520,6 +522,47 @@
     document.documentElement.toggleAttribute("data-working", !starting);
   });
 
+  /**
+   * Which settings panel is showing, once there are cues to act on.
+   *
+   * Opens on Style: the moment subtitles first appear, how they look is
+   * the next question, and "Generate again" is the least likely one.
+   */
+  type Panel = "subtitles" | "style" | "clip" | "translate" | "export";
+  let panel = $state<Panel>("style");
+  const panelTabs = $derived(
+    (
+      [
+        { id: "subtitles", label: "Subtitles" },
+        { id: "style", label: "Style" },
+        { id: "clip", label: "Clip & size" },
+        { id: "translate", label: "Translate" },
+        { id: "export", label: "Export" },
+      ] as { id: Panel; label: string }[]
+    ).filter((tab) => tab.id !== "clip" || hasDimensions),
+  );
+  $effect(() => {
+    if (!panelTabs.some((tab) => tab.id === panel)) panel = "style";
+  });
+  /** Without cues there is only the Subtitles card, so no tabs at all. */
+  function panelAttrs(id: Panel) {
+    if (!hasCues) return {};
+    return {
+      id: `panel-${id}`,
+      role: "tabpanel",
+      "aria-labelledby": `tab-${id}`,
+      hidden: panel !== id,
+    };
+  }
+  function onPanelKey(event: KeyboardEvent) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const i = panelTabs.findIndex((tab) => tab.id === panel);
+    panel = panelTabs[(i + step + panelTabs.length) % panelTabs.length].id;
+    void tick().then(() => document.getElementById(`tab-${panel}`)?.focus());
+  }
+
   /** A translation is on screen, and the text it came from is still held. */
   const canShowBoth = $derived(
     sourceCues !== null && sourceCues.length === cues.length && cues.length > 0,
@@ -747,12 +790,15 @@
 
   // --- lifecycle ---------------------------------------------------------
 
+  let stopLanguageLinks: (() => void) | undefined;
+
   onMount(async () => {
     // Before anything renders: the stored choice, else what the browser
     // asks for. Called here rather than at module scope because the
     // catalogues are also imported by the extension's engine host, which
     // has no `window` to read a preference from.
     initLocale();
+    stopLanguageLinks = keepWorkAcrossLanguageLinks(() => !starting);
     try {
       await load();
       engineReady = true;
@@ -802,6 +848,7 @@
   });
 
   onDestroy(() => {
+    stopLanguageLinks?.();
     preview?.destroy();
     burnAbort?.abort();
     asrAbort?.abort();
@@ -1868,11 +1915,11 @@
       {/if}
       <p class="oa-caption card-intro">
         {#if !hasVideo}
-          Load a video first, or open a subtitle file you already have.
+          {t("Load a video first, or open a subtitle file you already have.")}
         {:else if asrEngine === "local"}
-          Whisper runs here, on your machine{asrDevice === "webgpu"
-            ? ", on the GPU"
-            : ""}. The audio is never uploaded; only the model is downloaded, once.
+          {asrDevice === "webgpu"
+            ? t("Whisper runs here, on your machine, on the GPU. The audio is never uploaded; only the model is downloaded, once.")
+            : t("Whisper runs here, on your machine. The audio is never uploaded; only the model is downloaded, once.")}
           {#if asr?.integrated}
             <!-- APP-111 measured this hardware: say what it is and what it costs,
                  rather than only quietly choosing the smaller model. -->
@@ -1884,18 +1931,16 @@
           {#if asr?.device === "webgpu" && asrBackend === "cpu"}
             {t("On the processor it needs the larger full-precision model, about four times the download, and the page may stop responding while it works.")}
           {:else if asr?.device === "wasm"}
-            {inNativeShell() ? "This device" : "This browser"} has no WebGPU, so it runs on the CPU and needs the
-            larger full-precision model &mdash; slower, and roughly four times
-            the download.
+            {inNativeShell()
+              ? t("This device has no WebGPU, so it runs on the CPU and needs the larger full-precision model — slower, and roughly four times the download.")
+              : t("This browser has no WebGPU, so it runs on the CPU and needs the larger full-precision model — slower, and roughly four times the download.")}
           {/if}
         {:else if asrEngine === "opensubs"}
-          Only the trimmed span is uploaded, so shortening the clip lowers
-          the price by the same proportion.
+          {t("Only the trimmed span is uploaded, so shortening the clip lowers the price by the same proportion.")}
         {:else}
-          {inNativeShell() ? "This device" : "The browser"} can only run models up to about 250&nbsp;MB. A hosted
-          endpoint can run the full-size one, which is markedly better on
-          accents, noise and proper nouns &mdash; and far faster on a long
-          recording. Works with OpenAI, Groq, or any server of your own.
+          {inNativeShell()
+            ? t("This device can only run models up to about 250 MB. A hosted endpoint can run the full-size one, which is markedly better on accents, noise and proper nouns — and far faster on a long recording. Works with OpenAI, Groq, or any server of your own.")
+            : t("The browser can only run models up to about 250 MB. A hosted endpoint can run the full-size one, which is markedly better on accents, noise and proper nouns — and far faster on a long recording. Works with OpenAI, Groq, or any server of your own.")}
         {/if}
       </p>
 
@@ -1943,26 +1988,14 @@
       <p class="oa-caption card-intro">
         {#if asrEngine === "local"}
           {#if spokenLanguage === "auto"}
-            The language is read from the audio every four seconds, so a video
-            that switches between two languages is transcribed in both and comes
-            out as one subtitle file. If you know which two they are, name them
-            &mdash; a choice between two is harder to get wrong than a choice
-            between ninety-nine.
+            {t("The language is read from the audio every four seconds, so a video that switches between two languages is transcribed in both and comes out as one subtitle file. If you know which two they are, name them — a choice between two is harder to get wrong than a choice between ninety-nine.")}
           {:else if secondLanguage !== "none"}
-            Both are expected, so the audio is still read every four seconds and
-            each stretch is transcribed in whichever of the two is being spoken
-            &mdash; and it cannot wander off into a third language.
+            {t("Both are expected, so the audio is still read every four seconds and each stretch is transcribed in whichever of the two is being spoken — and it cannot wander off into a third language.")}
           {:else}
-            One language, named, so nothing is detected and nothing can be
-            misheard. Add a second if the video switches between two.
+            {t("One language, named, so nothing is detected and nothing can be misheard. Add a second if the video switches between two.")}
           {/if}
         {:else}
-          This route sends the whole clip away at once, so it can only be
-          transcribed in <em>one</em> language &mdash; detection picks whichever
-          is spoken most and puts every other speaker through it. For a video
-          that switches between two languages, use <strong>{t("On this device")}</strong>,
-          which reads the language every four seconds and transcribes each
-          stretch in the language it was actually spoken in.
+          <Rich text={t("This route sends the whole clip away at once, so it can only be transcribed in *one* language — detection picks whichever is spoken most and puts every other speaker through it. For a video that switches between two languages, use **{device}**, which reads the language every four seconds and transcribes each stretch in the language it was actually spoken in.", { device: t("On this device") })} />
         {/if}
       </p>
     </div>
@@ -1981,8 +2014,7 @@
   <div class="credit-bar">
     {#if session.signedIn}
       <span class="credit-balance">
-        <strong>{session.balance}</strong>
-        {session.balance === 1 ? "credit" : "credits"} left
+        <Rich text={t(session.balance === 1 ? "**{n}** credit left" : "**{n}** credits left", { n: session.balance })} />
         <span class="credit-worth">{usd(session.balance * PRICING_OF().credit_usd)}</span>
       </span>
       {#if quote}
@@ -2014,7 +2046,7 @@
         {#if quote}
           {t("Costs")} <strong>{priceLabel(quote.credits)}</strong> &mdash;
         {/if}
-        sign in to use it
+        {t("sign in to use it")}
       </span>
       <span class="credit-actions">
         <openapps-login></openapps-login>
@@ -2022,9 +2054,7 @@
     {/if}
   </div>
   <p class="oa-caption">
-    You are charged the price shown, never more, and only for work that
-    succeeds &mdash; a failed job costs nothing. {PRICING_OF().pack_credits} credits
-    cost {usd(PRICING_OF().pack_usd)}, and they do not expire.
+    {t("You are charged the price shown, never more, and only for work that succeeds — a failed job costs nothing. {credits} credits cost {price}, and they do not expire.", { credits: PRICING_OF().pack_credits, price: usd(PRICING_OF().pack_usd) })}
   </p>
 {/snippet}
 
@@ -2069,17 +2099,19 @@
     -->
     <section class="card restore-card">
       <p class="restore-title">
-        Your subtitles from <strong>{restored.videoName || "a previous video"}</strong>
-        were kept &mdash; {restored.cues.length}
-        {restored.cues.length === 1 ? "cue" : "cues"}, saved {describeAge(restored.at)}.
+        <Rich text={t(restored.cues.length === 1
+          ? "Your subtitles from **{name}** were kept — {n} cue, saved {age}."
+          : "Your subtitles from **{name}** were kept — {n} cues, saved {age}.", {
+          name: restored.videoName || t("a previous video"),
+          n: restored.cues.length,
+          age: describeAge(restored.at),
+        })} />
       </p>
       <p class="oa-caption">
         {#if rememberedVideoHandle}
-          The video is offered back above &mdash; we kept a pointer to it, never
-          a copy, so your browser will ask before opening it.
+          {t("The video is offered back above — we kept a pointer to it, never a copy, so your browser will ask before opening it.")}
         {:else}
-          Open the video again to carry on. The subtitles come back; the video
-          itself cannot, because it never left your machine for us to keep.
+          {t("Open the video again to carry on. The subtitles come back; the video itself cannot, because it never left your machine for us to keep.")}
         {/if}
       </p>
       <div class="field-row">
@@ -2096,7 +2128,7 @@
   {#if engineError}
     <div class="banner banner-danger">
       <Icon name="alert-triangle" />
-      <p>The engine failed to load: {engineError}</p>
+      <p>{t("The engine failed to load: {error}", { error: engineError })}</p>
     </div>
   {:else if !engineReady}
     <div class="banner">
@@ -2118,10 +2150,9 @@
           <div class="resume-video">
             <Icon name="film" size={18} />
             <p class="resume-video-text">
-              You were working on <strong>{rememberedVideoHandle.name}</strong>.
+              <Rich text={t("You were working on **{name}**.", { name: rememberedVideoHandle.name })} />
               <span class="oa-caption">
-                It never left your machine &mdash; your browser will ask before
-                opening it again.
+                {t("It never left your machine — your browser will ask before opening it again.")}
               </span>
             </p>
             <button
@@ -2247,7 +2278,7 @@
                 </p>
               {:else}
                 <p class="oa-caption file-meta">
-                  <span class="oa-mono">{videoName}</span> &middot; reading&hellip;
+                  <span class="oa-mono">{videoName}</span> &middot; {t("reading…")}
                 </p>
               {/if}
               <label class="btn btn-ghost btn-sm" class:disabled={burning || transcribing}>
@@ -2289,13 +2320,12 @@
                   </select>
                 </label>
                 <p class="oa-caption">
-                  Not Unicode, so this is a guess. If the characters below are wrong,
-                  pick another &mdash; the file is re-read, nothing is lost.
+                  {t("Not Unicode, so this is a guess. If the characters below are wrong, pick another — the file is re-read, nothing is lost.")}
                 </p>
               </div>
             {/if}
             <div class="cue-head">
-              <span class="oa-caption">{cues.length} cues</span>
+              <span class="oa-caption">{t(cues.length === 1 ? "{n} cue" : "{n} cues", { n: cues.length })}</span>
               <label class="btn btn-ghost btn-sm">
                 <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
                 {t("Replace")}
@@ -2330,7 +2360,33 @@
       </div>
 
       <div class="workspace-controls">
-        <section class="card">
+        {#if hasCues}
+          <!--
+            One panel at a time once there is something to adjust. Stacked,
+            the five cards ran to several screens and Export sat at the very
+            bottom; as tabs the whole column fits beside the video, and
+            nothing is further away than one click.
+          -->
+          <div class="panel-tabs" role="tablist">
+            {#each panelTabs as tab (tab.id)}
+              <button
+                type="button"
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-controls={`panel-${tab.id}`}
+                aria-selected={panel === tab.id}
+                tabindex={panel === tab.id ? 0 : -1}
+                class="panel-tab"
+                class:selected={panel === tab.id}
+                onclick={() => (panel = tab.id)}
+                onkeydown={onPanelKey}
+              >
+                {t(tab.label)}
+              </button>
+            {/each}
+          </div>
+        {/if}
+        <section class="card" {...panelAttrs("subtitles")}>
           <h2 class="section-title">{t("Subtitles")}</h2>
           {#if hasCues}
 
@@ -2348,14 +2404,12 @@
             {@render transcribeProgress()}
           {:else if hasVideo}
             <p class="oa-caption card-intro">
-              Change anything below and run it again. This replaces the subtitles
-              above, including any edits and any translation, so save what you want
-              to keep from Export first.
+              {t("Change anything below and run it again. This replaces the subtitles above, including any edits and any translation, so save what you want to keep from Export first.")}
             </p>
             {@render transcribeControls(true)}
           {:else}
             <p class="oa-caption card-intro">
-              Load a video to generate subtitles from its audio.
+              {t("Load a video to generate subtitles from its audio.")}
             </p>
           {/if}
           {#if noSpeechOffer}
@@ -2399,15 +2453,14 @@
         <div class="banner banner-ok">
           <Icon name="check-circle" />
           <p>
-            <strong>{listOut(spokenNames)}</strong>
-            {spokenNames.length > 2 ? "were all heard" : "were both heard"}, and the
-            subtitles below carry {spokenNames.length > 2 ? "all of them" : "both"}.
-            Translating now renders the whole thing into one language, and
-            <em>{t("Keep the original on screen too")}</em> shows the translation beside
-            what was said.
+            <Rich text={t(spokenNames.length > 2
+              ? "**{names}** were all heard, and the subtitles below carry all of them. Translating now renders the whole thing into one language, and *{keep}* shows the translation beside what was said."
+              : "**{names}** were both heard, and the subtitles below carry both. Translating now renders the whole thing into one language, and *{keep}* shows the translation beside what was said.", {
+              names: listOut(spokenNames),
+              keep: t("Keep the original on screen too"),
+            })} />
             {#if spokenLanguage === "auto" && spokenNames.length > 2}
-              Three or more is often one of them being misheard &mdash; if you know
-              which two are really spoken, name them above and run it again.
+              {t("Three or more is often one of them being misheard — if you know which two are really spoken, name them above and run it again.")}
             {/if}
           </p>
         </div>
@@ -2416,16 +2469,15 @@
         <div class="banner banner-danger">
           <Icon name="alert-triangle" />
           <p>
-            No bundled font can draw
+            {t("No bundled font can draw")}
             <span class="oa-mono">{missingGlyphs.slice(0, 12).join(" ")}</span>
-            &mdash; these will burn in as empty rectangles. Emoji and rare symbols
-            are the usual cause; removing them from the cue text fixes it.
+            &mdash; {t("these will burn in as empty rectangles. Emoji and rare symbols are the usual cause; removing them from the cue text fixes it.")}
           </p>
         </div>
       {/if}
 
       <!-- 3. style -->
-      <section class="card">
+      <section class="card" {...panelAttrs("style")}>
         <div class="subsection-head">
           <h2 class="section-title">{t("Style")}</h2>
           <CostBadge cost="free" />
@@ -2511,10 +2563,7 @@
           </label>
           {#if loudness.length === 0}
             <p class="oa-caption">
-              Sizing by loudness needs the audio, so it is offered only for
-              subtitles this app transcribed. Highlighting works on any
-              subtitles, imported ones included &mdash; it runs off the cue
-              timings.
+              {t("Sizing by loudness needs the audio, so it is offered only for subtitles this app transcribed. Highlighting works on any subtitles, imported ones included — it runs off the cue timings.")}
             </p>
           {/if}
           {#if wordEffect === "karaoke"}
@@ -2547,11 +2596,7 @@
               </label>
             </div>
             <p class="oa-caption">
-              The whole line stays on screen; the word being spoken grows
-              {Math.round(karaokeStrength * 100)}% and gains a glow. Word times are
-              shared out across each cue by length &mdash; no speech model here
-              reports exact ones &mdash; so the highlight tracks the line's pace
-              but can sit a word out.
+              {t("The whole line stays on screen; the word being spoken grows {pct}% and gains a glow. Word times are shared out across each cue by length — no speech model here reports exact ones — so the highlight tracks the line's pace but can sit a word out.", { pct: Math.round(karaokeStrength * 100) })}
             </p>
           {/if}
           {#if emphasise}
@@ -2568,24 +2613,19 @@
                 />
               </label>
               <span class="oa-caption">
-                {Math.round(emphasisStrength * 100)}% larger at the loudest
+                {t("{pct}% larger at the loudest", { pct: Math.round(emphasisStrength * 100) })}
               </span>
             </div>
             {#if emphasisSkipped > 0}
               <p class="field-error">
                 {emphasisSkipped === cues.length
-                  ? "No line is being emphasised"
-                  : `${emphasisSkipped} of ${cues.length} lines are not being emphasised`}
-                &mdash; their words no longer match the audio that was measured.
-                Translating a line, or adding and removing words while editing,
-                breaks that match. Re-run <strong>{t("Generate from the audio")}</strong>
-                to measure the current words, or turn emphasis off.
+                  ? t("No line is being emphasised")
+                  : t("{skipped} of {total} lines are not being emphasised", { skipped: emphasisSkipped, total: cues.length })}
+                &mdash; <Rich text={t("their words no longer match the audio that was measured. Translating a line, or adding and removing words while editing, breaks that match. Re-run **{button}** to measure the current words, or turn emphasis off.", { button: t("Generate from the audio") })} />
               </p>
             {/if}
             <p class="oa-caption">
-              Measured from the audio, so it only applies to subtitles this app
-              transcribed. Word timings are approximate &mdash; no speech model here
-              reports exact ones &mdash; so emphasis lands on about the right word.
+              {t("Measured from the audio, so it only applies to subtitles this app transcribed. Word timings are approximate — no speech model here reports exact ones — so emphasis lands on about the right word.")}
             </p>
           {/if}
         {/if}
@@ -2594,7 +2634,7 @@
 
       <!-- 4. clip and size -->
       {#if hasDimensions}
-        <section class="card">
+        <section class="card" {...panelAttrs("clip")}>
           <h2 class="section-title">{t("Clip & size")}</h2>
         <details class="more">
           <summary>{t("Other settings")}</summary>
@@ -2603,7 +2643,7 @@
               <label class="field">
                 <span class="field-label">{t("Start")}</span>
                 <input class="oa-mono input" type="number" min="0" step="0.1" placeholder="0" bind:value={trimStart} />
-                <span class="field-unit">sec</span>
+                <span class="field-unit">{t("sec")}</span>
               </label>
               <label class="field">
                 <span class="field-label">{t("End")}</span>
@@ -2615,12 +2655,12 @@
                   placeholder={videoDuration.toFixed(1)}
                   bind:value={trimEnd}
                 />
-                <span class="field-unit">sec</span>
+                <span class="field-unit">{t("sec")}</span>
               </label>
               <label class="field field-wide">
                 <span class="field-label">{t("Resolution")}</span>
                 <select class="input" bind:value={exportHeight}>
-                  <option value="">Source ({videoWidth}&times;{videoHeight})</option>
+                  <option value="">{t("Source ({size})", { size: `${videoWidth}×${videoHeight}` })}</option>
                   {#each heightOptions as h (h)}
                     <option value={String(h)}>{h}p</option>
                   {/each}
@@ -2640,13 +2680,12 @@
       {/if}
 
       <!-- 5. translation -->
-      <section class="card">
+      <section class="card" {...panelAttrs("translate")}>
         <div class="subsection-head">
           <h2 class="section-title">{t("Translate")}</h2>
         </div>
         <p class="oa-caption card-intro">
-          Timings are never touched &mdash; only the text inside each cue is replaced,
-          and the rewrapping happens in the same engine the desktop uses.
+          {t("Timings are never touched — only the text inside each cue is replaced, and the rewrapping happens in the same engine the desktop uses.")}
         </p>
         <div class="field-row">
           <label class="field field-wide">
@@ -2737,8 +2776,7 @@
             {/if}
           </div>
           <p class="oa-caption">
-            The key stays in this tab. It is sent only to the service you picked, and
-            never stored.
+            {t("The key stays in this tab. It is sent only to the service you picked, and never stored.")}
           </p>
         {/if}
 
@@ -2801,7 +2839,7 @@
                 <label class="field">
                   <span class="field-label">{t("Original size")}</span>
                   <select class="input" bind:value={originalScale}>
-                    <option value={1}>Same as the translation</option>
+                    <option value={1}>{t("Same as the translation")}</option>
                     <option value={0.8}>{t("Smaller (80%)")}</option>
                     <option value={0.65}>{t("Much smaller (65%)")}</option>
                   </select>
@@ -2810,18 +2848,14 @@
             {/if}
             <p class="oa-caption">
               {#if bilingual}
-                Both languages are burned in, previewed and exported together.
-                The .ass carries the sizes; .srt and .vtt are plain text, so they
-                carry both languages but not the styling.
+                {t("Both languages are burned in, previewed and exported together. The .ass carries the sizes; .srt and .vtt are plain text, so they carry both languages but not the styling.")}
               {:else}
-                Burn the translation over the original, so viewers get both.
+                {t("Burn the translation over the original, so viewers get both.")}
               {/if}
             </p>
             {#if bilingual && wordEffect !== "none"}
               <p class="oa-caption">
-                The word effect runs on the <strong>original</strong>, whichever way
-                round the two are stacked &mdash; its words are the ones the audio
-                was timed against. The translation sits beside it, unhighlighted.
+                <Rich text={t("The word effect runs on the **original**, whichever way round the two are stacked — its words are the ones the audio was timed against. The translation sits beside it, unhighlighted.")} />
               </p>
             {/if}
           </div>
@@ -2829,7 +2863,7 @@
       </section>
 
       <!-- 6. export -->
-      <section class="card">
+      <section class="card" {...panelAttrs("export")}>
         <div class="subsection-head">
           <h2 class="section-title">{t("Export")}</h2>
           <CostBadge cost="free" />
@@ -2839,10 +2873,7 @@
           <span class="tag">{t("text only")}</span>
         </div>
         <p class="oa-caption card-intro">
-          The subtitles on their own, to hand to a player, a platform or an editor
-          &mdash; the video is not touched. <strong>.ass</strong> keeps the styling
-          you chose here; <strong>.srt</strong> and <strong>.vtt</strong> are plain
-          text that everything reads, with none of the styling.
+          <Rich text={t("The subtitles on their own, to hand to a player, a platform or an editor — the video is not touched. **.ass** keeps the styling you chose here; **.srt** and **.vtt** are plain text that everything reads, with none of the styling.")} />
         </p>
         <div class="checkbox-row">
           <button
@@ -2926,12 +2957,8 @@
             </div>
           {:else}
             <p class="oa-caption card-intro">
-              {t("Saves")} <strong class="oa-mono">{burnWillSave}</strong> &mdash; the
-              picture with the subtitles drawn into it, so they show up anywhere
-              without a subtitle file beside them. Encoded here in the browser with
-              WebCodecs; the audio is copied across untouched rather than
-              re-encoded, and the subtitles are drawn by libass &mdash; the same
-              renderer the preview above uses.
+              {t("Saves")} <strong class="oa-mono">{burnWillSave}</strong> &mdash;
+              {t("the picture with the subtitles drawn into it, so they show up anywhere without a subtitle file beside them. Encoded here in the browser with WebCodecs; the audio is copied across untouched rather than re-encoded, and the subtitles are drawn by libass — the same renderer the preview above uses.")}
             </p>
             <div class="checkbox-row">
               <button
@@ -2954,14 +2981,12 @@
           <details class="raw-command">
             <summary class="oa-caption">{t("Prefer to burn it on the command line?")}</summary>
             <p class="oa-caption card-intro">
-              The CLI probes the real file, so it gets colour tags, rotation and
-              variable frame rate right in ways a browser cannot see. Worth using for
-              anything long, or for HDR footage.
+              {t("The CLI probes the real file, so it gets colour tags, rotation and variable frame rate right in ways a browser cannot see. Worth using for anything long, or for HDR footage.")}
             </p>
             <div class="command">
               <code class="oa-mono">{cliLine}</code>
               <button type="button" class="btn btn-ghost btn-sm" onclick={() => copy(cliLine, "cli")}>
-                {copied === "cli" ? "Copied" : "Copy"}
+                {copied === "cli" ? t("Copied") : t("Copy")}
               </button>
             </div>
             {#if ffmpegLine}
@@ -2972,12 +2997,11 @@
                   class="btn btn-ghost btn-sm"
                   onclick={() => copy(ffmpegLine, "ffmpeg")}
                 >
-                  {copied === "ffmpeg" ? "Copied" : "Copy"}
+                  {copied === "ffmpeg" ? t("Copied") : t("Copy")}
                 </button>
               </div>
               <p class="oa-caption">
-                Download the .ass above first. This one assumes BT.709 colour, because
-                a browser cannot read the file's real tags.
+                {t("Download the .ass above first. This one assumes BT.709 colour, because a browser cannot read the file's real tags.")}
               </p>
             {/if}
           </details>
@@ -3001,9 +3025,7 @@
       </button>
       {#if showFeatures}
         <p class="oa-caption card-intro">
-          No account, no watermark and no export limit. The badge says what a
-          thing costs <em>you</em>; the tier says where this would be paid for
-          one day, which is not the same question.
+          <Rich text={t("No account, no watermark and no export limit. The badge says what a thing costs *you*; the tier says where this would be paid for one day, which is not the same question.")} />
         </p>
         <ul class="feature-list">
           {#each features as f (f.id)}
@@ -3020,8 +3042,7 @@
 
   <footer class="web-footer">
     <p class="oa-caption">
-      Engine {version} running in WebAssembly &mdash; the same Rust the desktop app
-      and CLI use.
+      {t("Engine {version} running in WebAssembly — the same Rust the desktop app and CLI use.", { version })}
     </p>
   </footer>
 </main>
