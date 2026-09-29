@@ -1,16 +1,35 @@
+/* The accent is the product's green, the same #00c896 the site and the
+   app use, so the popup does not arrive in a different brand from the
+   page that sent someone to install it.
+   
+   Black on it, not white. White on this green is 2.16:1 -- unreadable,
+   and the design system already knows it: `--brand-contrast` resolves to
+   black wherever `--brand` is the green. Near-black gives 8.26:1.
+   
+   One green in both themes rather than a lighter one for dark, which is
+   what the blue needed. It is bright enough at #00c896 to sit on the
+   dark ground unaided, and a brand colour that shifts with the theme is
+   two brand colours. */
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
   --fg: #16181d;
   --muted: #5c6270;
   --line: #e3e6ec;
-  --accent: #1f6feb;
-  --accent-fg: #ffffff;
+  --accent: #00c896;
+  --accent-fg: #0b1a17;
   --bad: #b4232c;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#16181d; --fg:#eceef2; --muted:#9aa1ae; --line:#2b2f38; --accent:#5b9bff; --accent-fg:#0b0d11; --bad:#ff8189; }
+  :root { --bg:#16181d; --fg:#eceef2; --muted:#9aa1ae; --line:#2b2f38; --accent:#00c896; --accent-fg:#0b1a17; --bad:#ff8189; }
 }
+/* The native controls too. A range thumb and a checkbox are painted by
+   the browser, not by this stylesheet, so they stayed the default blue
+   while everything around them went green -- `accent-color` is the only
+   thing that reaches them. The browser works out the tick and thumb
+   contrast from it. */
+:root { accent-color: var(--accent); }
+
 * { box-sizing: border-box; }
 body { margin: 0; width: 320px; background: var(--bg); color: var(--fg);
        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
