@@ -151,6 +151,8 @@ const ja: Record<string, string> = {
   "The App Store purchase could not be completed.": "App Store での購入を完了できませんでした。",
   "Purchasing…": "購入中…",
   "Loading the credit packs…": "クレジットパックを読み込んでいます…",
+  "Try a sample": "サンプルを見る",
+  "Opening…": "開いています…",
 };
 
 export default ja;

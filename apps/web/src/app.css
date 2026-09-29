@@ -1160,17 +1160,37 @@ html {
 /* The measured problem, as a rule: the way in was a 15px/400 line of grey
    inside a dashed box, lighter than the "Open the app" link in the page
    header above it. */
+/* The two ways in, on one line: bring a file, or see what it does with
+   one of ours. They wrap onto separate lines on a narrow screen rather
+   than shrinking, because a 56px target is the point. */
+.start-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 .start-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   min-height: 56px;
-  width: 100%;
+  flex: 1 1 16rem;
   max-width: 22rem;
-  margin-top: var(--space-2);
   font-size: 1.0625rem;
   font-weight: var(--weight-medium);
+}
+
+/* Quieter than the primary and the same height, so the row reads as one
+   control with a second option rather than two rival buttons. */
+.start-sample {
+  min-height: 56px;
+  flex: 0 1 11rem;
+  padding-inline: var(--space-5);
+  font-size: 1rem;
 }
 
 .start-drop-hint {

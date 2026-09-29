@@ -151,6 +151,8 @@ const zhHans: Record<string, string> = {
   "The App Store purchase could not be completed.": "这次 App Store 购买没有完成。",
   "Purchasing…": "购买中…",
   "Loading the credit packs…": "正在载入点数套餐…",
+  "Try a sample": "看个示例",
+  "Opening…": "正在打开…",
 };
 
 export default zhHans;

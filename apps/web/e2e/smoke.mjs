@@ -438,6 +438,39 @@ check(
 );
 check("nothing is gated in this build", !(await page.textContent("body")).includes("Locked"));
 
+// The sample, before anything is loaded by hand.
+//
+// It is the shortest path a first-time visitor has to seeing what the
+// product does, and it is the only one that reaches a working app with
+// no file of their own and no 80 MB model download -- so it ships with
+// its own cues. Checked here, at the top, because it only exists in the
+// empty state and everything below fills that state in.
+console.log("the sample");
+{
+  await page.click(".start-sample");
+  await page.waitForSelector("video", { timeout: 30000 });
+  await page.waitForTimeout(2500);
+  const sample = await page.evaluate(() => ({
+    named: document.body.textContent.includes("sample.mp4"),
+    cues: document.querySelectorAll(".cue").length,
+    working: document.documentElement.hasAttribute("data-working"),
+  }));
+  check(
+    "the sample loads a video and its subtitles together",
+    sample.named && sample.cues === 3,
+    JSON.stringify(sample) + " -- a sample without cues would need the speech model, which is the thing it exists to skip",
+  );
+  check("loading it puts the page into its working state", sample.working);
+  // Back to empty, so the checks below start where they expect to.
+  await page.goto(base, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
+  const restore = await page.locator('button:has-text("Discard")').count();
+  if (restore > 0) {
+    await page.click('button:has-text("Discard")');
+    await page.waitForTimeout(800);
+  }
+}
+
 // The video comes first, as it does for a user: it is what makes
 // "generate subtitles from the audio" possible at all.
 if (FIXTURE) {

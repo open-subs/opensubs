@@ -1128,6 +1128,49 @@
     }
   }
 
+  /**
+   * The sample, for someone who has arrived with nothing to try it on.
+   *
+   * It ships with its own .srt, so pressing this puts styled subtitles
+   * over real footage without downloading an 80 MB speech model first --
+   * which is the only version of "show me what this does" that answers
+   * in under a second.
+   *
+   * Both files go through exactly the paths a chosen file takes. A
+   * preview mode that bypassed `loadVideo` would be a second
+   * implementation of the app's own opening sequence, and the first
+   * thing a visitor saw would be the one path nothing else tests.
+   */
+  let loadingSample = $state(false);
+
+  async function trySample() {
+    if (loadingSample) return;
+    loadingSample = true;
+    videoError = null;
+    try {
+      const [clip, cues] = await Promise.all([
+        fetch("sample.mp4").then((r) => r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))),
+        fetch("sample.srt").then((r) => r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))),
+      ]);
+      await loadVideo(new File([clip], "sample.mp4", { type: "video/mp4" }));
+      await useSubtitleFile(new File([cues], "sample.srt", { type: "text/plain" }));
+    } catch (e) {
+      videoError = `The sample could not be loaded: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      loadingSample = false;
+    }
+  }
+
+  // `?sample` opens it directly, so a link can put someone straight into
+  // a working app -- the same affordance the slides studio has.
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    if (!new URLSearchParams(window.location.search).has("sample")) return;
+    untrack(() => {
+      if (!hasVideo && !hasCues && !loadingSample) void trySample();
+    });
+  });
+
   async function onSubtitleInput(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -2114,18 +2157,34 @@
         <p class="start-sub">
           {t("Its speech becomes subtitles here, on this machine. Nothing is uploaded.")}
         </p>
-        <label class="btn btn-primary start-primary">
-          <input
-            type="file"
-            accept="video/*"
-            aria-label={t("Choose a video")}
-            onclick={chooseVideo}
-            onchange={onVideoInput}
-            hidden
-          />
-          <Icon name="film" size={20} />
-          {touchOnly ? t("Choose a video") : t("Choose a video")}
-        </label>
+        <!--
+          Beside the button, not under it: someone with nothing to try
+          this on has the same problem as someone with a file, and the
+          two ways out of it belong on the same line. A ghost button, so
+          it reads as the second choice.
+        -->
+        <div class="start-row">
+          <label class="btn btn-primary start-primary">
+            <input
+              type="file"
+              accept="video/*"
+              aria-label={t("Choose a video")}
+              onclick={chooseVideo}
+              onchange={onVideoInput}
+              hidden
+            />
+            <Icon name="film" size={20} />
+            {t("Choose a video")}
+          </label>
+          <button
+            type="button"
+            class="btn btn-secondary start-sample"
+            disabled={loadingSample}
+            onclick={trySample}
+          >
+            {loadingSample ? t("Opening…") : t("Try a sample")}
+          </button>
+        </div>
         <p class="start-drop-hint">{t("or drop one anywhere on this page")}</p>
         <div class="start-alt">
           <!--

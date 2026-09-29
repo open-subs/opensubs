@@ -151,6 +151,8 @@ const ko: Record<string, string> = {
   "The App Store purchase could not be completed.": "App Store 구매를 완료하지 못했습니다.",
   "Purchasing…": "구매 중…",
   "Loading the credit packs…": "크레딧 팩을 불러오는 중…",
+  "Try a sample": "샘플 보기",
+  "Opening…": "여는 중…",
 };
 
 export default ko;

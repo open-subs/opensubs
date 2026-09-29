@@ -151,6 +151,8 @@ const zhHant: Record<string, string> = {
   "The App Store purchase could not be completed.": "這次 App Store 購買沒有完成。",
   "Purchasing…": "購買中…",
   "Loading the credit packs…": "正在載入點數方案…",
+  "Try a sample": "看個範例",
+  "Opening…": "正在開啟…",
 };
 
 export default zhHant;

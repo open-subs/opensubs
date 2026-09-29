@@ -151,6 +151,8 @@ const es: Record<string, string> = {
   "The App Store purchase could not be completed.": "No se pudo completar la compra en la App Store.",
   "Purchasing…": "Comprando…",
   "Loading the credit packs…": "Cargando los packs de créditos…",
+  "Try a sample": "Ver un ejemplo",
+  "Opening…": "Abriendo…",
 };
 
 export default es;
