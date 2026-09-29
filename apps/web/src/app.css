@@ -22,14 +22,14 @@ html {
   height: 100%;
 }
 
-/* Wider than the 640px it used to be, which made the tool 58% of the
-   width of the marketing copy above it and read as a secondary form on
-   the page it is the point of. Not much wider, though, and the content
-   inside still limits itself: a form stretched to 1100px is harder to
-   read, not easier. The extra room goes into the panel's own two columns
-   and its breathing space. */
+/* Wide enough for two columns once there is something to work on. It was
+   640px, which made the tool 58% of the width of the marketing copy above
+   it and read as a secondary form on the page it is the point of. The
+   content inside still limits itself -- a form stretched this wide is
+   harder to read, not easier -- so the width goes to the split, not to
+   the line length. */
 .screen {
-  max-width: 940px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-8) var(--space-6) var(--space-12);
   display: flex;
@@ -1123,42 +1123,29 @@ html {
 
 /* ---- the first screen ---- */
 
-/* One job: open a video. Everything that used to sit here -- three engine
-   cards, a model list, two language lists and a second file input -- is
-   a choice about a file, and waits for one now.
+/* One job, one button.
 
-   Two columns so the sentence and the button are beside the target rather
-   than stacked above it: the button was below the fold's midpoint on a
-   1440x765 screen, which is the shape of "I opened it and did not use
-   it". */
+   It began as six stacked cards, became two columns with a drop target
+   beside the buttons, and is now a single column with one control that
+   has any weight. The report each time was the same -- people landed and
+   could not tell what to do -- and the two-column version still gave the
+   drop target equal billing with the thing to press. */
 .card-start {
   padding: var(--space-8);
 }
 
 .start {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
-  gap: var(--space-8);
-  align-items: center;
-}
-
-@media (max-width: 46rem) {
-  .start {
-    grid-template-columns: 1fr;
-    gap: var(--space-5);
-  }
-}
-
-.start-say {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-3);
-  /* The prose keeps a readable measure even though the panel is wide. */
+  text-align: center;
   max-width: 34rem;
+  margin: 0 auto;
 }
 
 .start-title {
-  font: var(--type-h3);
+  font: var(--type-h2);
   color: var(--text-strong);
   margin: 0;
   text-wrap: balance;
@@ -1170,57 +1157,186 @@ html {
   margin: 0;
 }
 
-.start-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-1);
-}
-
-/* The measured problem, stated as a rule: the way in was a 15px/400 line
-   of grey inside a dashed box, lighter than the "Open the app" link in
-   the page header above it. A primary action is at least this big. */
-.btn-start {
-  min-height: 48px;
-  min-width: 11rem;
-  padding-inline: var(--space-6);
-  font-size: 1rem;
+/* The measured problem, as a rule: the way in was a 15px/400 line of grey
+   inside a dashed box, lighter than the "Open the app" link in the page
+   header above it. */
+.start-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  width: 100%;
+  max-width: 22rem;
+  margin-top: var(--space-2);
+  font-size: 1.0625rem;
   font-weight: var(--weight-medium);
 }
 
-.start-fine {
+.start-drop-hint {
   font: var(--type-caption);
   color: var(--text-muted);
   margin: 0;
 }
 
-/* The second way in, for people who drag. Not the only way in, which is
-   what it used to be. */
-.start-drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 11rem;
-  padding: var(--space-6);
-  text-align: center;
-  font: var(--type-caption);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: var(--border-width) solid var(--border-hairline);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: var(--transition-control);
+.start-alt {
+  margin-top: var(--space-2);
 }
 
-.start-drop:hover {
-  background: var(--surface-hover);
+.start-alt-link {
+  font: var(--type-caption);
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.start-alt-link:hover {
+  color: var(--text-strong);
+}
+
+.start-fine {
+  font: var(--type-caption);
+  color: var(--text-muted);
+  margin: var(--space-2) 0 0;
+  max-width: 28rem;
+}
+
+/* ---- the workspace: settings on the left, what they act on on the right ---- */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 27rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* The controls read first and sit on the left; the output is first in the
+   source so that one column puts the video above the settings for it. */
+.workspace-controls {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.workspace-output {
+  grid-column: 2;
+  grid-row: 1;
+  /* The reason the split exists. Changing a style, a language or a word
+     effect re-renders the picture, and a picture you have to scroll back
+     up to see may as well not have re-rendered. `top` clears the site's
+     own sticky header. */
+  position: sticky;
+  top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  /* Never taller than the window, or the sticky panel scrolls past its
+     own bottom and the cue list becomes unreachable. */
+  max-height: calc(100vh - var(--space-8));
+}
+
+/* The cues are output you edit, so they live with the picture rather than
+   with the settings -- and they scroll inside the panel instead of making
+   the page long. */
+.cue-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 62rem) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-controls,
+  .workspace-output {
+    grid-column: 1;
+  }
+
+  .workspace-output {
+    grid-row: 1;
+    position: static;
+    max-height: none;
+  }
+
+  .workspace-controls {
+    grid-row: 2;
+  }
+
+  .cue-panel {
+    overflow-y: visible;
+  }
+}
+
+
+/* ---- "Other settings" ---- */
+
+/* The technicalities, folded. Not hidden: a disclosure is a promise that
+   the thing is still there, which is what makes it safe to default the
+   engine, the model and the backend rather than asking. */
+.more {
+  border-top: var(--border-width) solid var(--border-hairline);
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.more > summary {
+  font: var(--type-caption);
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The page around the app styles every `summary` with a +/- on the right
+   (its FAQ uses them). That rule reaches into the app, because the app is
+   in the same document, and it put a stray "+" at the far end of this
+   row. The disclosure has its own triangle, so the inherited one goes. */
+.more > summary::after {
+  content: none;
+}
+
+.more > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+.more[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.more > summary:hover {
   color: var(--text-body);
 }
 
-@media (max-width: 46rem) {
-  .start-drop {
-    min-height: 7rem;
-  }
+.more-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
 }

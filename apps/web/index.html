@@ -43,36 +43,31 @@
       <main class="screen">
         <section class="card card-start">
           <div class="start">
-            <div class="start-say">
-              <h3 class="start-title">Start with a video</h3>
-              <p class="start-sub">
-                Its speech becomes subtitles here, on this machine. Nothing is
-                uploaded.
-              </p>
-              <div class="start-actions">
-                <label class="btn btn-primary btn-start">
-                  <input type="file" accept="video/*" aria-label="Choose a video" hidden />
-                  Choose a video
-                </label>
-                <label class="btn btn-secondary btn-start">
-                  <input
-                    type="file"
-                    accept=".srt,.vtt,text/vtt"
-                    aria-label="Open an .srt or .vtt"
-                    hidden
-                  />
-                  Open an .srt or .vtt
-                </label>
-              </div>
-              <p class="start-fine">
-                MP4, MOV, WebM and MKV. Free, no account. The speech model
-                downloads once, when you generate.
-              </p>
-            </div>
-            <label class="start-drop">
-              <input type="file" accept="video/*" hidden />
-              <span>or drop a video here</span>
+            <h3 class="start-title">Start with a video</h3>
+            <p class="start-sub">
+              Its speech becomes subtitles here, on this machine. Nothing is
+              uploaded.
+            </p>
+            <label class="btn btn-primary start-primary">
+              <input type="file" accept="video/*" aria-label="Choose a video" hidden />
+              Choose a video
             </label>
+            <p class="start-drop-hint">or drop one anywhere on this page</p>
+            <div class="start-alt">
+              <label class="start-alt-link">
+                <input
+                  type="file"
+                  accept=".srt,.vtt,text/vtt"
+                  aria-label="Open an .srt or .vtt"
+                  hidden
+                />
+                Already have subtitles? Open an .srt or .vtt
+              </label>
+            </div>
+            <p class="start-fine">
+              MP4, MOV, WebM and MKV. Free, no account. The speech model
+              downloads once, when you generate.
+            </p>
           </div>
         </section>
 

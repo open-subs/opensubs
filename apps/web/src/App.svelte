@@ -505,6 +505,21 @@
    */
   const starting = $derived(!hasVideo && !hasCues);
 
+  /**
+   * Tell the page around the app that someone is working.
+   *
+   * The marketing copy is the site's, not the app's -- it is in the
+   * document the app is mounted into, above and below it. It is the
+   * right thing to read before you start and pure noise once you have a
+   * video open, so the app states the fact and the site's stylesheet
+   * decides what to do about it. One attribute rather than the app
+   * reaching up and hiding somebody else's elements.
+   */
+  $effect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.toggleAttribute("data-working", !starting);
+  });
+
   /** A translation is on screen, and the text it came from is still held. */
   const canShowBoth = $derived(
     sourceCues !== null && sourceCues.length === cues.length && cues.length > 0,
@@ -1703,107 +1718,19 @@
   on the first attempt.
 -->
 {#snippet transcribeControls(again: boolean)}
-  <RoutePicker
-    routes={asrRoutes}
-    selected={asrEngine}
-    disabled={transcribing}
-    onselect={(id) => (asrEngine = id)}
-  />
-
-  {#if asrEngine === "opensubs"}
-    {@render creditBar(transcriptionQuote, asrAffordable, "Load a video to see the price")}
-  {/if}
-
-  {#if asrEngineOption.needsKey}
-    <div class="field-row">
-      <label class="field field-wide">
-        <span class="field-label">{t("API key")}</span>
-        <input
-          class="input oa-mono"
-          type="password"
-          placeholder={asrEngineOption.keyPlaceholder}
-          autocomplete="off"
-          bind:value={asrKey}
-        />
-      </label>
-      <label class="field field-wide">
-        <span class="field-label">{t("Server")}</span>
-        <input
-          class="input oa-mono"
-          type="text"
-          placeholder={asrEngineOption.defaultBaseUrl}
-          bind:value={asrBaseUrl}
-        />
-      </label>
-      <label class="field field-wide">
-        <span class="field-label">{t("Model")}</span>
-        <!--
-          A datalist, not a <select> (APP-71). The column beside this one
-          says the route works with "any server of your own", and a closed
-          list would make that untrue for every self-hosted endpoint. This
-          suggests the four models known to return timings while leaving
-          the field exactly as free as it was.
-        -->
-        <input
-          class="input oa-mono"
-          type="text"
-          list="asr-remote-models"
-          placeholder={asrEngineOption.defaultModel}
-          bind:value={asrRemoteModel}
-        />
-        <datalist id="asr-remote-models">
-          {#each REMOTE_MODELS as m (m.id)}
-            <option value={m.id}>{m.note}</option>
-          {/each}
-        </datalist>
-      </label>
-    </div>
-    {#if asrRouteWarning}
-      <p class="field-error">{asrRouteWarning}</p>
-    {/if}
-  {/if}
-  <p class="oa-caption card-intro">
-    {#if !hasVideo}
-      Load a video first, or open a subtitle file you already have.
-    {:else if asrEngine === "local"}
-      Whisper runs here, on your machine{asrDevice === "webgpu"
-        ? ", on the GPU"
-        : ""}. The audio is never uploaded; only the model is downloaded, once.
-      {#if asr?.integrated}
-        <!-- APP-111 measured this hardware: say what it is and what it costs,
-             rather than only quietly choosing the smaller model. -->
-        {t(
-          "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.",
-          { gpu: asr.gpu ?? "integrated" },
-        )}
-      {/if}
-      {#if asr?.device === "webgpu" && asrBackend === "cpu"}
-        {t("On the processor it needs the larger full-precision model, about four times the download, and the page may stop responding while it works.")}
-      {:else if asr?.device === "wasm"}
-        {inNativeShell() ? "This device" : "This browser"} has no WebGPU, so it runs on the CPU and needs the
-        larger full-precision model &mdash; slower, and roughly four times
-        the download.
-      {/if}
-    {:else if asrEngine === "opensubs"}
-      Only the trimmed span is uploaded, so shortening the clip lowers
-      the price by the same proportion.
-    {:else}
-      {inNativeShell() ? "This device" : "The browser"} can only run models up to about 250&nbsp;MB. A hosted
-      endpoint can run the full-size one, which is markedly better on
-      accents, noise and proper nouns &mdash; and far faster on a long
-      recording. Works with OpenAI, Groq, or any server of your own.
-    {/if}
-  </p>
   <!--
-    The button comes last, after the route, the price and the
-    explanation. It used to sit above all three, which asked the user
-    to press "Generate" before the page had told them what it would
-    do or what it would cost.
- 
-    The same controls serve the first run and every one after it. A
-    second set, or a "settings" panel kept in step with this one,
-    would be two places to change a language and one of them would
-    drift.
+    What a first-time reader has to decide, and nothing else.
+
+    This used to open with three engine cards, a model list with download
+    sizes in it, a GPU/CPU choice and four paragraphs of why, all before
+    the button that does the thing. The defaults are right for almost
+    everybody -- Whisper on this device, the base model, the language
+    read from the audio -- so what is left above the fold is the button
+    and the one choice a person actually has an opinion about.
+
+    Everything that is a technicality rather than a choice is behind the
+    disclosure. Closing it changes nothing: these are the same controls,
+    not a second set kept in step with a first.
   -->
   <div class="field-row">
     <button
@@ -1823,34 +1750,6 @@
         {t("Generate from the audio")}
       {/if}
     </button>
-    {#if asrEngine === "local"}
-      <label class="field field-wide">
-        <span class="field-label">{t("Model")}</span>
-        <select
-          class="input"
-          bind:value={asrModel}
-          onchange={() => (modelChosenByUser = true)}
-        >
-          {#each ASR_MODELS as m (m.id)}
-            <option value={m.id}>{t(m.label)} &middot; {m.size}</option>
-          {/each}
-        </select>
-      </label>
-      {#if asr?.device === "webgpu"}
-        <label class="field">
-          <span class="field-label">{t("Runs on")}</span>
-          <select
-            class="input"
-            bind:value={asrBackend}
-            disabled={transcribing}
-            onchange={settleDefaultModel}
-          >
-            <option value="gpu">{t("Graphics card (GPU)")}</option>
-            <option value="cpu">{t("Processor (CPU)")}</option>
-          </select>
-        </label>
-      {/if}
-    {/if}
     <label class="field field-wide">
       <span class="field-label">{t("Spoken language")}</span>
       <select class="input" bind:value={spokenLanguage} disabled={transcribing}>
@@ -1860,43 +1759,171 @@
         {/each}
       </select>
     </label>
-    {#if canNameSecond}
-      <label class="field field-wide">
-        <span class="field-label">{t("Second language")}</span>
-        <select class="input" bind:value={secondLanguage} disabled={transcribing}>
-          <option value="none">{t("None — only the one above")}</option>
-          {#each languages.filter((l) => l.code !== spokenLanguage) as l (l.code)}
-            <option value={l.code}>{l.endonym} &middot; {l.name}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
   </div>
-  <p class="oa-caption card-intro">
-    {#if asrEngine === "local"}
-      {#if spokenLanguage === "auto"}
-        The language is read from the audio every four seconds, so a video
-        that switches between two languages is transcribed in both and comes
-        out as one subtitle file. If you know which two they are, name them
-        &mdash; a choice between two is harder to get wrong than a choice
-        between ninety-nine.
-      {:else if secondLanguage !== "none"}
-        Both are expected, so the audio is still read every four seconds and
-        each stretch is transcribed in whichever of the two is being spoken
-        &mdash; and it cannot wander off into a third language.
-      {:else}
-        One language, named, so nothing is detected and nothing can be
-        misheard. Add a second if the video switches between two.
+
+  <details class="more">
+    <summary>{t("Other settings")}</summary>
+    <div class="more-body">
+      <RoutePicker
+        routes={asrRoutes}
+        selected={asrEngine}
+        disabled={transcribing}
+        onselect={(id) => (asrEngine = id)}
+      />
+
+      {#if asrEngine === "opensubs"}
+        {@render creditBar(transcriptionQuote, asrAffordable, "Load a video to see the price")}
       {/if}
-    {:else}
-      This route sends the whole clip away at once, so it can only be
-      transcribed in <em>one</em> language &mdash; detection picks whichever
-      is spoken most and puts every other speaker through it. For a video
-      that switches between two languages, use <strong>{t("On this device")}</strong>,
-      which reads the language every four seconds and transcribes each
-      stretch in the language it was actually spoken in.
-    {/if}
-  </p>
+
+      {#if asrEngineOption.needsKey}
+        <div class="field-row">
+          <label class="field field-wide">
+            <span class="field-label">{t("API key")}</span>
+            <input
+              class="input oa-mono"
+              type="password"
+              placeholder={asrEngineOption.keyPlaceholder}
+              autocomplete="off"
+              bind:value={asrKey}
+            />
+          </label>
+          <label class="field field-wide">
+            <span class="field-label">{t("Server")}</span>
+            <input
+              class="input oa-mono"
+              type="text"
+              placeholder={asrEngineOption.defaultBaseUrl}
+              bind:value={asrBaseUrl}
+            />
+          </label>
+          <label class="field field-wide">
+            <span class="field-label">{t("Model")}</span>
+            <!--
+              A datalist, not a <select> (APP-71). The column beside this one
+              says the route works with "any server of your own", and a closed
+              list would make that untrue for every self-hosted endpoint. This
+              suggests the four models known to return timings while leaving
+              the field exactly as free as it was.
+            -->
+            <input
+              class="input oa-mono"
+              type="text"
+              list="asr-remote-models"
+              placeholder={asrEngineOption.defaultModel}
+              bind:value={asrRemoteModel}
+            />
+            <datalist id="asr-remote-models">
+              {#each REMOTE_MODELS as m (m.id)}
+                <option value={m.id}>{m.note}</option>
+              {/each}
+            </datalist>
+          </label>
+        </div>
+        {#if asrRouteWarning}
+          <p class="field-error">{asrRouteWarning}</p>
+        {/if}
+      {/if}
+      <p class="oa-caption card-intro">
+        {#if !hasVideo}
+          Load a video first, or open a subtitle file you already have.
+        {:else if asrEngine === "local"}
+          Whisper runs here, on your machine{asrDevice === "webgpu"
+            ? ", on the GPU"
+            : ""}. The audio is never uploaded; only the model is downloaded, once.
+          {#if asr?.integrated}
+            <!-- APP-111 measured this hardware: say what it is and what it costs,
+                 rather than only quietly choosing the smaller model. -->
+            {t(
+              "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.",
+              { gpu: asr.gpu ?? "integrated" },
+            )}
+          {/if}
+          {#if asr?.device === "webgpu" && asrBackend === "cpu"}
+            {t("On the processor it needs the larger full-precision model, about four times the download, and the page may stop responding while it works.")}
+          {:else if asr?.device === "wasm"}
+            {inNativeShell() ? "This device" : "This browser"} has no WebGPU, so it runs on the CPU and needs the
+            larger full-precision model &mdash; slower, and roughly four times
+            the download.
+          {/if}
+        {:else if asrEngine === "opensubs"}
+          Only the trimmed span is uploaded, so shortening the clip lowers
+          the price by the same proportion.
+        {:else}
+          {inNativeShell() ? "This device" : "The browser"} can only run models up to about 250&nbsp;MB. A hosted
+          endpoint can run the full-size one, which is markedly better on
+          accents, noise and proper nouns &mdash; and far faster on a long
+          recording. Works with OpenAI, Groq, or any server of your own.
+        {/if}
+      </p>
+
+      <div class="field-row">
+        {#if asrEngine === "local"}
+          <label class="field field-wide">
+            <span class="field-label">{t("Model")}</span>
+            <select
+              class="input"
+              bind:value={asrModel}
+              onchange={() => (modelChosenByUser = true)}
+            >
+              {#each ASR_MODELS as m (m.id)}
+                <option value={m.id}>{t(m.label)} &middot; {m.size}</option>
+              {/each}
+            </select>
+          </label>
+          {#if asr?.device === "webgpu"}
+            <label class="field">
+              <span class="field-label">{t("Runs on")}</span>
+              <select
+                class="input"
+                bind:value={asrBackend}
+                disabled={transcribing}
+                onchange={settleDefaultModel}
+              >
+                <option value="gpu">{t("Graphics card (GPU)")}</option>
+                <option value="cpu">{t("Processor (CPU)")}</option>
+              </select>
+            </label>
+          {/if}
+        {/if}
+        {#if canNameSecond}
+          <label class="field field-wide">
+            <span class="field-label">{t("Second language")}</span>
+            <select class="input" bind:value={secondLanguage} disabled={transcribing}>
+              <option value="none">{t("None — only the one above")}</option>
+              {#each languages.filter((l) => l.code !== spokenLanguage) as l (l.code)}
+                <option value={l.code}>{l.endonym} &middot; {l.name}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
+      </div>
+      <p class="oa-caption card-intro">
+        {#if asrEngine === "local"}
+          {#if spokenLanguage === "auto"}
+            The language is read from the audio every four seconds, so a video
+            that switches between two languages is transcribed in both and comes
+            out as one subtitle file. If you know which two they are, name them
+            &mdash; a choice between two is harder to get wrong than a choice
+            between ninety-nine.
+          {:else if secondLanguage !== "none"}
+            Both are expected, so the audio is still read every four seconds and
+            each stretch is transcribed in whichever of the two is being spoken
+            &mdash; and it cannot wander off into a third language.
+          {:else}
+            One language, named, so nothing is detected and nothing can be
+            misheard. Add a second if the video switches between two.
+          {/if}
+        {:else}
+          This route sends the whole clip away at once, so it can only be
+          transcribed in <em>one</em> language &mdash; detection picks whichever
+          is spoken most and puts every other speaker through it. For a video
+          that switches between two languages, use <strong>{t("On this device")}</strong>,
+          which reads the language every four seconds and transcribes each
+          stretch in the language it was actually spoken in.
+        {/if}
+      </p>
+    </div>
+  </details>
 {/snippet}
 
 {#snippet creditBar(quote: Quote | null, ok: boolean, empty: string)}
@@ -2035,893 +2062,871 @@
   {/if}
 
   <!-- 1. the video -->
-  <section class="card" class:card-start={starting}>
-    {#if !starting}
-      <h2 class="section-title">{t("Video")}</h2>
-    {/if}
-    {#if hasVideo}
-      <div class="stage">
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <video
-          bind:this={videoEl}
-          src={videoUrl}
-          onloadedmetadata={onVideoLoaded}
-          controls
-          playsinline
-        ></video>
-      </div>
-      <div class="file-row">
-        {#if hasDimensions}
-          <p class="oa-caption file-meta">
-            <span class="oa-mono">{videoName}</span>
-            &middot; {videoWidth}&times;{videoHeight}
-            &middot; {formatDuration(videoDuration)}
-          </p>
-        {:else}
-          <p class="oa-caption file-meta">
-            <span class="oa-mono">{videoName}</span> &middot; reading&hellip;
-          </p>
+  {#if starting}
+    <section class="card card-start">
+        {#if rememberedVideoHandle}
+          <!--
+            Signing in destroys the tab, which used to cost the video as well
+            as the subtitles -- and the burn section is gated on the video's
+            dimensions, so losing it made the export look like it had been
+            taken away. Only the *handle* was kept, never the footage, so
+            this asks rather than reaches.
+          -->
+          <div class="resume-video">
+            <Icon name="film" size={18} />
+            <p class="resume-video-text">
+              You were working on <strong>{rememberedVideoHandle.name}</strong>.
+              <span class="oa-caption">
+                It never left your machine &mdash; your browser will ask before
+                opening it again.
+              </span>
+            </p>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={reopening}
+              onclick={reopenRememberedVideo}
+            >
+              {reopening ? "Opening…" : "Open it again"}
+            </button>
+          </div>
         {/if}
-        <label class="btn btn-ghost btn-sm" class:disabled={burning || transcribing}>
+        <!--
+          Two columns, and one job: open a video. What to say on the left,
+          where to put the file on the right.
+
+          `showOpenFilePicker` is preferred because it yields a handle that
+          outlives a sign-in redirect; `chooseVideo` steps aside on browsers
+          without it, and the plain input inside each label does the work.
+        -->
+        <!--
+        One column, one dominant button.
+
+        This was two columns with a drop target beside the buttons, and
+        the drop target competed with the thing people should press. The
+        report from the team was that they landed and could not tell what
+        to do -- so there is now one control with any visual weight on
+        this screen, and the page takes a drop anywhere rather than
+        asking for a particular rectangle.
+      -->
+      <div class="start">
+        <h3 class="start-title">{t("Start with a video")}</h3>
+        <p class="start-sub">
+          {t("Its speech becomes subtitles here, on this machine. Nothing is uploaded.")}
+        </p>
+        <label class="btn btn-primary start-primary">
           <input
             type="file"
             accept="video/*"
+            aria-label={t("Choose a video")}
             onclick={chooseVideo}
             onchange={onVideoInput}
-            disabled={burning || transcribing}
             hidden
           />
-          {t("Replace video")}
+          <Icon name="film" size={20} />
+          {touchOnly ? t("Choose a video") : t("Choose a video")}
         </label>
+        <p class="start-drop-hint">{t("or drop one anywhere on this page")}</p>
+        <div class="start-alt">
+          <!--
+            The shortest path through the product -- someone who already
+            has a subtitle file waits for no model at all -- but a
+            second-rank one, so it reads as a link rather than a rival
+            button.
+          -->
+          <label class="start-alt-link">
+            <input
+              type="file"
+              accept=".srt,.vtt,text/vtt"
+              aria-label={t("Open an .srt or .vtt")}
+              onchange={onSubtitleInput}
+              hidden
+            />
+            {t("Already have subtitles? Open an .srt or .vtt")}
+          </label>
+        </div>
+        <p class="start-fine">
+          {t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
+        </p>
       </div>
-    {:else}
-      {#if rememberedVideoHandle}
+      {#if videoError}
+        <p class="field-error">{videoError}</p>
+      {/if}
+    </section>
+  {:else}
+    <!--
+      Two columns once there is something to work on: what you can change
+      on the left, what you are changing on the right.
+
+      Stacked, this was three and a half screens of cards, and the video
+      was at the top of it -- so choosing a style meant scrolling down to
+      the picker and back up to see what it did. The preview is sticky
+      now, which is the whole point of the split: the thing the settings
+      act on stays in front of you while you change them.
+
+      The output comes first in the source so that a narrow screen, which
+      gets one column, shows the video before the controls for it.
+    -->
+    <div class="workspace">
+      <div class="workspace-output">
+            <div class="stage">
+              <!-- svelte-ignore a11y_media_has_caption -->
+              <video
+                bind:this={videoEl}
+                src={videoUrl}
+                onloadedmetadata={onVideoLoaded}
+                controls
+                playsinline
+              ></video>
+            </div>
+            <div class="file-row">
+              {#if hasDimensions}
+                <p class="oa-caption file-meta">
+                  <span class="oa-mono">{videoName}</span>
+                  &middot; {videoWidth}&times;{videoHeight}
+                  &middot; {formatDuration(videoDuration)}
+                </p>
+              {:else}
+                <p class="oa-caption file-meta">
+                  <span class="oa-mono">{videoName}</span> &middot; reading&hellip;
+                </p>
+              {/if}
+              <label class="btn btn-ghost btn-sm" class:disabled={burning || transcribing}>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onclick={chooseVideo}
+                  onchange={onVideoInput}
+                  disabled={burning || transcribing}
+                  hidden
+                />
+                {t("Replace video")}
+              </label>
+            </div>
+        {#if videoError}
+          <p class="field-error">{videoError}</p>
+        {/if}
+        {#if hasCues}
+          <div class="cue-panel">
+            {#if !subtitleEncodingCertain}
+              <!--
+                The file was not UTF-8 and had no BOM, so the encoding is a
+                guess. GB18030 is the right guess for most Chinese subtitle
+                files, and a wrong one produces valid, plausible, entirely wrong
+                characters rather than anything that looks like an error -- so
+                the guess is stated and can be changed.
+              -->
+              <div class="encoding-row">
+                <label class="field">
+                  <span class="field-label">{t("This file's text encoding")}</span>
+                  <select
+                    class="input"
+                    value={subtitleEncoding}
+                    onchange={(e) => rereadSubtitles((e.currentTarget as HTMLSelectElement).value)}
+                  >
+                    {#each SUBTITLE_ENCODINGS as option (option.id)}
+                      <option value={option.id}>{t(option.label)}</option>
+                    {/each}
+                  </select>
+                </label>
+                <p class="oa-caption">
+                  Not Unicode, so this is a guess. If the characters below are wrong,
+                  pick another &mdash; the file is re-read, nothing is lost.
+                </p>
+              </div>
+            {/if}
+            <div class="cue-head">
+              <span class="oa-caption">{cues.length} cues</span>
+              <label class="btn btn-ghost btn-sm">
+                <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
+                {t("Replace")}
+              </label>
+            </div>
+            <ol class="cue-list">
+              {#each cues as cue, i (i)}
+                <li class="cue" class:selected={selectedCue === i}>
+                  <button
+                    type="button"
+                    class="cue-time oa-mono"
+                    onclick={() => {
+                      selectedCue = i;
+                      seekTo(cue.start);
+                    }}
+                    title={t("Jump here")}
+                  >
+                    {formatTime(cue.start)}
+                  </button>
+                  <textarea
+                    class="cue-text"
+                    rows={cue.lines.length}
+                    value={cue.lines.join("\n")}
+                    oninput={(e) => editCue(i, (e.currentTarget as HTMLTextAreaElement).value)}
+                    onfocus={() => (selectedCue = i)}
+                  ></textarea>
+                </li>
+              {/each}
+            </ol>
+          </div>
+        {/if}
+      </div>
+
+      <div class="workspace-controls">
+        <section class="card">
+          <h2 class="section-title">{t("Subtitles")}</h2>
+          {#if hasCues}
+
+          <!--
+            The same controls again, because the reason to re-run is almost
+            always that one of them was wrong: the wrong model for the accent,
+            the wrong language, a route that was slower than expected. Sending
+            someone back to a screen they can only reach by discarding what
+            they have would be a strange way to offer a second attempt.
+          -->
+          <div class="subsection-head">
+            <h3 class="subsection-title">{t("Generate again")}</h3>
+          </div>
+          {#if transcribing}
+            {@render transcribeProgress()}
+          {:else if hasVideo}
+            <p class="oa-caption card-intro">
+              Change anything below and run it again. This replaces the subtitles
+              above, including any edits and any translation, so save what you want
+              to keep from Export first.
+            </p>
+            {@render transcribeControls(true)}
+          {:else}
+            <p class="oa-caption card-intro">
+              Load a video to generate subtitles from its audio.
+            </p>
+          {/if}
+          {#if noSpeechOffer}
+            {@render noSpeechNotice()}
+          {/if}
+          {#if asrError}
+            <p class="field-error">{asrError}</p>
+          {/if}
+          {:else}
+          {#if transcribing}
+            {@render transcribeProgress()}
+          {:else}
+            {@render transcribeControls(false)}
+
+            <label class="dropzone dropzone-sm">
+              <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
+              <Icon name="upload" size={18} />
+              <span>{t("Or open an .srt / .vtt you already have")}</span>
+            </label>
+          {/if}
+          {#if noSpeechOffer}
+            {@render noSpeechNotice()}
+          {/if}
+          {#if asrError}
+            <p class="field-error">{asrError}</p>
+          {/if}
+          {/if}
+          {#if subtitleError}
+            <p class="field-error">{subtitleError}</p>
+          {/if}
+        </section>
+
+        {#if hasCues}
+      {#if spokenNames.length > 1}
         <!--
-          Signing in destroys the tab, which used to cost the video as well
-          as the subtitles -- and the burn section is gated on the video's
-          dimensions, so losing it made the export look like it had been
-          taken away. Only the *handle* was kept, never the footage, so
-          this asks rather than reaches.
+          A subtitle file that changes script halfway looks like a fault
+          unless something says it is deliberate. It is: the audio changed
+          language, and both halves were transcribed in the language they
+          were actually spoken in.
         -->
-        <div class="resume-video">
-          <Icon name="film" size={18} />
-          <p class="resume-video-text">
-            You were working on <strong>{rememberedVideoHandle.name}</strong>.
-            <span class="oa-caption">
-              It never left your machine &mdash; your browser will ask before
-              opening it again.
-            </span>
+        <div class="banner banner-ok">
+          <Icon name="check-circle" />
+          <p>
+            <strong>{listOut(spokenNames)}</strong>
+            {spokenNames.length > 2 ? "were all heard" : "were both heard"}, and the
+            subtitles below carry {spokenNames.length > 2 ? "all of them" : "both"}.
+            Translating now renders the whole thing into one language, and
+            <em>{t("Keep the original on screen too")}</em> shows the translation beside
+            what was said.
+            {#if spokenLanguage === "auto" && spokenNames.length > 2}
+              Three or more is often one of them being misheard &mdash; if you know
+              which two are really spoken, name them above and run it again.
+            {/if}
           </p>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={reopening}
-            onclick={reopenRememberedVideo}
-          >
-            {reopening ? "Opening…" : "Open it again"}
-          </button>
         </div>
       {/if}
-      <!--
-        Two columns, and one job: open a video. What to say on the left,
-        where to put the file on the right.
-
-        `showOpenFilePicker` is preferred because it yields a handle that
-        outlives a sign-in redirect; `chooseVideo` steps aside on browsers
-        without it, and the plain input inside each label does the work.
-      -->
-      <div class="start">
-        <div class="start-say">
-          <h3 class="start-title">{t("Start with a video")}</h3>
-          <p class="start-sub">
-            {t("Its speech becomes subtitles here, on this machine. Nothing is uploaded.")}
-          </p>
-          <div class="start-actions">
-            <!--
-              The handler is on the input, not the label: a label click is
-              forwarded here, and so is a keyboard activation of the
-              focused input, so one listener covers both and
-              `preventDefault` suppresses the native dialog either way.
-            -->
-            <label class="btn btn-primary btn-start">
-              <input
-                type="file"
-                accept="video/*"
-                aria-label={t("Choose a video")}
-                onclick={chooseVideo}
-                onchange={onVideoInput}
-                hidden
-              />
-              {t("Choose a video")}
-            </label>
-            <!--
-              The shortest path through the product, and it used to be
-              named nowhere on the first screen: someone who already has a
-              subtitle file waits for no model at all.
-            -->
-            <label class="btn btn-secondary btn-start">
-              <input
-                type="file"
-                accept=".srt,.vtt,text/vtt"
-                aria-label={t("Open an .srt or .vtt")}
-                onchange={onSubtitleInput}
-                hidden
-              />
-              {t("Open an .srt or .vtt")}
-            </label>
-          </div>
-          <p class="start-fine">
-            {t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
+      {#if missingGlyphs.length > 0}
+        <div class="banner banner-danger">
+          <Icon name="alert-triangle" />
+          <p>
+            No bundled font can draw
+            <span class="oa-mono">{missingGlyphs.slice(0, 12).join(" ")}</span>
+            &mdash; these will burn in as empty rectangles. Emoji and rare symbols
+            are the usual cause; removing them from the cue text fixes it.
           </p>
         </div>
-        <label class="start-drop">
-          <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
-          <Icon name="film" size={26} />
-          <span>{touchOnly ? t("Tap to choose") : t("or drop a video here")}</span>
-        </label>
-      </div>
-    {/if}
-    {#if videoError}
-      <p class="field-error">{videoError}</p>
-    {/if}
-  </section>
+      {/if}
 
-  <!-- 2. the subtitles -->
-  <!--
-    Held back until there is a video. The engine cards, the model list and
-    the two language lists are all choices *about* a file, and putting them
-    on the first screen asked people to decide five things before they had
-    opened anything.
-  -->
-  {#if !starting}
-  <section class="card">
-    <h2 class="section-title">{t("Subtitles")}</h2>
-    {#if hasCues}
-      {#if !subtitleEncodingCertain}
+      <!-- 3. style -->
+      <section class="card">
+        <div class="subsection-head">
+          <h2 class="section-title">{t("Style")}</h2>
+          <CostBadge cost="free" />
+        </div>
         <!--
-          The file was not UTF-8 and had no BOM, so the encoding is a
-          guess. GB18030 is the right guess for most Chinese subtitle
-          files, and a wrong one produces valid, plausible, entirely wrong
-          characters rather than anything that looks like an error -- so
-          the guess is stated and can be changed.
+          A name, and the video above it.
+
+          The twelve presets used to be laid out here as twelve rendered
+          tiles, which meant the panel spent most of its height showing
+          stills of footage the reader was already looking at, and the
+          choice had to be made by comparing thumbnails rather than by
+          seeing the thing itself. Picking a name re-renders the preview
+          over the real frame immediately, which is the only comparison
+          that settles it. The twelve, side by side and full size, are on
+          /styles, where there is room for them.
         -->
-        <div class="encoding-row">
-          <label class="field">
-            <span class="field-label">{t("This file's text encoding")}</span>
+        <div class="field-row">
+          <label class="field field-wide">
+            <span class="field-label">{t("Preset")}</span>
             <select
               class="input"
-              value={subtitleEncoding}
-              onchange={(e) => rereadSubtitles((e.currentTarget as HTMLSelectElement).value)}
-            >
-              {#each SUBTITLE_ENCODINGS as option (option.id)}
-                <option value={option.id}>{t(option.label)}</option>
-              {/each}
-            </select>
-          </label>
-          <p class="oa-caption">
-            Not Unicode, so this is a guess. If the characters below are wrong,
-            pick another &mdash; the file is re-read, nothing is lost.
-          </p>
-        </div>
-      {/if}
-      <div class="cue-head">
-        <span class="oa-caption">{cues.length} cues</span>
-        <label class="btn btn-ghost btn-sm">
-          <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
-          {t("Replace")}
-        </label>
-      </div>
-      <ol class="cue-list">
-        {#each cues as cue, i (i)}
-          <li class="cue" class:selected={selectedCue === i}>
-            <button
-              type="button"
-              class="cue-time oa-mono"
-              onclick={() => {
-                selectedCue = i;
-                seekTo(cue.start);
+              value={selectedStyle}
+              onchange={(e) => {
+                selectedStyle = (e.currentTarget as HTMLSelectElement).value;
+                showACue();
               }}
-              title={t("Jump here")}
             >
-              {formatTime(cue.start)}
-            </button>
-            <textarea
-              class="cue-text"
-              rows={cue.lines.length}
-              value={cue.lines.join("\n")}
-              oninput={(e) => editCue(i, (e.currentTarget as HTMLTextAreaElement).value)}
-              onfocus={() => (selectedCue = i)}
-            ></textarea>
-          </li>
-        {/each}
-      </ol>
-
-      <!--
-        The same controls again, because the reason to re-run is almost
-        always that one of them was wrong: the wrong model for the accent,
-        the wrong language, a route that was slower than expected. Sending
-        someone back to a screen they can only reach by discarding what
-        they have would be a strange way to offer a second attempt.
-      -->
-      <div class="subsection-head">
-        <h3 class="subsection-title">{t("Generate again")}</h3>
-      </div>
-      {#if transcribing}
-        {@render transcribeProgress()}
-      {:else if hasVideo}
-        <p class="oa-caption card-intro">
-          Change anything below and run it again. This replaces the subtitles
-          above, including any edits and any translation, so save what you want
-          to keep from Export first.
-        </p>
-        {@render transcribeControls(true)}
-      {:else}
-        <p class="oa-caption card-intro">
-          Load a video to generate subtitles from its audio.
-        </p>
-      {/if}
-      {#if noSpeechOffer}
-        {@render noSpeechNotice()}
-      {/if}
-      {#if asrError}
-        <p class="field-error">{asrError}</p>
-      {/if}
-    {:else}
-      {#if transcribing}
-        {@render transcribeProgress()}
-      {:else}
-        {@render transcribeControls(false)}
-
-        <label class="dropzone dropzone-sm">
-          <input type="file" accept=".srt,.vtt,text/vtt" onchange={onSubtitleInput} hidden />
-          <Icon name="upload" size={18} />
-          <span>{t("Or open an .srt / .vtt you already have")}</span>
-        </label>
-      {/if}
-      {#if noSpeechOffer}
-        {@render noSpeechNotice()}
-      {/if}
-      {#if asrError}
-        <p class="field-error">{asrError}</p>
-      {/if}
-    {/if}
-    {#if subtitleError}
-      <p class="field-error">{subtitleError}</p>
-    {/if}
-  </section>
-  {/if}
-
-  {#if staleCues}
-    <!--
-      APP-72. Replacing the video left the previous video's subtitles on
-      screen, and exporting them here produces a file whose timings belong
-      to footage that is no longer loaded. Stated rather than silently
-      cleared: a transcription costs a model download and minutes of
-      waiting, and the same replace is also how somebody re-cuts the same
-      content on purpose.
-    -->
-    <div class="banner banner-warning">
-      <Icon name="alert-triangle" />
-      <div class="banner-body">
-        <p>
-          {t("These subtitles were made for {old}, not for {now}.", {
-            old: staleCues,
-            now: videoName,
-          })}
-          {t("Their timings belong to the other video, so exporting or burning them here will not line up.")}
-        </p>
-        <div class="banner-actions">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            onclick={() => { cues = []; cuesVideo = null; staleCues = null; sourceCues = null;
-                             bilingual = false; loudness = []; selectedCue = null;
-                             subtitleBytes = null; }}
-          >
-            {t("Discard them")}
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            onclick={() => { cuesVideo = videoName || null; staleCues = null; }}
-          >
-            {t("Keep them anyway")}
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if hasCues}
-    {#if spokenNames.length > 1}
-      <!--
-        A subtitle file that changes script halfway looks like a fault
-        unless something says it is deliberate. It is: the audio changed
-        language, and both halves were transcribed in the language they
-        were actually spoken in.
-      -->
-      <div class="banner banner-ok">
-        <Icon name="check-circle" />
-        <p>
-          <strong>{listOut(spokenNames)}</strong>
-          {spokenNames.length > 2 ? "were all heard" : "were both heard"}, and the
-          subtitles below carry {spokenNames.length > 2 ? "all of them" : "both"}.
-          Translating now renders the whole thing into one language, and
-          <em>{t("Keep the original on screen too")}</em> shows the translation beside
-          what was said.
-          {#if spokenLanguage === "auto" && spokenNames.length > 2}
-            Three or more is often one of them being misheard &mdash; if you know
-            which two are really spoken, name them above and run it again.
-          {/if}
-        </p>
-      </div>
-    {/if}
-    {#if missingGlyphs.length > 0}
-      <div class="banner banner-danger">
-        <Icon name="alert-triangle" />
-        <p>
-          No bundled font can draw
-          <span class="oa-mono">{missingGlyphs.slice(0, 12).join(" ")}</span>
-          &mdash; these will burn in as empty rectangles. Emoji and rare symbols
-          are the usual cause; removing them from the cue text fixes it.
-        </p>
-      </div>
-    {/if}
-
-    <!-- 3. style -->
-    <section class="card">
-      <div class="subsection-head">
-        <h2 class="section-title">{t("Style")}</h2>
-        <CostBadge cost="free" />
-      </div>
-      <!--
-        A name, and the video above it.
-
-        The twelve presets used to be laid out here as twelve rendered
-        tiles, which meant the panel spent most of its height showing
-        stills of footage the reader was already looking at, and the
-        choice had to be made by comparing thumbnails rather than by
-        seeing the thing itself. Picking a name re-renders the preview
-        over the real frame immediately, which is the only comparison
-        that settles it. The twelve, side by side and full size, are on
-        /styles, where there is room for them.
-      -->
-      <div class="field-row">
-        <label class="field field-wide">
-          <span class="field-label">{t("Preset")}</span>
-          <select
-            class="input"
-            value={selectedStyle}
-            onchange={(e) => {
-              selectedStyle = (e.currentTarget as HTMLSelectElement).value;
-              showACue();
-            }}
-          >
-            <optgroup label={t("Core")}>
-              {#each corePresets as style (style.name)}
-                <option value={style.name}>{style.name}</option>
-              {/each}
-            </optgroup>
-            {#if advancedPresets.length > 0}
-              <optgroup label={t("Advanced pack")}>
-                {#each advancedPresets as style (style.name)}
+              <optgroup label={t("Core")}>
+                {#each corePresets as style (style.name)}
                   <option value={style.name}>{style.name}</option>
                 {/each}
               </optgroup>
-            {/if}
-          </select>
-        </label>
-        <a class="btn btn-ghost btn-sm" href="/styles" target="_blank" rel="noopener">
-          {t("See all twelve")}
-        </a>
-      </div>
-      <p class="oa-caption card-intro">
-        {hasDimensions
-          ? t("The preview above is libass, the same renderer that burns the video. What you see is what you get.")
-          : t("Rendered by libass, the same renderer that burns the video. What you see is what you get.")}
-      </p>
-      {#if hasCues}
-        <div class="subsection-head">
-          <h3 class="subsection-title">{t("Word effects")}</h3>
-          <CostBadge cost="free" />
-        </div>
-        <label class="checkbox">
-          <input
-            type="radio"
-            value="none"
-            bind:group={wordEffect}
-            onchange={showACue}
-          />
-          <span>{t("None")}</span>
-        </label>
-        <label class="checkbox">
-          <input
-            type="radio"
-            value="karaoke"
-            bind:group={wordEffect}
-            onchange={showACue}
-          />
-          <span>{t("Highlight each word as it is spoken")}</span>
-        </label>
-        <label class="checkbox" class:disabled={loudness.length === 0}>
-          <input
-            type="radio"
-            value="loudness"
-            bind:group={wordEffect}
-            disabled={loudness.length === 0}
-            onchange={showACue}
-          />
-          <span>{t("Size every word by how loud it was")}</span>
-        </label>
-        {#if loudness.length === 0}
-          <p class="oa-caption">
-            Sizing by loudness needs the audio, so it is offered only for
-            subtitles this app transcribed. Highlighting works on any
-            subtitles, imported ones included &mdash; it runs off the cue
-            timings.
-          </p>
-        {/if}
-        {#if wordEffect === "karaoke"}
-          <div class="field-row emphasis-row">
-            <label class="field field-wide">
-              <span class="field-label">{t("Growth")}</span>
-              <input
-                class="input range"
-                type="range"
-                min="0"
-                max={emphasisCap()}
-                step="0.05"
-                bind:value={karaokeStrength}
-              />
-            </label>
-            <label class="field field-wide">
-              <span class="field-label">{t("Glow")}</span>
-              <input
-                class="input range"
-                type="range"
-                min="0"
-                max={glowCap()}
-                step="0.05"
-                bind:value={karaokeGlow}
-              />
-            </label>
-            <label class="field">
-              <span class="field-label">{t("Colour")}</span>
-              <input class="input swatch" type="color" bind:value={karaokeAccent} />
-            </label>
-          </div>
-          <p class="oa-caption">
-            The whole line stays on screen; the word being spoken grows
-            {Math.round(karaokeStrength * 100)}% and gains a glow. Word times are
-            shared out across each cue by length &mdash; no speech model here
-            reports exact ones &mdash; so the highlight tracks the line's pace
-            but can sit a word out.
-          </p>
-        {/if}
-        {#if emphasise}
-          <div class="field-row emphasis-row">
-            <label class="field field-wide">
-              <span class="field-label">{t("Strength")}</span>
-              <input
-                class="input range"
-                type="range"
-                min="0.1"
-                max={emphasisCap()}
-                step="0.05"
-                bind:value={emphasisStrength}
-              />
-            </label>
-            <span class="oa-caption">
-              {Math.round(emphasisStrength * 100)}% larger at the loudest
-            </span>
-          </div>
-          {#if emphasisSkipped > 0}
-            <p class="field-error">
-              {emphasisSkipped === cues.length
-                ? "No line is being emphasised"
-                : `${emphasisSkipped} of ${cues.length} lines are not being emphasised`}
-              &mdash; their words no longer match the audio that was measured.
-              Translating a line, or adding and removing words while editing,
-              breaks that match. Re-run <strong>{t("Generate from the audio")}</strong>
-              to measure the current words, or turn emphasis off.
-            </p>
-          {/if}
-          <p class="oa-caption">
-            Measured from the audio, so it only applies to subtitles this app
-            transcribed. Word timings are approximate &mdash; no speech model here
-            reports exact ones &mdash; so emphasis lands on about the right word.
-          </p>
-        {/if}
-      {/if}
-
-    </section>
-
-    <!-- 4. clip and size -->
-    {#if hasDimensions}
-      <section class="card">
-        <h2 class="section-title">{t("Clip & size")}</h2>
-        <div class="field-row">
-          <label class="field">
-            <span class="field-label">{t("Start")}</span>
-            <input class="oa-mono input" type="number" min="0" step="0.1" placeholder="0" bind:value={trimStart} />
-            <span class="field-unit">sec</span>
-          </label>
-          <label class="field">
-            <span class="field-label">{t("End")}</span>
-            <input
-              class="oa-mono input"
-              type="number"
-              min="0"
-              step="0.1"
-              placeholder={videoDuration.toFixed(1)}
-              bind:value={trimEnd}
-            />
-            <span class="field-unit">sec</span>
-          </label>
-          <label class="field field-wide">
-            <span class="field-label">{t("Resolution")}</span>
-            <select class="input" bind:value={exportHeight}>
-              <option value="">Source ({videoWidth}&times;{videoHeight})</option>
-              {#each heightOptions as h (h)}
-                <option value={String(h)}>{h}p</option>
-              {/each}
+              {#if advancedPresets.length > 0}
+                <optgroup label={t("Advanced pack")}>
+                  {#each advancedPresets as style (style.name)}
+                    <option value={style.name}>{style.name}</option>
+                  {/each}
+                </optgroup>
+              {/if}
             </select>
           </label>
+          <a class="btn btn-ghost btn-sm" href="/styles" target="_blank" rel="noopener">
+            {t("See all twelve")}
+          </a>
         </div>
-        {#if trimProblem}
-          <p class="field-error">{trimProblem}</p>
-        {:else if isTrimmed}
-          <p class="oa-caption">
-            {t("Exporting {clip} of {total}.", { clip: formatDuration(clipSeconds), total: formatDuration(videoDuration) })}
-          </p>
+        <p class="oa-caption card-intro">
+          {hasDimensions
+            ? t("The preview above is libass, the same renderer that burns the video. What you see is what you get.")
+            : t("Rendered by libass, the same renderer that burns the video. What you see is what you get.")}
+        </p>
+        {#if hasCues}
+          <div class="subsection-head">
+            <h3 class="subsection-title">{t("Word effects")}</h3>
+            <CostBadge cost="free" />
+          </div>
+          <label class="checkbox">
+            <input
+              type="radio"
+              value="none"
+              bind:group={wordEffect}
+              onchange={showACue}
+            />
+            <span>{t("None")}</span>
+          </label>
+          <label class="checkbox">
+            <input
+              type="radio"
+              value="karaoke"
+              bind:group={wordEffect}
+              onchange={showACue}
+            />
+            <span>{t("Highlight each word as it is spoken")}</span>
+          </label>
+          <label class="checkbox" class:disabled={loudness.length === 0}>
+            <input
+              type="radio"
+              value="loudness"
+              bind:group={wordEffect}
+              disabled={loudness.length === 0}
+              onchange={showACue}
+            />
+            <span>{t("Size every word by how loud it was")}</span>
+          </label>
+          {#if loudness.length === 0}
+            <p class="oa-caption">
+              Sizing by loudness needs the audio, so it is offered only for
+              subtitles this app transcribed. Highlighting works on any
+              subtitles, imported ones included &mdash; it runs off the cue
+              timings.
+            </p>
+          {/if}
+          {#if wordEffect === "karaoke"}
+            <div class="field-row emphasis-row">
+              <label class="field field-wide">
+                <span class="field-label">{t("Growth")}</span>
+                <input
+                  class="input range"
+                  type="range"
+                  min="0"
+                  max={emphasisCap()}
+                  step="0.05"
+                  bind:value={karaokeStrength}
+                />
+              </label>
+              <label class="field field-wide">
+                <span class="field-label">{t("Glow")}</span>
+                <input
+                  class="input range"
+                  type="range"
+                  min="0"
+                  max={glowCap()}
+                  step="0.05"
+                  bind:value={karaokeGlow}
+                />
+              </label>
+              <label class="field">
+                <span class="field-label">{t("Colour")}</span>
+                <input class="input swatch" type="color" bind:value={karaokeAccent} />
+              </label>
+            </div>
+            <p class="oa-caption">
+              The whole line stays on screen; the word being spoken grows
+              {Math.round(karaokeStrength * 100)}% and gains a glow. Word times are
+              shared out across each cue by length &mdash; no speech model here
+              reports exact ones &mdash; so the highlight tracks the line's pace
+              but can sit a word out.
+            </p>
+          {/if}
+          {#if emphasise}
+            <div class="field-row emphasis-row">
+              <label class="field field-wide">
+                <span class="field-label">{t("Strength")}</span>
+                <input
+                  class="input range"
+                  type="range"
+                  min="0.1"
+                  max={emphasisCap()}
+                  step="0.05"
+                  bind:value={emphasisStrength}
+                />
+              </label>
+              <span class="oa-caption">
+                {Math.round(emphasisStrength * 100)}% larger at the loudest
+              </span>
+            </div>
+            {#if emphasisSkipped > 0}
+              <p class="field-error">
+                {emphasisSkipped === cues.length
+                  ? "No line is being emphasised"
+                  : `${emphasisSkipped} of ${cues.length} lines are not being emphasised`}
+                &mdash; their words no longer match the audio that was measured.
+                Translating a line, or adding and removing words while editing,
+                breaks that match. Re-run <strong>{t("Generate from the audio")}</strong>
+                to measure the current words, or turn emphasis off.
+              </p>
+            {/if}
+            <p class="oa-caption">
+              Measured from the audio, so it only applies to subtitles this app
+              transcribed. Word timings are approximate &mdash; no speech model here
+              reports exact ones &mdash; so emphasis lands on about the right word.
+            </p>
+          {/if}
         {/if}
-      </section>
-    {/if}
 
-    <!-- 5. translation -->
-    <section class="card">
-      <div class="subsection-head">
-        <h2 class="section-title">{t("Translate")}</h2>
-      </div>
-      <p class="oa-caption card-intro">
-        Timings are never touched &mdash; only the text inside each cue is replaced,
-        and the rewrapping happens in the same engine the desktop uses.
-      </p>
-      <div class="field-row">
-        <label class="field field-wide">
-          <span class="field-label">{t("Into")}</span>
-          <select class="input" bind:value={translateTo} disabled={translating}>
-            <option value="">{t("Don't translate")}</option>
-            {#each languages as l (l.code)}
-              <option value={l.code}>{l.endonym} &middot; {l.name}</option>
-            {/each}
-          </select>
-        </label>
-        {#if activeProvider.local}
+      </section>
+
+      <!-- 4. clip and size -->
+      {#if hasDimensions}
+        <section class="card">
+          <h2 class="section-title">{t("Clip & size")}</h2>
+        <details class="more">
+          <summary>{t("Other settings")}</summary>
+          <div class="more-body">
+            <div class="field-row">
+              <label class="field">
+                <span class="field-label">{t("Start")}</span>
+                <input class="oa-mono input" type="number" min="0" step="0.1" placeholder="0" bind:value={trimStart} />
+                <span class="field-unit">sec</span>
+              </label>
+              <label class="field">
+                <span class="field-label">{t("End")}</span>
+                <input
+                  class="oa-mono input"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder={videoDuration.toFixed(1)}
+                  bind:value={trimEnd}
+                />
+                <span class="field-unit">sec</span>
+              </label>
+              <label class="field field-wide">
+                <span class="field-label">{t("Resolution")}</span>
+                <select class="input" bind:value={exportHeight}>
+                  <option value="">Source ({videoWidth}&times;{videoHeight})</option>
+                  {#each heightOptions as h (h)}
+                    <option value={String(h)}>{h}p</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+            {#if trimProblem}
+              <p class="field-error">{trimProblem}</p>
+            {:else if isTrimmed}
+              <p class="oa-caption">
+                {t("Exporting {clip} of {total}.", { clip: formatDuration(clipSeconds), total: formatDuration(videoDuration) })}
+              </p>
+            {/if}
+                  </div>
+        </details>
+      </section>
+      {/if}
+
+      <!-- 5. translation -->
+      <section class="card">
+        <div class="subsection-head">
+          <h2 class="section-title">{t("Translate")}</h2>
+        </div>
+        <p class="oa-caption card-intro">
+          Timings are never touched &mdash; only the text inside each cue is replaced,
+          and the rewrapping happens in the same engine the desktop uses.
+        </p>
+        <div class="field-row">
           <label class="field field-wide">
-            <span class="field-label">{t("Translate from")}</span>
-            <select class="input" bind:value={sourceLanguage} disabled={translating}>
-              {#if canDetect}
-                <option value="auto">{t("Detect automatically")}</option>
-              {/if}
+            <span class="field-label">{t("Into")}</span>
+            <select class="input" bind:value={translateTo} disabled={translating}>
+              <option value="">{t("Don't translate")}</option>
               {#each languages as l (l.code)}
                 <option value={l.code}>{l.endonym} &middot; {l.name}</option>
               {/each}
             </select>
           </label>
-        {/if}
-      </div>
+          {#if activeProvider.local}
+            <label class="field field-wide">
+              <span class="field-label">{t("Translate from")}</span>
+              <select class="input" bind:value={sourceLanguage} disabled={translating}>
+                {#if canDetect}
+                  <option value="auto">{t("Detect automatically")}</option>
+                {/if}
+                {#each languages as l (l.code)}
+                  <option value={l.code}>{l.endonym} &middot; {l.name}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+        </div>
 
-      <RoutePicker
-        routes={translateRoutes}
-        selected={translateRoute}
-        disabled={translating}
-        onselect={pickTranslateRoute}
-      />
+        <RoutePicker
+          routes={translateRoutes}
+          selected={translateRoute}
+          disabled={translating}
+          onselect={pickTranslateRoute}
+        />
 
-      {#if translateRoute === "key"}
-        <label class="field field-wide route-detail">
-          <span class="field-label">{t("Service")}</span>
-          <select
-            class="input"
-            value={providerId}
-            disabled={translating}
-            onchange={(e) => {
-              providerId = e.currentTarget.value as ProviderId;
-              lastKeyProvider = providerId;
-            }}
-          >
-            {#each keyProviders as p (p.id)}
-              <option value={p.id}>{t(p.label)}</option>
-            {/each}
-          </select>
-        </label>
-        <p class="oa-caption">{t(activeProvider.note)}</p>
-      {/if}
-
-      {#if activeProvider.needsKey}
-        <div class="field-row">
-          <label class="field field-wide">
-            <span class="field-label">{t("API key")}</span>
-            <input
-              class="input oa-mono"
-              type="password"
-              placeholder={activeProvider.keyPlaceholder}
-              autocomplete="off"
-              bind:value={apiKey}
+        {#if translateRoute === "key"}
+          <label class="field field-wide route-detail">
+            <span class="field-label">{t("Service")}</span>
+            <select
+              class="input"
+              value={providerId}
               disabled={translating}
-            />
+              onchange={(e) => {
+                providerId = e.currentTarget.value as ProviderId;
+                lastKeyProvider = providerId;
+              }}
+            >
+              {#each keyProviders as p (p.id)}
+                <option value={p.id}>{t(p.label)}</option>
+              {/each}
+            </select>
           </label>
-          {#if activeProvider.needsBaseUrl}
+          <p class="oa-caption">{t(activeProvider.note)}</p>
+        {/if}
+
+        {#if activeProvider.needsKey}
+          <div class="field-row">
             <label class="field field-wide">
-              <span class="field-label">{t("Server")}</span>
+              <span class="field-label">{t("API key")}</span>
               <input
                 class="input oa-mono"
-                type="text"
-                placeholder={activeProvider.defaultBaseUrl}
-                bind:value={baseUrl}
+                type="password"
+                placeholder={activeProvider.keyPlaceholder}
+                autocomplete="off"
+                bind:value={apiKey}
                 disabled={translating}
               />
             </label>
-            <label class="field field-wide">
-              <span class="field-label">{t("Model")}</span>
-              <input
-                class="input oa-mono"
-                type="text"
-                placeholder={activeProvider.defaultModel}
-                bind:value={providerModel}
-                disabled={translating}
-              />
-            </label>
-          {/if}
-        </div>
-        <p class="oa-caption">
-          The key stays in this tab. It is sent only to the service you picked, and
-          never stored.
-        </p>
-      {/if}
-
-      {#if providerId === "device" && deviceStatus}
-        <p class="oa-caption">{deviceStatus}</p>
-      {/if}
-
-      {#if providerId === "opensubs"}
-        {@render creditBar(
-          translationQuote,
-          affordable,
-          translateTo ? "Add subtitles to see the price" : "Pick a language to see the price",
-        )}
-      {/if}
-
-      <div class="checkbox-row">
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          disabled={!canTranslateNow || !affordable}
-          onclick={doTranslate}
-        >
-          {#if translating}
-            {translateProgress || t("Translating")}
-          {:else if translationQuote}
-            {t("Translate for {price}", { price: creditWord(translationQuote.credits) })}
-          {:else}
-            {t("Translate cues")}
-          {/if}
-        </button>
-      </div>
-      {#if translateShortfall}
-        <p class="oa-caption">{translateShortfall}</p>
-      {/if}
-      {#if translateError}
-        <p class="field-error">{translateError}</p>
-      {/if}
-
-      {#if canShowBoth}
-        <!--
-          Only offered once there is something to compare: before a
-          translation runs there is no second language, and afterwards the
-          original is still held rather than overwritten, which is what
-          makes this possible at all.
-        -->
-        <div class="bilingual">
-          <label class="checkbox">
-            <input type="checkbox" bind:checked={bilingual} />
-            <span>{t("Keep the original on screen too")}</span>
-          </label>
-          {#if bilingual}
-            <div class="field-row">
-              <label class="field">
-                <span class="field-label">{t("Order")}</span>
-                <select class="input" bind:value={bilingualOrder}>
-                  <option value="original-first">{t("Original on top")}</option>
-                  <option value="translation-first">{t("Translation on top")}</option>
-                </select>
+            {#if activeProvider.needsBaseUrl}
+              <label class="field field-wide">
+                <span class="field-label">{t("Server")}</span>
+                <input
+                  class="input oa-mono"
+                  type="text"
+                  placeholder={activeProvider.defaultBaseUrl}
+                  bind:value={baseUrl}
+                  disabled={translating}
+                />
               </label>
-              <label class="field">
-                <span class="field-label">{t("Original size")}</span>
-                <select class="input" bind:value={originalScale}>
-                  <option value={1}>Same as the translation</option>
-                  <option value={0.8}>{t("Smaller (80%)")}</option>
-                  <option value={0.65}>{t("Much smaller (65%)")}</option>
-                </select>
+              <label class="field field-wide">
+                <span class="field-label">{t("Model")}</span>
+                <input
+                  class="input oa-mono"
+                  type="text"
+                  placeholder={activeProvider.defaultModel}
+                  bind:value={providerModel}
+                  disabled={translating}
+                />
               </label>
-            </div>
-          {/if}
-          <p class="oa-caption">
-            {#if bilingual}
-              Both languages are burned in, previewed and exported together.
-              The .ass carries the sizes; .srt and .vtt are plain text, so they
-              carry both languages but not the styling.
-            {:else}
-              Burn the translation over the original, so viewers get both.
             {/if}
-          </p>
-          {#if bilingual && wordEffect !== "none"}
-            <p class="oa-caption">
-              The word effect runs on the <strong>original</strong>, whichever way
-              round the two are stacked &mdash; its words are the ones the audio
-              was timed against. The translation sits beside it, unhighlighted.
-            </p>
-          {/if}
-        </div>
-      {/if}
-    </section>
-
-    <!-- 6. export -->
-    <section class="card">
-      <div class="subsection-head">
-        <h2 class="section-title">{t("Export")}</h2>
-        <CostBadge cost="free" />
-      </div>
-      <div class="subsection-head">
-        <h3 class="subsection-title">{t("A subtitle file")}</h3>
-        <span class="tag">{t("text only")}</span>
-      </div>
-      <p class="oa-caption card-intro">
-        The subtitles on their own, to hand to a player, a platform or an editor
-        &mdash; the video is not touched. <strong>.ass</strong> keeps the styling
-        you chose here; <strong>.srt</strong> and <strong>.vtt</strong> are plain
-        text that everything reads, with none of the styling.
-      </p>
-      <div class="checkbox-row">
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          disabled={!assDocument}
-          onclick={() => download(assDocument, assName(videoName), "text/plain")}
-        >
-          <Icon name="download" size={14} />
-          .ass
-        </button>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          onclick={() => download(writeSrt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain")}
-        >
-          <Icon name="download" size={14} />
-          .srt
-        </button>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          onclick={() => download(writeVtt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt")}
-        >
-          <Icon name="download" size={14} />
-          .vtt
-        </button>
-      </div>
-
-      {#if hasDimensions}
-        <div class="subsection-head">
-          <h3 class="subsection-title">{t("A video, with the subtitles burned in")}</h3>
-          {#if support?.ok}
-            <span class="tag tag-unlocked">
-              {support.container === "mp4" ? "MP4 · H.264" : "WebM · VP9"}
-            </span>
-          {/if}
-        </div>
-
-        {#if support && !support.ok}
-          <div class="banner banner-danger">
-            <Icon name="alert-triangle" />
-            <p>{support.reason}</p>
           </div>
-        {:else if burnedUrl}
-          <div class="burn-done">
-            <Icon name="check-circle" size={20} />
-            <div class="burn-done-body">
-              <p class="success-title">{burnedName}</p>
-              {#if burnedNote}
-                <p class="oa-caption">{burnedNote}</p>
+          <p class="oa-caption">
+            The key stays in this tab. It is sent only to the service you picked, and
+            never stored.
+          </p>
+        {/if}
+
+        {#if providerId === "device" && deviceStatus}
+          <p class="oa-caption">{deviceStatus}</p>
+        {/if}
+
+        {#if providerId === "opensubs"}
+          {@render creditBar(
+            translationQuote,
+            affordable,
+            translateTo ? "Add subtitles to see the price" : "Pick a language to see the price",
+          )}
+        {/if}
+
+        <div class="checkbox-row">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            disabled={!canTranslateNow || !affordable}
+            onclick={doTranslate}
+          >
+            {#if translating}
+              {translateProgress || t("Translating")}
+            {:else if translationQuote}
+              {t("Translate for {price}", { price: creditWord(translationQuote.credits) })}
+            {:else}
+              {t("Translate cues")}
+            {/if}
+          </button>
+        </div>
+        {#if translateShortfall}
+          <p class="oa-caption">{translateShortfall}</p>
+        {/if}
+        {#if translateError}
+          <p class="field-error">{translateError}</p>
+        {/if}
+
+        {#if canShowBoth}
+          <!--
+            Only offered once there is something to compare: before a
+            translation runs there is no second language, and afterwards the
+            original is still held rather than overwritten, which is what
+            makes this possible at all.
+          -->
+          <div class="bilingual">
+            <label class="checkbox">
+              <input type="checkbox" bind:checked={bilingual} />
+              <span>{t("Keep the original on screen too")}</span>
+            </label>
+            {#if bilingual}
+              <div class="field-row">
+                <label class="field">
+                  <span class="field-label">{t("Order")}</span>
+                  <select class="input" bind:value={bilingualOrder}>
+                    <option value="original-first">{t("Original on top")}</option>
+                    <option value="translation-first">{t("Translation on top")}</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="field-label">{t("Original size")}</span>
+                  <select class="input" bind:value={originalScale}>
+                    <option value={1}>Same as the translation</option>
+                    <option value={0.8}>{t("Smaller (80%)")}</option>
+                    <option value={0.65}>{t("Much smaller (65%)")}</option>
+                  </select>
+                </label>
+              </div>
+            {/if}
+            <p class="oa-caption">
+              {#if bilingual}
+                Both languages are burned in, previewed and exported together.
+                The .ass carries the sizes; .srt and .vtt are plain text, so they
+                carry both languages but not the styling.
+              {:else}
+                Burn the translation over the original, so viewers get both.
               {/if}
+            </p>
+            {#if bilingual && wordEffect !== "none"}
+              <p class="oa-caption">
+                The word effect runs on the <strong>original</strong>, whichever way
+                round the two are stacked &mdash; its words are the ones the audio
+                was timed against. The translation sits beside it, unhighlighted.
+              </p>
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <!-- 6. export -->
+      <section class="card">
+        <div class="subsection-head">
+          <h2 class="section-title">{t("Export")}</h2>
+          <CostBadge cost="free" />
+        </div>
+        <div class="subsection-head">
+          <h3 class="subsection-title">{t("A subtitle file")}</h3>
+          <span class="tag">{t("text only")}</span>
+        </div>
+        <p class="oa-caption card-intro">
+          The subtitles on their own, to hand to a player, a platform or an editor
+          &mdash; the video is not touched. <strong>.ass</strong> keeps the styling
+          you chose here; <strong>.srt</strong> and <strong>.vtt</strong> are plain
+          text that everything reads, with none of the styling.
+        </p>
+        <div class="checkbox-row">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            disabled={!assDocument}
+            onclick={() => download(assDocument, assName(videoName), "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .ass
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeSrt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .srt
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeVtt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt")}
+          >
+            <Icon name="download" size={14} />
+            .vtt
+          </button>
+        </div>
+
+        {#if hasDimensions}
+          <div class="subsection-head">
+            <h3 class="subsection-title">{t("A video, with the subtitles burned in")}</h3>
+            {#if support?.ok}
+              <span class="tag tag-unlocked">
+                {support.container === "mp4" ? "MP4 · H.264" : "WebM · VP9"}
+              </span>
+            {/if}
+          </div>
+
+          {#if support && !support.ok}
+            <div class="banner banner-danger">
+              <Icon name="alert-triangle" />
+              <p>{support.reason}</p>
             </div>
-            <div class="success-actions">
-              <a class="btn btn-primary btn-sm" href={burnedUrl} download={burnedName}>
-                <Icon name="download" size={14} />
-                {t("Save")}
-              </a>
-              <button type="button" class="btn btn-ghost btn-sm" onclick={clearBurned}>
-                {t("Burn again")}
+          {:else if burnedUrl}
+            <div class="burn-done">
+              <Icon name="check-circle" size={20} />
+              <div class="burn-done-body">
+                <p class="success-title">{burnedName}</p>
+                {#if burnedNote}
+                  <p class="oa-caption">{burnedNote}</p>
+                {/if}
+              </div>
+              <div class="success-actions">
+                <a class="btn btn-primary btn-sm" href={burnedUrl} download={burnedName}>
+                  <Icon name="download" size={14} />
+                  {t("Save")}
+                </a>
+                <button type="button" class="btn btn-ghost btn-sm" onclick={clearBurned}>
+                  {t("Burn again")}
+                </button>
+              </div>
+            </div>
+          {:else if burning}
+            <div class="burn-progress">
+              <div
+                class="progress-track"
+                role="progressbar"
+                aria-valuenow={burnPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div class="progress-fill" style:width={`${burnPercent}%`}></div>
+              </div>
+              <span class="oa-mono progress-label">
+                {progressLabel(t(burnNote), burnPercent, burnRemaining)}
+              </span>
+              <button type="button" class="btn btn-ghost btn-sm" onclick={cancelBurn}>
+                {t("Cancel")}
               </button>
             </div>
-          </div>
-        {:else if burning}
-          <div class="burn-progress">
-            <div
-              class="progress-track"
-              role="progressbar"
-              aria-valuenow={burnPercent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <div class="progress-fill" style:width={`${burnPercent}%`}></div>
-            </div>
-            <span class="oa-mono progress-label">
-              {progressLabel(t(burnNote), burnPercent, burnRemaining)}
-            </span>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={cancelBurn}>
-              {t("Cancel")}
-            </button>
-          </div>
-        {:else}
-          <p class="oa-caption card-intro">
-            {t("Saves")} <strong class="oa-mono">{burnWillSave}</strong> &mdash; the
-            picture with the subtitles drawn into it, so they show up anywhere
-            without a subtitle file beside them. Encoded here in the browser with
-            WebCodecs; the audio is copied across untouched rather than
-            re-encoded, and the subtitles are drawn by libass &mdash; the same
-            renderer the preview above uses.
-          </p>
-          <div class="checkbox-row">
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              disabled={!assDocument}
-              onclick={doBurn}
-            >
-              {t("Burn subtitles into the video")}
-            </button>
-          </div>
-        {/if}
-
-        {#if burnError}
-          <p class="field-error">{burnError}</p>
-        {/if}
-      {/if}
-
-      {#if cliLine}
-        <details class="raw-command">
-          <summary class="oa-caption">{t("Prefer to burn it on the command line?")}</summary>
-          <p class="oa-caption card-intro">
-            The CLI probes the real file, so it gets colour tags, rotation and
-            variable frame rate right in ways a browser cannot see. Worth using for
-            anything long, or for HDR footage.
-          </p>
-          <div class="command">
-            <code class="oa-mono">{cliLine}</code>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => copy(cliLine, "cli")}>
-              {copied === "cli" ? "Copied" : "Copy"}
-            </button>
-          </div>
-          {#if ffmpegLine}
-            <div class="command">
-              <code class="oa-mono">{ffmpegLine}</code>
+          {:else}
+            <p class="oa-caption card-intro">
+              {t("Saves")} <strong class="oa-mono">{burnWillSave}</strong> &mdash; the
+              picture with the subtitles drawn into it, so they show up anywhere
+              without a subtitle file beside them. Encoded here in the browser with
+              WebCodecs; the audio is copied across untouched rather than
+              re-encoded, and the subtitles are drawn by libass &mdash; the same
+              renderer the preview above uses.
+            </p>
+            <div class="checkbox-row">
               <button
                 type="button"
-                class="btn btn-ghost btn-sm"
-                onclick={() => copy(ffmpegLine, "ffmpeg")}
+                class="btn btn-primary btn-sm"
+                disabled={!assDocument}
+                onclick={doBurn}
               >
-                {copied === "ffmpeg" ? "Copied" : "Copy"}
+                {t("Burn subtitles into the video")}
               </button>
             </div>
-            <p class="oa-caption">
-              Download the .ass above first. This one assumes BT.709 colour, because
-              a browser cannot read the file's real tags.
-            </p>
           {/if}
-        </details>
-      {/if}
-    </section>
+
+          {#if burnError}
+            <p class="field-error">{burnError}</p>
+          {/if}
+        {/if}
+
+        {#if cliLine}
+          <details class="raw-command">
+            <summary class="oa-caption">{t("Prefer to burn it on the command line?")}</summary>
+            <p class="oa-caption card-intro">
+              The CLI probes the real file, so it gets colour tags, rotation and
+              variable frame rate right in ways a browser cannot see. Worth using for
+              anything long, or for HDR footage.
+            </p>
+            <div class="command">
+              <code class="oa-mono">{cliLine}</code>
+              <button type="button" class="btn btn-ghost btn-sm" onclick={() => copy(cliLine, "cli")}>
+                {copied === "cli" ? "Copied" : "Copy"}
+              </button>
+            </div>
+            {#if ffmpegLine}
+              <div class="command">
+                <code class="oa-mono">{ffmpegLine}</code>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  onclick={() => copy(ffmpegLine, "ffmpeg")}
+                >
+                  {copied === "ffmpeg" ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <p class="oa-caption">
+                Download the .ass above first. This one assumes BT.709 colour, because
+                a browser cannot read the file's real tags.
+              </p>
+            {/if}
+          </details>
+        {/if}
+      </section>
+        {/if}
+      </div>
+    </div>
   {/if}
 
   {#if features.length > 0}

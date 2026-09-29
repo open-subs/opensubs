@@ -760,6 +760,13 @@ if (FIXTURE) {
   );
 
   console.log("clip");
+  // Trimming lives behind "Other settings" now: it is a real control and a
+  // rare one, and the first screen was three and a half screens long with
+  // everything on it. Opening the disclosure is what a person does too.
+  await page.evaluate(() => {
+    for (const d of document.querySelectorAll("details.more")) d.open = true;
+  });
+  await page.waitForTimeout(300);
   await page.fill('.field input[placeholder="0"]', "1");
   await page.waitForFunction(() => document.body.textContent.includes("Exporting"), {
     timeout: 5000,
@@ -1445,21 +1452,21 @@ if (FIXTURE) {
       expectedConsoleError = "simulated picker failure";
       // Real clicks, not synthetic ones: opening a file dialog needs
       // transient user activation, which `element.click()` does not carry.
-      // `.start-drop` is the first screen's drop target, beside the
-      // buttons; the subtitle import has its own and must not be hit.
+      // `.start-primary` is the first screen's one button; the subtitle
+      // import is a quieter link beside it and must not be hit.
       //
       // The first click is the one that discovers the breakage, and it
       // cannot be rescued in flight -- the gesture is spent by the time
       // the rejection arrives. What must hold is that the app says so and
       // the *next* click opens the ordinary dialog.
-      await page.click(".start-drop");
+      await page.click(".start-primary");
       await page.waitForTimeout(800);
       check(
         "a failing picker says so rather than doing nothing",
         (await page.locator(".field-error").count()) > 0,
         "a silent dead drop target is the failure this whole section is about",
       );
-      await page.click(".start-drop");
+      await page.click(".start-primary");
       await page.waitForTimeout(1500);
       page.off("filechooser", onChooser);
       expectedConsoleError = null;
