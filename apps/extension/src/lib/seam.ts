@@ -192,6 +192,23 @@ export function unstutter(text: string): string {
   return text;
 }
 
+/**
+ * Whether the whole of `inner` is already said, in order, somewhere inside
+ * `outer` -- "There she is." after "Don't... There she is. Now, you'll love
+ * her." Three words at least, or four characters without spaces: shorter
+ * than that, two lines sharing a phrase is a coincidence, not a repeat.
+ */
+function saidWithin(outer: string, inner: string): boolean {
+  const o = tokens(outer).filter((t) => t.key);
+  const n = tokens(inner).filter((t) => t.key);
+  const spaced = /\s/.test(inner.trim());
+  if (n.length < (spaced ? 3 : MIN_REPEAT.characters) || n.length >= o.length) return false;
+  for (let at = 0; at + n.length <= o.length; at += 1) {
+    if (n.every((t, j) => alike(t.key, o[at + j].key))) return true;
+  }
+  return false;
+}
+
 /** `text` without its last `k` compared tokens, and any punctuation after them. */
 function dropTail(text: string, k: number): string {
   const all = tokens(text);
@@ -297,6 +314,32 @@ export function stitch(kept: Cue[], incoming: Cue[]): Cue[] {
     out.push(cue);
   }
   out.sort((a, b) => a.start - b.start || a.end - b.end);
+
+  // Every seam again, in the order the lines will be shown. The checks
+  // above run as each line arrives, against the line that arrived before
+  // it -- but a later window can deliver a line that starts *earlier*, and
+  // the pair it forms only exists once the list is sorted. "...his
+  // wonderful voice," then "voice, paired with..." was such a pair, and
+  // kept its repeat. So was a line already said whole inside the one
+  // before it, which the tail-against-head rule cannot see because the
+  // repeat is not at the end.
+  for (let i = 1; i < out.length; i += 1) {
+    if (out[i].end < reach) continue;
+    const a = out[i - 1];
+    const b = out[i];
+    if (b.start - a.end > NEAR_S) continue;
+    if (saidWithin(a.text, b.text)) {
+      out[i - 1] = { ...a, end: Math.max(a.end, b.end) };
+      out.splice(i, 1);
+      i -= 1;
+      continue;
+    }
+    const settled = settle(a, b);
+    if (!settled) {
+      out.splice(i - 1, 1);
+      i -= 1;
+    } else out[i - 1] = settled;
+  }
 
   // Two lines never share the screen, whichever path above produced them.
   // Where they would, the later one owns the time from its own start: a

@@ -181,6 +181,19 @@ try {
     (lines.join(" ").toLowerCase().match(/don't look/g) ?? []).length === 1, JSON.stringify(lines));
   ok("nor a single word across the next one",
     (lines.join(" ").toLowerCase().match(/\bback\b/g) ?? []).length === 1, JSON.stringify(lines));
+  // The retest's two, in the order a later window can deliver them: the
+  // line that starts earlier arrives second.
+  await send({ kind: "clear", tabId });
+  await hand([{ start: 20, end: 24, text: "voice, paired with a smartphone playing at the lawyer." }]);
+  await hand([{ start: 16, end: 20, text: "the beautiful melodies that came from his wonderful voice," }]);
+  await hand([{ start: 52.068, end: 53.068, text: "There she is." }]);
+  await hand([{ start: 48.7, end: 52.068, text: "Don't... There she is. Now, you'll love her." }]);
+  const retest = await saved();
+  const again = retest.srt.split(/\n\n+/).map((b) => b.split("\n").slice(2).join(" ")).filter(Boolean).join(" ").toLowerCase();
+  ok("a word repeated across a seam that only sorting made is in the file once",
+    (again.match(/\bvoice\b/g) ?? []).length === 1, again);
+  ok("a line already said inside the one before it is in the file once",
+    (again.match(/there she is/g) ?? []).length === 1, again);
   await send({ kind: "clear", tabId });
   await hand([
     { start: 0, end: 3, text: "It's the height of the Gold Rush," },

@@ -409,6 +409,53 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("a line genuinely said twice, a minute apart, is still two lines", out.length === 2);
 }
 
+// --- the retest's two seams that were still repeating --------------------
+{
+  const joined = (cues) => cues.map((c) => c.text).join(" | ");
+  const count = (cues, phrase) => joined(cues).toLowerCase().split(phrase).length - 1;
+
+  // A later line that is already said, whole, inside the line before it --
+  // not at its end, so the tail-against-head rule never looked. Tears of
+  // Steel 180-420 s, lines 14 and 15; the official subtitles have it once.
+  let out = stitch(
+    [{ start: 48.7, end: 52.068, text: "Don't... There she is. Now, you'll love her." }],
+    [{ start: 52.068, end: 53.068, text: "There she is." }],
+  );
+  ok("a line already said inside the one before it is not shown again",
+    count(out, "there she is") === 1, joined(out));
+  ok("...and the line that said it first is kept whole",
+    out.some((c) => c.text === "Don't... There she is. Now, you'll love her."), joined(out));
+
+  // The same, arriving the other way round: the shorter reading first.
+  out = stitch(
+    [{ start: 52.068, end: 53.068, text: "There she is." }],
+    [{ start: 48.7, end: 52.068, text: "Don't... There she is. Now, you'll love her." }],
+  );
+  ok("...whichever of the two arrives first", count(out, "there she is") === 1, joined(out));
+
+  // One content word ending a line and beginning the next, where the
+  // earlier line arrives in a later window: the seam only came into being
+  // when the list was sorted, and was never looked at.
+  out = stitch(
+    [{ start: 20, end: 24, text: "voice, paired with a smartphone playing at the lawyer." }],
+    [{ start: 16, end: 20, text: "the beautiful melodies that came from his wonderful voice," }],
+  );
+  ok("a word repeated across a seam formed by sorting is said once",
+    count(out, "voice") === 1, joined(out));
+  out = stitch(
+    [{ start: 16, end: 20, text: "the beautiful melodies that came from his wonderful voice," }],
+    [{ start: 20, end: 24, text: "voice, paired with a smartphone playing at the lawyer." }],
+  );
+  ok("...and in arrival order too", count(out, "voice") === 1, joined(out));
+
+  // What this must not eat: a line repeated far enough away to be said twice.
+  out = stitch(
+    [{ start: 0, end: 3, text: "Don't... There she is. Now, you'll love her." }],
+    [{ start: 40, end: 41, text: "There she is." }],
+  );
+  ok("the same short line half a minute later is a new line", out.length === 2, joined(out));
+}
+
 // --- the subtitle sizes (APP-147) ----------------------------------------
 {
   const { SIZES, DEFAULT_SIZE, nearestSize } = await import("../src/lib/pace.ts");
