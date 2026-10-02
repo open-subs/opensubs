@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// Release signing, kept out of this public repository entirely: the upload
+// keystore and its passwords live in ~/.config/opensubs-android/. Google Play
+// ties every future update to this key, so that file is the one to back up.
+// Without it the release build is left unsigned rather than failing, so a
+// clone can still build.
+def signingProps = new Properties()
+def signingFile = new File(System.getProperty("user.home"), ".config/opensubs-android/signing.properties")
+if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+
 android {
     namespace "app.opensubs.mobile"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +16,10 @@ android {
         applicationId "app.opensubs.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Minutes since 2020, as the iOS build numbers are: always larger than
+        // the last one, with nothing to remember between builds.
+        versionCode ((int) ((System.currentTimeMillis() / 1000 - 1577836800) / 60))
+        versionName "1.0.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +27,19 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (signingProps.getProperty("storeFile")) {
+            upload {
+                storeFile file(signingProps.getProperty("storeFile"))
+                storePassword signingProps.getProperty("storePassword")
+                keyAlias signingProps.getProperty("keyAlias")
+                keyPassword signingProps.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.findByName("upload")
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
