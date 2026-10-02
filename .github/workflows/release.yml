@@ -67,6 +67,11 @@ jobs:
           # whisper.cpp (crates/subs-whisper) uses std::filesystem, which
           # macOS has from 10.15; the toolchain's default target is older.
           MACOSX_DEPLOYMENT_TARGET: "11.0"
+          # Windows: the static C runtime. ct2rs builds CTranslate2 with /MT,
+          # and linking it into Rust's default /MD failed with LNK2038
+          # (RuntimeLibrary mismatch). whisper.cpp's cmake build follows
+          # the flag, and the installer stops needing the VC++ runtime.
+          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
