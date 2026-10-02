@@ -20,6 +20,7 @@
 // and that is the one this file acts on: this runs on your machine, costs
 // nothing, needs no key, and uploads nothing.
 
+import { inNativeShell } from "./native";
 import {
   ALL_FORMATS,
   AudioBufferSink,
@@ -1135,6 +1136,21 @@ export async function loadLocalModel(options: {
   // no wasm backend. In a browser it is always there.
   const wasm = env.backends?.onnx?.wasm;
   if (wasm) wasm.wasmPaths = new URL("./ort/", document.baseURI).href;
+
+  // The iOS and Android apps carry Whisper Base in the bundle (apps/mobile
+  // stage.mjs), so a first transcription there needs no download. Looked for
+  // in the bundle first and fetched only when it is not there, which is
+  // every other model. Not on the website: it carries none, and each file
+  // would be a 404 first. `?bundled-models` is how a test asks for it.
+  if (inNativeShell() || new URLSearchParams(location.search).has("bundled-models")) {
+    env.allowLocalModels = true;
+    // Relative, not an absolute URL: transformers.js treats any http(s)
+    // path as remote and skips the local check for it, which sent every
+    // file's size lookup to Hugging Face even with the model right here.
+    env.localModelPath = "./models/";
+  } else {
+    env.allowLocalModels = false;
+  }
   if (wasm && options.wasmProxy && device === "wasm") (wasm as { proxy?: boolean }).proxy = true;
 
   // Keyed on the backend as well as the model. The two load different

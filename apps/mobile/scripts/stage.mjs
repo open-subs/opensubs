@@ -61,11 +61,23 @@ for (const locale of LOCALES) {
 // What the shell actually needs, checked rather than assumed. The failure
 // this prevents is quiet: Capacitor serves whatever is in www/, so a
 // missing bundle is a white screen on a device and nothing at all here.
+// The speech model, carried in the app so a first transcription needs no
+// download (fetch-models.mjs fills the cache). The recogniser looks here
+// before Hugging Face when it runs in the native shell.
+const cache = join(root, "models-cache");
+if (existsSync(cache)) {
+  cpSync(cache, join(www, "models"), { recursive: true });
+} else {
+  console.error("stage: models-cache/ is missing -- run `node scripts/fetch-models.mjs` first");
+  process.exit(1);
+}
+
 const must = [
   ["index.html", "the page Capacitor loads"],
   ["assets", "the app bundle"],
   ["ort", "the ONNX Runtime files the recogniser fetches"],
   ["vad", "the voice-detection model"],
+  ["models/onnx-community/whisper-base/onnx/encoder_model.onnx", "the bundled speech model"],
 ];
 const missing = must.filter(([name]) => !existsSync(join(www, name)));
 if (missing.length > 0) {

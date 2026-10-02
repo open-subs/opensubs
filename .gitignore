@@ -78,3 +78,6 @@ __pycache__/
 
 # --- the desktop installers carry these; fetched by apps/desktop/scripts/fetch-bundled.sh ---
 apps/desktop/src-tauri/bundled/
+
+# the speech model the mobile apps carry; fetched by apps/mobile/scripts/fetch-models.mjs
+apps/mobile/models-cache/
