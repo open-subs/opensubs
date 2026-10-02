@@ -20,6 +20,7 @@ members = [
     "crates/subs-wasm",
     "crates/subs-translate",
     "crates/subs-whisper",
+    "crates/subs-m2m",
     "apps/cli",
     "apps/desktop/src-tauri",
 ]
@@ -36,6 +37,7 @@ license = "AGPL-3.0-or-later"
 subs-media = { path = "crates/subs-media" }
 subs-asr = { path = "crates/subs-asr" }
 subs-whisper = { path = "crates/subs-whisper" }
+subs-m2m = { path = "crates/subs-m2m" }
 subs-subtitle = { path = "crates/subs-subtitle" }
 subs-style = { path = "crates/subs-style" }
 subs-pipeline = { path = "crates/subs-pipeline" }

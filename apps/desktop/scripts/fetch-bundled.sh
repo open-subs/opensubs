@@ -3,6 +3,10 @@
 # with nothing else to download or install:
 #
 #   bundled/models/ggml-base.bin   multilingual Whisper Base (whisper.cpp)
+#   bundled/models/m2m100/         M2M-100 418M int8 (CTranslate2), offline
+#                                  translation; MIT, converted by us and
+#                                  published as the models-m2m100-418m-int8
+#                                  release of this repository
 #   bundled/vendor/ffmpeg[.exe]    a self-contained ffmpeg with libass
 #   bundled/vendor/ffprobe[.exe]
 #
@@ -22,6 +26,21 @@ if [ ! -s "$MODEL" ]; then
   echo "fetching Whisper Base"
   curl -fsSL https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin -o "$MODEL.part"
   mv "$MODEL.part" "$MODEL"
+fi
+
+M2M="$OUT/models/m2m100"
+M2M_URL=https://github.com/open-subs/opensubs/releases/download/models-m2m100-418m-int8
+mkdir -p "$M2M"
+if [ ! -s "$M2M/model.bin" ]; then
+  echo "fetching M2M-100 (translation)"
+  for f in model.bin config.json shared_vocabulary.json sentencepiece.bpe.model SHA256SUMS; do
+    curl -fsSL "$M2M_URL/$f" -o "$M2M/$f"
+  done
+  # Checked against the sums published with it: this is a file we made,
+  # served from a release anyone could have replaced.
+  if command -v sha256sum >/dev/null; then (cd "$M2M" && sha256sum -c SHA256SUMS --quiet)
+  else (cd "$M2M" && shasum -a 256 -c SHA256SUMS --quiet); fi
+  rm -f "$M2M/SHA256SUMS"
 fi
 
 case "$(uname -s)" in

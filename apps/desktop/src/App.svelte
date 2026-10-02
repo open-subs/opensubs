@@ -630,7 +630,10 @@
         </p>
       {:else if translateTo !== ""}
         <p class="oa-caption">
-          Subtitle timings are unchanged by translation &mdash; only the text is replaced.
+          Translated on this computer by the model that came with the app, with no
+          network and no key &mdash; quick, but more literal than a hosted model. Set
+          <code class="oa-mono">ANTHROPIC_API_KEY</code> to use Claude instead.
+          Subtitle timings are unchanged; only the text is replaced.
         </p>
       {/if}
 

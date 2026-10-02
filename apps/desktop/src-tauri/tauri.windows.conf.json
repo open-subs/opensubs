@@ -4,7 +4,11 @@
     "resources": {
       "bundled/models/ggml-base.bin": "models/ggml-base.bin",
       "bundled/vendor/ffmpeg.exe": "vendor/ffmpeg.exe",
-      "bundled/vendor/ffprobe.exe": "vendor/ffprobe.exe"
+      "bundled/vendor/ffprobe.exe": "vendor/ffprobe.exe",
+      "bundled/models/m2m100/model.bin": "models/m2m100/model.bin",
+      "bundled/models/m2m100/config.json": "models/m2m100/config.json",
+      "bundled/models/m2m100/shared_vocabulary.json": "models/m2m100/shared_vocabulary.json",
+      "bundled/models/m2m100/sentencepiece.bpe.model": "models/m2m100/sentencepiece.bpe.model"
     }
   }
 }

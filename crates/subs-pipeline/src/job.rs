@@ -118,7 +118,15 @@ pub fn plan_job(
     // Translation replaces cue text and nothing else -- see
     // `subs_translate` for why it cannot run before segmentation.
     let cues = match (&spec.translate, translator) {
-        (Some(req), Some(t)) => translate_cues(&source_cues, t, req)?,
+        (Some(req), Some(t)) => {
+            // An offline translator has to be told the source language; a
+            // hosted model works it out. Whisper already did, so say it.
+            let mut req = req.clone();
+            if req.source.as_deref().map_or(true, |s| s == "auto") {
+                req.source = Some(transcript.language.clone());
+            }
+            translate_cues(&source_cues, t, &req)?
+        }
         (Some(_), None) => {
             return Err(JobError::Translate(TranslateError::Backend(
                 "a translation was requested but no translation backend was supplied".into(),

@@ -4,7 +4,11 @@
     "resources": {
       "bundled/models/ggml-base.bin": "models/ggml-base.bin",
       "bundled/vendor/ffmpeg": "vendor/ffmpeg",
-      "bundled/vendor/ffprobe": "vendor/ffprobe"
+      "bundled/vendor/ffprobe": "vendor/ffprobe",
+      "bundled/models/m2m100/model.bin": "models/m2m100/model.bin",
+      "bundled/models/m2m100/config.json": "models/m2m100/config.json",
+      "bundled/models/m2m100/shared_vocabulary.json": "models/m2m100/shared_vocabulary.json",
+      "bundled/models/m2m100/sentencepiece.bpe.model": "models/m2m100/sentencepiece.bpe.model"
     },
     "macOS": {
       "minimumSystemVersion": "11.0"

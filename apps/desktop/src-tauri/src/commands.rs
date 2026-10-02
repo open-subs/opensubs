@@ -363,10 +363,17 @@ fn run_burn_job_in(
 
     // Built before the transcription runs: a missing API key must be
     // reported now, not after the user has waited out a full transcribe.
+    //
+    // Claude when there is a key for it; otherwise the offline model the
+    // installer carries, so translating needs neither a key nor a network.
     let translator: Option<Box<dyn Translator>> = match options.translate_request() {
-        Some(_) => Some(Box::new(
-            ClaudeTranslator::from_env().map_err(|e| e.to_string())?,
-        )),
+        Some(_) => Some(match ClaudeTranslator::from_env() {
+            Ok(claude) => Box::new(claude) as Box<dyn Translator>,
+            Err(no_key) => match bundled_translator(app) {
+                Some(dir) => Box::new(subs_m2m::M2mTranslator::new(&dir).map_err(|e| e.to_string())?),
+                None => return Err(no_key.to_string()),
+            },
+        }),
         None => None,
     };
 
@@ -560,8 +567,14 @@ pub fn list_languages() -> Vec<LanguageDto> {
 /// checks this before offering it rather than letting the user set up a
 /// translated export and fail at the end of it.
 #[tauri::command]
-pub fn translation_ready() -> bool {
-    subs_translate::claude::api_key_from_env().is_some()
+pub fn translation_ready(app: AppHandle) -> bool {
+    subs_translate::claude::api_key_from_env().is_some() || bundled_translator(&app).is_some()
+}
+
+/// The offline translation model the installer ships (M2M-100, MIT), if any.
+fn bundled_translator(app: &AppHandle) -> Option<PathBuf> {
+    let dir = app.path().resource_dir().ok()?.join("models").join("m2m100");
+    dir.join("model.bin").is_file().then_some(dir)
 }
 
 /// A shipped preset as template JSON, for a user to save and edit.

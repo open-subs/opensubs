@@ -20,7 +20,6 @@
 // and that is the one this file acts on: this runs on your machine, costs
 // nothing, needs no key, and uploads nothing.
 
-import { inNativeShell } from "./native";
 import {
   ALL_FORMATS,
   AudioBufferSink,
@@ -1142,7 +1141,11 @@ export async function loadLocalModel(options: {
   // in the bundle first and fetched only when it is not there, which is
   // every other model. Not on the website: it carries none, and each file
   // would be a 404 first. `?bundled-models` is how a test asks for it.
-  if (inNativeShell() || new URLSearchParams(location.search).has("bundled-models")) {
+  // Capacitor's global rather than native.ts: this module is also built
+  // into the browser extension, which has no Capacitor to import.
+  const native = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+    ?.isNativePlatform?.() === true;
+  if (native || new URLSearchParams(location.search).has("bundled-models")) {
     env.allowLocalModels = true;
     // Relative, not an absolute URL: transformers.js treats any http(s)
     // path as remote and skips the local check for it, which sent every

@@ -1,0 +1,12 @@
+[package]
+name = "subs-m2m"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Offline translation with M2M-100 through CTranslate2, behind subs_translate::Translator"
+
+[dependencies]
+subs-translate = { workspace = true }
+# The portable `ruy` backend: no MKL, OpenBLAS or CUDA to find on the build
+# machine, so it builds the same on macOS and Windows runners.
+ct2rs = { version = "0.10", default-features = false, features = ["sentencepiece", "ruy"] }
