@@ -438,7 +438,10 @@ fn run_burn_job(
     let ffmpeg_bin = resolve_ffmpeg();
     let ffprobe_bin = resolve_ffprobe(&ffmpeg_bin);
 
-    match subs_pipeline::missing_filters(&ffmpeg_bin) {
+    // Only libass: transcription is linked in (subs-whisper), so ffmpeg's
+    // `whisper` filter is no longer needed -- and the ffmpeg the macOS app
+    // ships has none, so asking for it refused every burn.
+    match subs_pipeline::missing_filters(&ffmpeg_bin).map(|m| without_whisper(m)) {
         Ok(missing) if missing.is_empty() => {}
         Ok(missing) => return Err(missing_message(&ffmpeg_bin, &missing)),
         Err(e) => return Err(format!("could not check {}: {e}", ffmpeg_bin.display())),
@@ -585,6 +588,13 @@ pub fn export_style(name: String) -> Result<String, String> {
         .ok_or_else(|| format!("no preset named '{name}'"))
 }
 
+/// The filters this app still needs from ffmpeg: all of them but `whisper`.
+/// Both checks -- the status shown up front and the one before a burn --
+/// go through this, so they cannot disagree again.
+fn without_whisper(missing: Vec<&'static str>) -> Vec<&'static str> {
+    missing.into_iter().filter(|f| *f != "whisper").collect()
+}
+
 /// What is wrong with ffmpeg, in a sentence that says what to do about it.
 fn missing_message(ffmpeg_bin: &Path, missing: &[&str]) -> String {
     let what: Vec<String> = subs_pipeline::REQUIRED_FILTERS
@@ -639,11 +649,7 @@ pub fn check_ffmpeg() -> FfmpegCheck {
             found: true,
             // Transcription is linked in (subs-whisper), so only the burn's
             // libass is asked of ffmpeg here.
-            missing: missing
-                .into_iter()
-                .filter(|f| *f != "whisper")
-                .map(String::from)
-                .collect(),
+            missing: without_whisper(missing).into_iter().map(String::from).collect(),
             install,
         },
         Err(_) => FfmpegCheck {
@@ -1019,4 +1025,21 @@ mod tests {
         assert_eq!(back.name, "Neon");
         assert!(export_style("nope".into()).is_err());
     }
+
+    /// The ffmpeg the installers ship (fetch-bundled.sh) has libass and no
+    /// `whisper` filter. A burn with it must not be refused -- it was, by a
+    /// pre-burn check that still asked for `whisper`.
+    #[test]
+    fn the_bundled_ffmpeg_is_enough_to_burn() {
+        let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+        let bin = Path::new(env!("CARGO_MANIFEST_DIR")).join("bundled/vendor").join(name);
+        if !bin.is_file() {
+            eprintln!("skipped: run apps/desktop/scripts/fetch-bundled.sh first");
+            return;
+        }
+        let missing = subs_pipeline::missing_filters(&bin).expect("runs");
+        assert!(missing.contains(&"whisper"), "this test assumes a build without whisper");
+        assert!(without_whisper(missing).is_empty());
+    }
+
 }
