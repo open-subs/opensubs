@@ -5,6 +5,9 @@
       "bundled/models/ggml-base.bin": "models/ggml-base.bin",
       "bundled/vendor/ffmpeg": "vendor/ffmpeg",
       "bundled/vendor/ffprobe": "vendor/ffprobe"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
     }
   }
 }
