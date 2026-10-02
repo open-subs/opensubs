@@ -54,6 +54,13 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm install
         working-directory: apps/desktop
+      # What the Mac and Windows installers carry so nothing is installed
+      # afterwards: the Whisper Base model and a self-contained ffmpeg with
+      # libass. Transcription itself is linked in (crates/subs-whisper).
+      - name: Bundled model and ffmpeg
+        if: matrix.os != 'ubuntu-22.04'
+        shell: bash
+        run: bash apps/desktop/scripts/fetch-bundled.sh
       - run: npx tauri build
         working-directory: apps/desktop
       - uses: actions/upload-artifact@v4

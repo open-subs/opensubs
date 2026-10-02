@@ -10,7 +10,8 @@ use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, Stdio};
 use std::time::Instant;
-use subs_asr::{FfmpegWhisperTranscriber, MockTranscriber, Transcriber};
+use subs_asr::{MockTranscriber, Transcriber};
+use subs_whisper::WhisperTranscriber;
 use subs_media::{probe_args, MediaInfo, VideoEncoder};
 use subs_pipeline::{plan_job, write_ass, JobSpec, ProgressParser};
 use subs_style::StyleTemplate;
@@ -385,7 +386,9 @@ fn cmd_burn(b: &BurnArgs) -> i32 {
             }
         },
         AsrChoice::Model(path) => {
-            let mut t = FfmpegWhisperTranscriber::new(ffmpeg_bin.clone(), path.clone());
+            // Linked in (subs-whisper): any ffmpeg with libass will do now,
+            // not only the few built against whisper.cpp.
+            let mut t = WhisperTranscriber::new(path.clone());
             if let Some(lang) = &b.language {
                 t = t.with_language(lang.clone());
             }

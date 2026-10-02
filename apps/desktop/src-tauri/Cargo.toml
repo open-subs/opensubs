@@ -24,6 +24,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 subs-media = { workspace = true }
 subs-asr = { workspace = true }
+subs-whisper = { workspace = true }
 subs-style = { workspace = true }
 subs-subtitle = { workspace = true }
 subs-pipeline = { workspace = true }

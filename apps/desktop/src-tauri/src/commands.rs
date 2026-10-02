@@ -14,7 +14,7 @@ use std::thread;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-use subs_asr::FfmpegWhisperTranscriber;
+use subs_whisper::WhisperTranscriber;
 use subs_media::{probe_args, MediaInfo, OutputSize, TrimRange, VideoEncoder};
 use subs_pipeline::{plan_job, write_ass, JobSpec, ProgressParser};
 use subs_style::{BorderStyle, Rgba, StyleTemplate};
@@ -148,15 +148,35 @@ fn work_dir_for(output: &Path) -> PathBuf {
     ))
 }
 
-/// Resolve the ffmpeg binary: prefer a bundled sidecar next to the running
-/// executable, fall back to searching `PATH`. Matches `apps/cli`.
+/// Resolve the ffmpeg binary: prefer the one the installer ships, fall back
+/// to searching `PATH`. Matches `apps/cli`.
+///
+/// Two places count as shipped, because the two platforms put bundled files
+/// in different places: beside the executable on Windows, and in the app's
+/// `Contents/Resources` on macOS (the executable is in `Contents/MacOS`).
 fn resolve_ffmpeg() -> PathBuf {
-    let vendor_dir = std::env::current_exe()
+    let exe_dir = std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|d| d.join("vendor")))
-        .unwrap_or_else(|| PathBuf::from("vendor"));
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .unwrap_or_default();
+    let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let vendor_dir = [exe_dir.join("vendor"), exe_dir.join("../Resources/vendor")]
+        .into_iter()
+        .find(|d| d.join(name).is_file())
+        .unwrap_or_else(|| exe_dir.join("vendor"));
     subs_pipeline::ffmpeg_binary(&vendor_dir)
 }
+
+/// The Whisper model the installer ships, if this build shipped one.
+fn bundled_model(app: &AppHandle) -> Option<PathBuf> {
+    let path = app.path().resource_dir().ok()?.join("models").join(BUNDLED_MODEL);
+    path.is_file().then_some(path)
+}
+
+/// Multilingual Base: the default the installers carry, so a fresh install
+/// transcribes with no download. The larger and English-only ones stay in
+/// the model picker as downloads.
+const BUNDLED_MODEL: &str = "ggml-base.bin";
 
 /// `ffprobe` is assumed to be a sibling of the resolved `ffmpeg` binary.
 /// Falls back to searching `PATH` when `ffmpeg` itself was resolved from
@@ -354,8 +374,10 @@ fn run_burn_job_in(
     extract_asr_audio(ffmpeg_bin, input, &wav_path, options.trim())
         .map_err(|e| format!("extracting ASR audio from {}: {e}", input.display()))?;
 
-    let transcriber =
-        FfmpegWhisperTranscriber::new(ffmpeg_bin.to_path_buf(), model_path.to_path_buf());
+    // whisper.cpp linked into the app, not ffmpeg's `whisper` filter: that
+    // filter exists only in ffmpeg builds no installer can ship on macOS, and
+    // needing one was the second install this app asked for.
+    let transcriber = WhisperTranscriber::new(model_path.to_path_buf());
 
     let spec = build_job_spec(
         input.to_path_buf(),
@@ -602,7 +624,13 @@ pub fn check_ffmpeg() -> FfmpegCheck {
     match subs_pipeline::missing_filters(&resolve_ffmpeg()) {
         Ok(missing) => FfmpegCheck {
             found: true,
-            missing: missing.into_iter().map(String::from).collect(),
+            // Transcription is linked in (subs-whisper), so only the burn's
+            // libass is asked of ffmpeg here.
+            missing: missing
+                .into_iter()
+                .filter(|f| *f != "whisper")
+                .map(String::from)
+                .collect(),
             install,
         },
         Err(_) => FfmpegCheck {
@@ -610,6 +638,7 @@ pub fn check_ffmpeg() -> FfmpegCheck {
             missing: subs_pipeline::REQUIRED_FILTERS
                 .iter()
                 .map(|(n, _)| n.to_string())
+                .filter(|n| n != "whisper")
                 .collect(),
             install,
         },
@@ -654,7 +683,12 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 pub fn get_model_path(app: AppHandle) -> Result<Option<String>, String> {
-    Ok(settings::load(&settings_path(&app)?).model_path)
+    // A model someone chose wins while it is still there; otherwise the one
+    // the installer shipped, so nothing has to be picked or downloaded first.
+    let chosen = settings::load(&settings_path(&app)?)
+        .model_path
+        .filter(|p| Path::new(p).is_file());
+    Ok(chosen.or_else(|| bundled_model(&app).map(|p| p.to_string_lossy().into_owned())))
 }
 
 #[tauri::command]

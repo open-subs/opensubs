@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "resources": {
+      "bundled/models/ggml-base.bin": "models/ggml-base.bin",
+      "bundled/vendor/ffmpeg": "vendor/ffmpeg",
+      "bundled/vendor/ffprobe": "vendor/ffprobe"
+    }
+  }
+}
