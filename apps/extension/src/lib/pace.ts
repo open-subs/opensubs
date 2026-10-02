@@ -16,7 +16,7 @@ export interface Support {
  * Nothing short of that is dropped. The first window waits for the model to
  * load, and every window recorded meanwhile queues behind it -- on a slow
  * machine that alone is four or five windows, and a bound of a minute
- * dropped one of them on every run (APP-110). After that, a machine a little
+ * dropped one of them on every run. After that, a machine a little
  * slower than the film falls a little further behind each window, and still
  * delivers every line: the overlay puts each one on its own moment in the
  * video, and the SRT comes out whole. Fifteen minutes is the safety valve
@@ -56,14 +56,14 @@ export function behindNote(waiting: number, model: string): string {
  * Measured on one laptop, an i7-1360P with Intel Iris Xe, reading 20-second
  * windows with Base:
  *
- *   Chrome,  WebGPU   14-30 s a window; dropped windows on 4 runs of 5 (APP-110)
- *   Firefox, WebGPU   285 s for the first window, then everything dropped (APP-121)
- *   Firefox, CPU      8-16 s a window; nothing dropped, 98% covered (APP-121)
+ *   Chrome,  WebGPU   14-30 s a window; dropped windows on 4 runs of 5
+ *   Firefox, WebGPU   285 s for the first window, then everything dropped
+ *   Firefox, CPU      8-16 s a window; nothing dropped, 98% covered
  *
  * So the CPU wherever the evidence says WebGPU is the slow path here: an
  * integrated Intel GPU (by the rule the web page uses, ../web device.ts),
  * and Firefox, whose adapter says nothing about itself and cannot be judged.
- * The page itself keeps WebGPU on an Iris Xe (APP-111) because there the
+ * The page itself keeps WebGPU on an Iris Xe because there the
  * CPU runs on the page's own thread and freezes it; here the engine has a
  * document of its own, and nothing the user sees stops. The cost is the
  * download: the CPU needs full-precision weights, about four times the size.
@@ -80,7 +80,7 @@ export function startsOnCpu(s: Support): boolean {
  * complete when it has played, and reading it takes seconds more. So the
  * line for 0:40 is ready when the film is at 1:20, and an overlay that asks
  * "what belongs at 1:20?" is handed nothing, for ever -- the subtitles were
- * there, in the exported file, and never on the video (APP-139).
+ * there, in the exported file, and never on the video.
  *
  * Five seconds separates that from an ordinary pause in speech, where there
  * genuinely is no line and the overlay should stay empty.
@@ -153,7 +153,7 @@ export function liveLine(
  * Base is the better recogniser and the slower one. On an Intel integrated
  * GPU it does not keep up: the subtitles fell thirty to seventy seconds
  * behind the picture and stayed there, which is no use to someone watching
- * (APP-142). Tiny reads the same window in about a third of the time.
+ * Tiny reads the same window in about a third of the time.
  *
  * Multilingual Tiny, not the English-only one: "Automatic" cannot know what
  * language is coming, and handing an English-only model a French video would
@@ -185,7 +185,7 @@ export function pickModel(chosen: string, device: "webgpu" | "wasm", behind: boo
  * subtitle cannot arrive until a whole pass of audio has played -- twenty
  * seconds on the default setting, during which the extension has nothing to
  * show and looks broken. It is most obvious on a second Start, where the
- * model is already in memory and the wait is purely this (APP-148). Six
+ * model is already in memory and the wait is purely this. Six
  * seconds is enough for a sentence or two, and Whisper pads a short clip to
  * its own thirty either way, so the only cost is one extra pass at the top
  * of each video.
@@ -197,7 +197,7 @@ export const FIRST_WINDOW_S = 6;
  *
  * They were 0.8 / 1 / 1.3 / 1.7 and the whole set read too large: the
  * smallest still covered the picture in a normal YouTube window, and nobody
- * reached for the largest (APP-147). Each step is now one notch down from
+ * reached for the largest. Each step is now one notch down from
  * where it was, and the extra-large step is gone.
  */
 export const SIZES = [0.6, 0.8, 1] as const;

@@ -93,7 +93,7 @@ try {
       ? result.text.replace(/\s+/gu, "").length >= 20
       : result.text.trim().split(/\s+/).filter(Boolean).length >= 8;
     if (!spaced) fails.push(`too little text came back: ${JSON.stringify(result.text)}`);
-    // The clean-up rules from APP-51 should keep audio-event annotations
+    // The clean-up rules should keep audio-event annotations
     // out -- bracketed or bare. A window that is nothing but a music bed
     // is ordinary in live capture, and its transcript must be empty
     // rather than the word "Music" across ten seconds.

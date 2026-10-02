@@ -1,5 +1,5 @@
-// Which GPU gets which default model (APP-111), and which browser starts on
-// the CPU (APP-121).
+// Which GPU gets which default model, and which browser starts on
+// the CPU.
 //
 // The adapter descriptions are the shapes Chrome reports through WebGPU's
 // GPUAdapterInfo, whose names come from Dawn. The first is the reporter's
@@ -46,7 +46,7 @@ ok("choosing the CPU on a discrete card gets Base -- Small in full precision is 
 
 ok("the GPU is named for the one line that says so", describeGpu({ vendor: "intel", architecture: "gen-12lp" }) === "intel · gen-12lp");
 
-// --- APP-121: Firefox, whose adapter says nothing -------------------------
+// --- Firefox, whose adapter says nothing -------------------------
 //
 // The user agents are real ones, and the adapter is what Firefox 154 gave
 // on the reporter's Iris Xe: every field an empty string.
@@ -67,7 +67,7 @@ ok("Chrome, Edge and Safari are not", !isFirefox(UA.chromeWin) && !isFirefox(UA.
 
 ok("the reporter's Firefox starts on the CPU", startsOnCpu({ info: firefoxInfo, userAgent: UA.firefoxWin }));
 ok("so does Firefox with no info object at all", startsOnCpu({ info: undefined, userAgent: UA.firefoxWin }));
-ok("Chrome on the same machine does not -- it names the GPU, and APP-111 already handles it",
+ok("Chrome on the same machine does not -- it names the GPU, which is already handled",
   !startsOnCpu({ info: { vendor: "intel", architecture: "gen-12lp" }, userAgent: UA.chromeWin }));
 ok("Chrome with an anonymous adapter is left alone -- not measured",
   !startsOnCpu({ info: firefoxInfo, userAgent: UA.chromeWin }));

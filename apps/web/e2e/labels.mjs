@@ -1,4 +1,4 @@
-// APP-33. The language-label smoothing rule, on its own.
+// The language-label smoothing rule, on its own.
 //
 // The Korean hallucination the report describes as intermittent is a
 // detection fault: with nobody having named a language, all 99 are on the
@@ -29,13 +29,13 @@ test("a lone disagreement in the middle is erased", () => {
   assert.deepEqual(smoothLabels(["zh", "zh", "ko", "zh", "zh"]), run("zh", 5));
 });
 
-test("APP-33: a lone Korean cell at the END is erased", () => {
+test("A lone Korean cell at the END is erased", () => {
   // zh.mp4's shape: 43 Chinese cells then one Korean.
   const labels = [...run("zh", 43), "ko"];
   assert.deepEqual(smoothLabels(labels), run("zh", 44));
 });
 
-test("APP-33: a lone English cell at the START is erased", () => {
+test("A lone English cell at the START is erased", () => {
   const labels = ["en", ...run("ja", 37)];
   assert.deepEqual(smoothLabels(labels), run("ja", 38));
 });

@@ -4,7 +4,7 @@
 User-agent: *
 Allow: /
 
-# APP-47. The rule above already admits everything, but several AI crawlers
+# The rule above already admits everything, but several AI crawlers
 # read only the block naming their own User-agent and ignore `*` — so being
 # allowed in general is not the same as being allowed by them. Listed one at
 # a time for that reason, not because anything here is being treated

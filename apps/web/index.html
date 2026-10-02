@@ -27,15 +27,15 @@
 
     <!-- app:begin -->
     <div id="app">
-      <!-- APP-48: a static rendering of the tool's first screen, in the
+      <!-- A static rendering of the tool's first screen, in the
            HTML that comes off the wire.
-           
+
            The app is client-rendered, so the first thing a crawler fetched
            was a page whose subject -- the tool -- was not in it. Google
            executes JavaScript but defers it, and a competitor whose upload
            control is in the served HTML is read on the first pass while
            this one waits for the second.
-           
+
            Svelte replaces all of this the moment it mounts (see
            src/main.ts, which empties the target first), so nobody sees it
            for more than a frame. It is not a mock-up: the copy, the

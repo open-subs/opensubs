@@ -309,7 +309,7 @@ mod tests {
     fn burn_argv_points_at_the_generated_ass_and_the_requested_output() {
         let p = plan(&spec(), &info(0));
         let joined = p.burn_argv.join(" ");
-        // Escaped for the filter (APP-119): on Windows the raw path is not in
+        // Escaped for the filter: on Windows the raw path is not in
         // the argv at all, and must not be.
         assert!(joined.contains(&subs_media::filter_path(&p.ass_path)));
         assert!(joined.contains("out.mp4"));

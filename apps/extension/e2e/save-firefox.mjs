@@ -8,7 +8,7 @@
 // The popup made a blob URL and handed it to downloads.download. Firefox
 // closes the popup when the save dialog opens, the URL dies with the page
 // that made it, and the download lands in the panel with a retry arrow and
-// no file (APP-152). Chromium keeps it, so the fault was invisible there.
+// no file. Chromium keeps it, so the fault was invisible there.
 //
 // # What this checks, and why it is not simply "did a file appear"
 //

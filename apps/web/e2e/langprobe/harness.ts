@@ -1,5 +1,5 @@
 /**
- * APP-33. What language does Whisper call each window, with nobody having
+ * What language does Whisper call each window, with nobody having
  * said what is being spoken?
  *
  * The report describes the Korean hallucination as intermittent. Before

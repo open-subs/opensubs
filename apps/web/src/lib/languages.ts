@@ -17,7 +17,7 @@
  *
  * # The edges, which this used to skip
  *
- * APP-33. The loop ran `1 .. length - 2`, so the first and last cells had
+ * The loop ran `1 .. length - 2`, so the first and last cells had
  * no rule at all -- and a mislabel is *more* likely there, because those
  * cells are the ones holding a title card, a fade-in, or the tail of a
  * sting after the speaking stops. Measured on the two clips to hand, with

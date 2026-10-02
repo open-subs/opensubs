@@ -313,7 +313,7 @@ test("the language is read at the time the segment was spoken", () => {
   assert.equal(kept.length, 2);
 });
 
-console.log("\nannotations the model leaves behind (APP-51)");
+console.log("\nannotations the model leaves behind");
 
 test("an annotation is recognised however broken it arrives", () => {
   // Verbatim from the tracker. Unclosed brackets, the words in any order,
@@ -376,7 +376,7 @@ test("a sentence about music survives the majority rule", () => {
   assert.equal(isNonSpeech("we sat and listened to music"), false);
 });
 
-console.log("\ncues too short to read (APP-52)");
+console.log("\ncues too short to read");
 
 test("a second's worth of a five-second sentence is dropped, not merged", () => {
   // Verbatim from the retest. 88 characters in one second is not a
@@ -556,7 +556,7 @@ test("a cue that is already a sentence is passed through untouched", () => {
 });
 
 
-// --- APP-31: a phrase repeated inside one line -------------------------
+// --- a phrase repeated inside one line -------------------------
 //
 // Japanese lesson video, 2:11. One phrase, twice, with a whole sentence
 // between them -- and nothing here caught it, each rule correctly:
@@ -565,42 +565,42 @@ test("a cue that is already a sentence is passed through untouched", () => {
 // crammedRepeat scored 0.58 against its 0.60 threshold because ときに and
 // 時に write the same word two ways.
 
-test("APP-31: the reported line loses its echo", () => {
+test("The reported line loses its echo", () => {
   assert.equal(
     trimInlineEcho("どうでしたかすみませんはいろいろなときによく使いますどうでしたか?"),
     "どうでしたかすみませんはいろいろなときによく使います",
   );
 });
 
-test("APP-31: an English echo goes too", () => {
+test("An English echo goes too", () => {
   assert.equal(
     trimInlineEcho("I'll see you next time, everyone. I'll see you next time"),
     "I'll see you next time, everyone.",
   );
 });
 
-test("APP-31: only the tail is cut, never the first occurrence", () => {
+test("Only the tail is cut, never the first occurrence", () => {
   assert.equal(trimInlineEcho("thank you very much thank you very much"), "thank you very much");
 });
 
 // The guards. Each is something a person actually says, and cutting any
 // of them would be a worse fault than the one being fixed.
-test("APP-31: a short repeat is left alone", () => {
+test("A short repeat is left alone", () => {
   assert.equal(trimInlineEcho("はいはい"), "はいはい");
 });
-test("APP-31: a short English repeat is left alone", () => {
+test("A short English repeat is left alone", () => {
   assert.equal(trimInlineEcho("that that is a problem"), "that that is a problem");
 });
-test("APP-31: an ordinary line is untouched", () => {
+test("An ordinary line is untouched", () => {
   assert.equal(trimInlineEcho("すみません注文いいですか"), "すみません注文いいですか");
 });
-test("APP-31: a line with no repeat is untouched", () => {
+test("A line with no repeat is untouched", () => {
   assert.equal(
     trimInlineEcho("The quick brown fox jumps over the lazy dog"),
     "The quick brown fox jumps over the lazy dog",
   );
 });
-test("APP-31: an empty line survives", () => {
+test("An empty line survives", () => {
   assert.equal(trimInlineEcho(""), "");
 });
 

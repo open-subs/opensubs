@@ -1,4 +1,4 @@
-// What happens to the subtitles around Stop (APP-146).
+// What happens to the subtitles around Stop.
 //
 //   node e2e/kept.mjs [--package dist | --zip opensubs-chrome-1.0.2.zip] --video lecture.mp4
 //
@@ -120,7 +120,7 @@ try {
 
   // Lines as the engine hands them over. The take is the one the page reports
   // for the first video of a session; a batch from any other take is a
-  // different video's and is meant to be dropped (APP-133).
+  // different video's and is meant to be dropped.
   const hand = (cues, take = 1) => send({ kind: "segments", cues, offset: cues[0].start, take });
 
   // What the background broadcasts, in order: the popup reads its status from
@@ -140,7 +140,7 @@ try {
   const made = await state();
   ok("the lines made during a capture are counted", made.count === 3, `count ${made.count}`);
 
-  // Half of APP-148 is what the popup says while the first window records:
+  // Half of the report is what the popup says while the first window records:
   // "Listening" alone reads as idle, and on a second Start that is the whole
   // of what the user sees for as long as the first pass lasts.
   const beganWith = firstNote ?? "";
@@ -166,8 +166,8 @@ try {
   ok("what follows joins the same file", both.count === 4, `count ${both.count}`);
   ok("in one timeline, in order", /Gold Rush[\s\S]*gold mining customers/.test(both.srt));
 
-  // --- two readings of one seam, in the installed package (APP-154) -------
-  // thea's own lines, from Firefox 156 on YouTube: the end of one window and
+  // --- two readings of one seam, in the installed package -------
+  // Lines from a real run, Firefox 156 on YouTube: the end of one window and
   // the start of the next are the same words, and the file had them twice.
   // Handed over the way the engine hands them over, so this is the shipped
   // background doing the stitching, not the module in isolation.
@@ -201,7 +201,7 @@ try {
     { start: 6, end: 9, text: "A young tailor named Jacob Davis notices" },
   ]);
 
-  // --- another video, same page (APP-153) ---------------------------------
+  // --- another video, same page ---------------------------------
   // What YouTube does when you click the next video: the address changes and
   // the player is swapped, with no navigation. The lines from the video
   // before must not join the new one's file -- they are a different clock.
@@ -222,7 +222,7 @@ try {
   ok("and saving writes only the second video's lines",
     /second video/.test(secondFile.srt) && !/Gold Rush/.test(secondFile.srt), `${secondFile.count} lines`);
 
-  // --- another video, same address (APP-153) ------------------------------
+  // --- another video, same address ------------------------------
   // The harder half of the same case: a player that swaps the video without
   // the address changing at all. The page is the same page, so the lines
   // were carried on -- into a file whose two halves both start at 00:00.

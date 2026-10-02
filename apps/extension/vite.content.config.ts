@@ -10,7 +10,7 @@ import { resolve } from "node:path";
  * opening with `import{...}from"./chunks/protocol-....js"`. Chrome rejects
  * that line as a syntax error before any of the file runs. In 1.0.1 that was
  * the whole feature: Start answered "Listening", nothing was ever in the page
- * to listen, and no subtitle could arrive (APP-109).
+ * to listen, and no subtitle could arrive.
  *
  * So this is an IIFE with everything it imports inlined. The cost is a second
  * copy of protocol.ts and seam.ts, a few kilobytes; the alternative -- a

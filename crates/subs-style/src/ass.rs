@@ -76,7 +76,7 @@ fn is_hangul(c: char) -> bool {
 ///
 /// `WrapStyle: 0` wraps at spaces and nowhere else, so a Chinese or Japanese
 /// sentence -- which has none -- is laid out on one line however wide the
-/// frame is (APP-90). Korean is excluded on purpose: it puts spaces between
+/// frame is. Korean is excluded on purpose: it puts spaces between
 /// words, libass already wraps it there, and splitting a word between two
 /// syllables would be worse than the wrap it gets today.
 fn unspaced_boundary(a: char, b: char) -> bool {
@@ -127,7 +127,7 @@ fn line_room(style: &StyleTemplate, play_res: (u32, u32), px: f64, scale: f64) -
 
 /// Mark where a line of Chinese or Japanese has to break to fit the frame.
 ///
-/// APP-90. A vertical 360x640 video burned a 28-character Chinese cue on a
+/// A vertical 360x640 video burned a 28-character Chinese cue on a
 /// single line about twice the width of the frame, and the characters past
 /// either edge were simply gone. English of the same length wrapped onto
 /// four lines, because it has spaces for libass to break at.
@@ -330,7 +330,7 @@ const BOX_PADDING_EM: f64 = 0.2;
 /// `back_color`, which is how every other reader of it treats the field --
 /// the /styles page, the style tiles -- so the translation happens here
 /// rather than in the presets. Writing the fields across verbatim is what
-/// left Boxed, Podcast and Reel Box with no box at all (APP-83).
+/// left Boxed, Podcast and Reel Box with no box at all.
 fn border_colour(style: &StyleTemplate) -> Rgba {
     match style.border_style {
         BorderStyle::OpaqueBox => style.back_color,
@@ -1687,7 +1687,7 @@ mod tests {
 
     #[test]
     fn an_opaque_box_is_coloured_and_sized_where_libass_reads_them() {
-        // APP-83. For BorderStyle=3 libass paints the box in OutlineColour
+        // For BorderStyle=3 libass paints the box in OutlineColour
         // and pads it by Outline; BackColour is only the shadow. Copying the
         // template's fields straight across left Outline=0, and libass draws
         // no box at all for that.
@@ -1993,9 +1993,9 @@ mod tests {
         assert_eq!(wild, capped, "out-of-range values must clamp, not run away");
     }
 
-    // --- APP-90: Chinese and Japanese fitted to the frame ------------------
+    // --- Chinese and Japanese fitted to the frame ------------------
     //
-    // thea's reproduction: a 360x640 video and one 28-character Chinese cue.
+    // The reproduction: a 360x640 video and one 28-character Chinese cue.
     // Burned, it was a single line twice the frame's width with the ends cut
     // off, while English of the same length wrapped onto four lines.
 

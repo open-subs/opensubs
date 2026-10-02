@@ -1,7 +1,7 @@
 /**
  * What kind of GPU this is, as far as choosing a speech model goes.
  *
- * APP-111, measured on an i7-1360P with Intel Iris Xe (WebGPU reports
+ * Measured on an i7-1360P with Intel Iris Xe (WebGPU reports
  * vendor "intel", architecture "gen-12lp"), transcribing a 114-second clip:
  *
  *   WebGPU + Base   250 s
@@ -9,7 +9,7 @@
  *   WebGPU + Small  517 s   <- the default this machine was given
  *
  * The default was the slowest of the three because the rule was "WebGPU
- * present, so Small" (APP-32), and on an integrated Intel GPU WebGPU is
+ * present, so Small", and on an integrated Intel GPU WebGPU is
  * present and slow. Small is the better recogniser, which is why it is the
  * default where the GPU can carry it -- a discrete card, or Apple silicon,
  * where the same rule measured an order of magnitude faster than the CPU.
@@ -84,7 +84,7 @@ export function describeGpu(info: GpuInfo | null | undefined): string | undefine
 /**
  * An adapter that says nothing about itself: no vendor, no architecture,
  * no device, no description. Firefox answers this way on every machine
- * (APP-121) -- it withholds the fields -- so it cannot be told apart from
+ * -- it withholds the fields -- so it cannot be told apart from
  * any other GPU, fast or slow.
  */
 export function isAnonymousAdapter(info: GpuInfo | null | undefined): boolean {
@@ -100,8 +100,8 @@ export function isFirefox(userAgent: string): boolean {
 /**
  * Whether to start on the CPU although WebGPU is there.
  *
- * Firefox, with an adapter that says nothing. APP-121, measured on the
- * Iris Xe laptop behind APP-111, Firefox 154, a 114-second clip:
+ * Firefox, with an adapter that says nothing. Measured on the same
+ * Iris Xe laptop, Firefox 154, a 114-second clip:
  *
  *   WebGPU + Small   15% after ten minutes, "about 55 min left"
  *   CPU    + Base    62-83 s, first download included

@@ -1,4 +1,4 @@
-// The default model and the GPU / CPU switch, in the built page (APP-111).
+// The default model and the GPU / CPU switch, in the built page.
 //
 // e2e/device.mjs tests the rule. This tests what a person is shown: the page
 // is loaded with navigator.gpu standing in for each kind of machine, and the
@@ -44,7 +44,7 @@ const machines = [
   { name: "apple", label: "Apple silicon", info: { vendor: "apple", architecture: "metal-3" }, model: "whisper-small", switch: true },
   { name: "nvidia", label: "NVIDIA discrete", info: { vendor: "nvidia", architecture: "ampere" }, model: "whisper-small", switch: true },
   { name: "none", label: "no WebGPU", info: null, model: "whisper-base", switch: false },
-  // APP-121: Firefox withholds every field, so its GPU cannot be judged, and
+  // Firefox withholds every field, so its GPU cannot be judged, and
   // on the reporter's Iris Xe its WebGPU was dozens of times slower than its
   // CPU. It starts on the CPU, with Base, and keeps the switch.
   { name: "firefox", label: "Firefox, adapter says nothing", info: { vendor: "", architecture: "", device: "", description: "" },

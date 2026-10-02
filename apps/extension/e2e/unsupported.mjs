@@ -1,6 +1,6 @@
 // Pages the extension cannot read, and a video that is not the one wanted.
 //
-// APP-133: on each of these the popup said "Listening" for as long as anyone
+// On each of these the popup said "Listening" for as long as anyone
 // waited, with nothing on the video and no error. Reproduced here on local
 // pages rather than the reported sites, whose players, ads and regions
 // change from day to day. Two servers on two ports are two origins, which is

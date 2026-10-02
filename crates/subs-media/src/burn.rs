@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// `\ ' : =` are. A path goes through both, so it is escaped for the
 /// option list first and the result escaped again for the graph.
 ///
-/// Unescaped, every absolute path on Windows breaks the burn (APP-119):
+/// Unescaped, every absolute path on Windows breaks the burn:
 /// `C:\Users\...\subs.ass` split at the drive colon, the rest read as the
 /// filter's next option, and the backslashes consumed as escapes --
 /// "Unable to parse option value \"Usersycan4subs.ass\"". The same bytes
@@ -307,7 +307,7 @@ mod tests {
     use crate::{ColorMeta, MediaInfo, Rational};
     use std::path::PathBuf;
 
-    /// APP-119: the path the burn wrote on Windows, and what ffmpeg must be
+    /// The path the burn wrote on Windows, and what ffmpeg must be
     /// handed for it. Checked against a real ffmpeg in
     /// subs-pipeline/tests/burn_e2e.rs.
     #[test]

@@ -3,7 +3,7 @@
  *
  * Its own module, like ./refill and ./remote, so the count can be tested
  * without the engine: a count that disagrees with the pipeline is invisible
- * until someone watches a bar sit at 100%, which is how APP-112 found it.
+ * until someone watches a bar sit at 100%, which is how it was found.
  */
 
 import { TARGET_SAMPLE_RATE } from "./remote.ts";
@@ -56,7 +56,7 @@ export function passEnd(run: Span, length: number): number {
  * Counting each run without its lead-out came up a window short whenever
  * the lead-out tipped a pass into one more: the bar reached 100% and then
  * sat there while the last window was read -- a silent 100% of its own,
- * before the missed-line check had even begun (APP-112).
+ * before the missed-line check had even begun.
  */
 export function plannedWindows(runs: Span[], length: number, chunkLengthS: number, strideLengthS: number): number {
   return runs.reduce((n, run) => n + whisperWindows(passEnd(run, length) - run.from, chunkLengthS, strideLengthS), 0);
@@ -75,7 +75,7 @@ const FRAMES_PER_TIMESTAMP = 2;
  * the last complete segment, so one window can take two calls or five. Each
  * call ends with `streamer.end()`, which is why counting those calls ran the
  * bar to 100% with windows still being read -- on a two-minute clip, eleven
- * calls for six windows and twenty silent seconds at "100%" (APP-112).
+ * calls for six windows and twenty silent seconds at "100%".
  *
  * This is that loop's rule, from `_generate_with_seek`: a call that ends on a
  * lone timestamp, or has no pair of them, or produced nothing, is the end of

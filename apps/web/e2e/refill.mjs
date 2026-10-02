@@ -1,6 +1,6 @@
 // Reading again what the first pass missed -- order, progress and waste.
 //
-// APP-112: after the bar said "Listening to the audio · 100%", this pass ran
+// After the bar said "Listening to the audio · 100%", this pass ran
 // for 76 to 233 seconds of a two-minute clip and said nothing. Two faults, and
 // both are checked here without a model:
 //

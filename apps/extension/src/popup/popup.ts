@@ -92,7 +92,7 @@ function showSettings(s: Settings) {
   windowEl.value = String(s.window);
   overlayEl.checked = s.overlay;
   backendEl.value = s.backend ?? DEFAULT_SETTINGS.backend;
-  // The sizes moved down a notch and the largest went (APP-147), so a size
+  // The sizes moved down a notch and the largest went, so a size
   // saved by an older build may name one that is no longer offered. Without
   // this the select shows nothing and the next change sends the default.
   sizeEl.value = String(nearestSize(s.fontScale ?? DEFAULT_SETTINGS.fontScale));
@@ -150,7 +150,7 @@ async function activeTab(): Promise<number | undefined> {
 
 async function refresh() {
   // With the tab, because subtitles kept after Stop belong to the page they
-  // were made from: another tab's are not this popup's to offer (APP-146).
+  // were made from: another tab's are not this popup's to offer.
   const state = (await tell({ kind: "state", tabId: await activeTab() })) as
     | { running: boolean; status: Status; count: number; settings: Settings }
     | undefined;
@@ -188,7 +188,7 @@ saveEl.addEventListener("click", async () => {
   const tabId = await activeTab();
   // Firefox closes the popup the moment the save dialog opens, and a blob URL
   // made here dies with the page that made it: the download appeared in the
-  // panel with a "retry" arrow and no file (APP-152). Where the background is
+  // panel with a "retry" arrow and no file. Where the background is
   // a document -- which on Firefox it is -- it makes the URL and drives the
   // download itself, and outlives the dialog. On Chromium the background is a
   // service worker, which has no createObjectURL at all, and the popup's own
@@ -215,7 +215,7 @@ for (const el of [modelEl, languageEl, windowEl, overlayEl, backendEl, sizeEl]) 
 }
 
 // The size and the overlay switch are judged by looking at the video, so they
-// are sent as they change rather than waiting for the next Start (APP-144).
+// are sent as they change rather than waiting for the next Start.
 for (const el of [sizeEl, overlayEl]) {
   el.addEventListener("change", () => void tell({ kind: "settings", settings: readSettings() }));
 }

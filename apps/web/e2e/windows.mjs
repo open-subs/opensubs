@@ -1,6 +1,6 @@
 // The progress bar's window count against what the pipeline really reads.
 //
-// APP-112: the bar reached "Listening to the audio · 100%" and then sat there
+// The bar reached "Listening to the audio · 100%" and then sat there
 // -- on a two-minute clip, 19 seconds of it before the missed-line check even
 // started. The bar counts finished Whisper windows, and the total it divides
 // by was counted over each language run, while each pass reads three seconds
@@ -61,7 +61,7 @@ for (const c of cases) {
   const runs = [{ from: 0, to: s(29) }, { from: s(29), to: length }];
   const old = runs.reduce((n, r) => n + whisperWindows(r.to - r.from, CHUNK, STRIDE), 0);
   const read = runs.reduce((n, r) => n + pipelineWindows(passEnd(r, length) - r.from), 0);
-  ok("counting runs without their lead-out comes up short (the APP-112 shape)", old < read, `${old} vs ${read}`);
+  ok("counting runs without their lead-out comes up short", old < read, `${old} vs ${read}`);
 }
 
 // --- a window is not one call: the seek loop ----------------------------
@@ -82,7 +82,7 @@ ok("and a later call's seek is counted from where it started",
 ok("no pair of timestamps consumes the window", seekAfter(tok(0, W, W), TB, EOS, 0) === WINDOW_FRAMES);
 ok("nothing generated gives up on the window", seekAfter(tok("eos"), TB, EOS, 900) === WINDOW_FRAMES);
 
-// The APP-112 shape: two windows, the first read in three calls.
+// The reported shape: two windows, the first read in three calls.
 {
   const p = windowProgress(2, TB, EOS);
   const call = (tokens) => { p.put([[1n, 2n, 3n]]); for (const t of tokens) p.put([[BigInt(t)]]); p.end(); return p.fraction; };
@@ -96,7 +96,7 @@ ok("nothing generated gives up on the window", seekAfter(tok("eos"), TB, EOS, 90
   ok("a window counts once, however many calls it took", seen[2] === 0.5, JSON.stringify(seen));
   ok("and 100% is the end of the last window, not the fourth call of six", seen[3] === 1, JSON.stringify(seen));
   // Counted the old way -- one window per end() -- it said 100% after two calls.
-  ok("counting calls as windows would have said 100% halfway (the APP-112 shape)", Math.min(2 / 2, 1) === 1 && seen[1] < 1);
+  ok("counting calls as windows would have said 100% halfway", Math.min(2 / 2, 1) === 1 && seen[1] < 1);
 }
 {
   const p = windowProgress(4);

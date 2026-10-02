@@ -1,4 +1,4 @@
-// A model that answers with one line too few (APP-141).
+// A model that answers with one line too few.
 //
 // Reported on opensubs.app with an OpenAI key and the default gpt-4o-mini:
 // the same nineteen-line file translated twice and failed once, and the

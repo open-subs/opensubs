@@ -5,7 +5,7 @@
 //
 // serve.mjs must already be running on --port. The profile is reused so the
 // model downloads once: Hugging Face is not always quick, and a download is
-// not what APP-112 measures.
+// not what is being measured.
 import { chromium } from "playwright";
 import { resolve } from "node:path";
 

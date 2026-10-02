@@ -61,16 +61,16 @@ export const DEFAULT_SETTINGS: Settings = {
 /** Sent by the popup; handled by the background. */
 export type Command =
   | { kind: "start"; tabId?: number; settings: Settings }
-  /** Changed while a session runs -- the subtitle size, so far (APP-144). */
+  /** Changed while a session runs -- the subtitle size, so far. */
   | { kind: "settings"; tabId?: number; settings: Settings }
   | { kind: "stop"; tabId?: number }
   | { kind: "state"; tabId?: number }
   | { kind: "cues"; tabId?: number }
-  /** Throw away the lines held for this tab -- the popup's Clear (APP-153). */
+  /** Throw away the lines held for this tab -- the popup's Clear. */
   | { kind: "clear"; tabId?: number }
   /**
    * Write the .srt, from wherever the download will survive being started
-   * (APP-152). Answered `{ok:false}` where the background cannot make an
+   * Answered `{ok:false}` where the background cannot make an
    * object URL, and then the popup does it itself.
    */
   | { kind: "save"; tabId?: number };
@@ -83,7 +83,7 @@ export type Command =
  * `runtime.sendMessage` arrives on the other side as `{}` -- no error, no
  * warning, just an empty object where the audio was. The engine then reports
  * "Input has an unsupported or unrecognizable format", which reads as a codec
- * problem and is not one (APP-109). Firefox structured-clones messages and
+ * problem and is not one. Firefox structured-clones messages and
  * would have carried the buffer fine, so the fault is invisible there.
  *
  * Text survives both. It costs a third more bytes on the wire -- about 30 KB
@@ -108,8 +108,7 @@ export type FromPage =
   /**
    * The page itself is going: navigated away, or closed. The subtitles kept
    * after Stop belong to the page they were made from, so they go with it
-   * (APP-146).
-   */
+   * */
   | { kind: "gone" };
 
 /**
@@ -118,17 +117,17 @@ export type FromPage =
  * It used to be a separate message sent after "begin" returned, and the
  * background set "Listening" as soon as the send resolved -- which was before
  * the page had looked for a video. On a page with none, "No video" arrived
- * first and "Listening" overwrote it, for good (APP-133).
+ * first and "Listening" overwrote it, for good.
  */
 export type BeginAnswer =
   /**
    * `waiting`: found, but not readable yet -- an ad to be waited out.
    * `url`: the page's own address, which says whether the subtitles kept
-   * from an earlier Start were made from this same page (APP-146). It comes
+   * from an earlier Start were made from this same page. It comes
    * from the page because the background has no `tabs` permission to ask.
    * `video`: which video, within that page. A player that swaps the film
    * without navigating -- YouTube's next video -- is the same page, and the
-   * lines from the one before belong to a different clock (APP-153).
+   * lines from the one before belong to a different clock.
    */
   | { found: true; duration: number; waiting?: string; url?: string; video?: string }
   | { found: false; reason: string };
@@ -140,7 +139,7 @@ export type ToPage =
   | { kind: "halt" }
   /**
    * `seen`: these lines were made before this Start -- they were carried over
-   * from the session that was stopped (APP-146). The overlay keeps them for
+   * from the session that was stopped. The overlay keeps them for
    * the file and for a seek back, and does not replay them over the video.
    */
   | { kind: "cues"; cues: Cue[]; seen?: boolean }

@@ -1,7 +1,7 @@
 /**
  * Is anyone actually speaking?
  *
- * APP-54. Whisper always writes something. Hand it 118 seconds of a wok
+ * Whisper always writes something. Hand it 118 seconds of a wok
  * and a music bed and it returns a confident page of English:
  *
  *     I'm going to be a little bit more careful. I'm

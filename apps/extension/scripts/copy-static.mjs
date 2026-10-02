@@ -87,7 +87,7 @@ if (missing.length) {
 // a classic script. A top-level `import` or `export` there is a syntax error
 // that rejects the whole file before a line of it runs -- and the extension
 // still says "Listening", because nothing downstream can tell. 1.0.1 shipped
-// exactly that (APP-109). Refuse the build instead.
+// exactly that. Refuse the build instead.
 const content = join(out, "content.js");
 if (!existsSync(content)) {
   console.error("copy-static: content.js is missing -- is vite.content.config.ts in the build script?");

@@ -2,7 +2,7 @@
 
 The site is not the app. The app is Svelte and translates itself at
 runtime from `src/lib/i18n/`; these pages are the HTML that comes off the
-wire, and their whole job (APP-48) is to put the copy in front of a
+wire, and their whole job is to put the copy in front of a
 crawler without anything having to run. Swapping their text with
 JavaScript would undo exactly that -- and would leave one URL claiming to
 be eight languages, which is not something a search engine can serve.

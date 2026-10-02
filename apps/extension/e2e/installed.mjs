@@ -13,8 +13,7 @@
 // pipeline.mjs imports the capture and engine modules straight into one dev
 // server page. That is a good test of the modules and no test at all of the
 // extension, and 1.0.1 shipped three faults it was structurally unable to see
-// (APP-109, APP-110):
-//
+// //
 //   - it never injects content.js with `scripting.executeScript`, so it could
 //     not notice that the built file is an ES module a classic injection
 //     rejects -- the whole feature was dead in the package;
@@ -66,27 +65,27 @@ const profileDir = flag("--profile", null);
 // setting existed runs exactly as it did.
 const backendFlag = args.includes("--backend") ? flag("--backend", "auto") : null;
 // Slow the engine's document by this factor (Chromium only), to stand in
-// for a machine that only just keeps up -- APP-110's Iris Xe, which one
+// for a machine that only just keeps up -- the Iris Xe, which one
 // run kept up and the next dropped windows. 1 is no throttle.
 const throttle = Number(flag("--throttle", "1"));
 // Measure how long this page's own thread is unavailable while the engine
-// works: a toolbar popup shares that thread (APP-140).
+// works: a toolbar popup shares that thread.
 const probePopup = args.includes("--probe-popup");
 const shotsDir = args.includes("--shots") ? resolve(flag("--shots", ".")) : null;
 const warmOnly = args.includes("--warm");
 // --restart: Stop once lines are arriving, then Start again without
-// reloading the page, and judge the run on what comes after that (APP-145).
+// reloading the page, and judge the run on what comes after that.
 const restart = args.includes("--restart");
 // How long to wait between Stop and the second Start. The old loop is
 // waiting on a recorder when Stop is pressed and wakes a moment later:
 // whether it wakes before or after the new Start decides which way the race
-// in APP-145 falls, so the gap is a dial.
+// falls, so the gap is a dial.
 const restartGap = Number(flag("--restart-gap", "3000"));
 // Pressing Start again with the model already in memory: how long the user
-// may be left with nothing on screen before it counts as broken (APP-148).
+// may be left with nothing on screen before it counts as broken.
 const FIRST_LINE_MAX_S = Number(flag("--first-line", "15"));
 // --size N: change the subtitle size while the video plays, and photograph
-// the video before and after (APP-144).
+// the video before and after.
 const sizeChange = args.includes("--size") ? Number(flag("--size", "1.7")) : null;
 const speechUntil = args.includes("--speech-until") ? Number(flag("--speech-until", "0")) : null;
 
@@ -219,12 +218,12 @@ async function firefoxContext({ geckodriver, profile, geckoId, uuid, unpackedPat
         // yes without the prompt; the request itself still has to come from
         // a real click, below.
         "extensions.webextOptionalPermissionPrompts": false,
-        // --ff-webgpu: Firefox with WebGPU on, the APP-121 configuration --
+        // --ff-webgpu: Firefox with WebGPU on, that configuration --
         // an adapter that exists and says nothing about itself.
         ...(args.includes("--ff-webgpu") ? { "dom.webgpu.enabled": true, "gfx.webgpu.ignore-blocklist": true } : {}),
         // --ff-idle MS: suspend an idle event page after MS instead of 30 s --
         // a faster machine's stand-in for a slow one's longer quiet stretches
-        // (APP-121: suspended mid-load on an Iris Xe, never here at 30 s).
+        // (suspended mid-load on an Iris Xe, never here at 30 s).
         ...(args.includes("--ff-idle") ? { "extensions.background.idle.timeout": Number(flag("--ff-idle", "30000")) } : {}),
       },
     },
@@ -428,7 +427,7 @@ try {
   // popup does, it is where status broadcasts land, and -- with --probe-popup
   // -- it is how responsive that page is while the engine works. A toolbar
   // popup opens in this same renderer; when it is blocked, the popup does not
-  // appear at all (APP-140), which automation cannot click but can measure.
+  // appear at all, which automation cannot click but can measure.
   console.log(`${at()}  the video is ready (${duration.toFixed(1)}s)`);
   const control = await context.newPage();
   // Retried: the extension is briefly unreachable while its worker restarts
@@ -521,7 +520,7 @@ try {
   if (throttle > 1) await throttleEngine(throttle);
   console.log(`${at()}  start -> ${JSON.stringify(started)}   (${model}, ${language}, ${windowS}s windows, ${duration.toFixed(1)}s video)`);
 
-  // Is there anything in the page listening? This is fault one of APP-109
+  // Is there anything in the page listening? This is the first fault
   // asked directly, rather than inferred from subtitles never arriving:
   // Chrome answers "Receiving end does not exist" when injection failed.
   await new Promise((r) => setTimeout(r, 1500));
@@ -558,7 +557,7 @@ try {
   let afterStop = null;
   // Photographs while it plays, without touching the scrubber: the overlay
   // is in a closed shadow root, so what is on the video can only be seen
-  // (APP-139). The post-run shots below seek deliberately; these do not.
+  // The post-run shots below seek deliberately; these do not.
   const liveShots = new Set();
   for (;;) {
     const state = await control.evaluate(() => chrome.runtime.sendMessage({ kind: "state" }));
@@ -567,7 +566,7 @@ try {
       lastChange = Date.now();
       // The wait a user sits through after pressing Start a second time: the
       // model is already loaded, so what is being waited for is a window of
-      // audio to record (APP-148).
+      // audio to record.
       if (afterRestart && afterRestart.first === null && state.count > 0) {
         afterRestart.first = (Date.now() - afterRestart.at) / 1000;
         console.log(`${at()}  first subtitle after the second Start, ${afterRestart.first.toFixed(1)}s later`);
@@ -614,7 +613,7 @@ try {
       // What a user does next: reach for Save .srt. The popup enables that
       // button from the count the background reports, and saves what the
       // "cues" message hands back -- so both are asked, as the popup asks
-      // them (APP-146).
+      // them.
       afterStop = await control.evaluate((id) => Promise.all([
         chrome.runtime.sendMessage({ kind: "state", tabId: id }),
         chrome.runtime.sendMessage({ kind: "cues", tabId: id }),
@@ -634,7 +633,7 @@ try {
       // Where the first session got to. Lines for audio past that point can
       // only come from windows recorded after the restart -- what the second
       // Start is supposed to do. Lines before it are the first session's
-      // queued windows finishing, which arrive either way (APP-145 reported
+      // queued windows finishing, which arrive either way (the report said
       // them as "5 residual lines").
       afterRestart = { at: Date.now(), through: stoppedAt, first: null, count: state.count };
       console.log(`${at()}  the video was at ${stoppedAt.toFixed(1)}s when Stop was pressed`);
@@ -647,7 +646,7 @@ try {
     for (const h of heard) {
       if (h.stage === "error") { console.log(`${at()}  [error, broadcast] ${h.note}`); continue; }
       // Every change of status, with the time: what the user is told, and
-      // when. APP-143 is entirely about this timeline.
+      // when. The report is entirely about this timeline.
       const shown = h.fraction === null || h.fraction === undefined
         ? h.note
         : `${h.note} ${Math.floor(h.fraction * 10) * 10}%`;
@@ -746,7 +745,7 @@ try {
   const flashes = cues.filter((c, i) => c.end - c.start < 0.5 && (text[i] ?? "").trim().split(/\s+/).length >= 3).length;
   // Adjacent lines that repeat each other: the end of one written again as
   // the start of the next, which is what a window seam produces when the two
-  // readings of the overlap are not settled into one (APP-154).
+  // readings of the overlap are not settled into one.
   const bare_ = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, "").split(/\s+/).filter(Boolean);
   const repeats = [];
   for (let i = 1; i < text.length; i += 1) {

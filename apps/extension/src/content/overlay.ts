@@ -85,7 +85,7 @@ function paint() {
   const shown = liveLine(cues, media.currentTime, Date.now(), catchup);
   // Transcribing a live video always trails it, so the line for this exact
   // moment is usually not made yet. Show the newest one instead, and say how
-  // far back it is, rather than showing nothing at all (APP-139).
+  // far back it is, rather than showing nothing at all.
   const text = shown ? cues[shown.index].text : "";
   if (shown) catchup = { index: shown.index, until: shown.until };
   if (line.textContent !== text) line.textContent = text;
@@ -117,7 +117,7 @@ const SWITCH_WAIT_MS = 8000;
  * was not, so a second Start in the same page sent take 2 to a background
  * expecting take 1, and every window was dropped as belonging to a video the
  * page had moved on from: Stop, Start, and nothing more was ever
- * transcribed until the page was reloaded (APP-145).
+ * transcribed until the page was reloaded.
  */
 let take = 0;
 /**
@@ -129,7 +129,7 @@ let take = 0;
  * old loop went on to stop the new session's audio track and set its stream
  * to null, or to adopt the video itself. What the user saw was Stop, Start,
  * and then "Listening" for ever with no subtitles until the page was
- * reloaded (APP-145). Every step of the loop now checks that its session is
+ * reloaded. Every step of the loop now checks that its session is
  * still the current one before it touches anything shared.
  */
 let session = 0;
@@ -140,7 +140,7 @@ let session = 0;
  * TED's pre-roll is served from Google's ad domain with no CORS, so its audio
  * cannot be read, and Start pressed during it ended the session with "This
  * site does not let other pages read its video's audio" -- about a film the
- * page had not started yet (APP-133). An ad has seconds left; the film that
+ * page had not started yet. An ad has seconds left; the film that
  * cannot be read -- a Wikimedia Commons file -- has minutes, and still gets
  * the error at once.
  */
@@ -207,7 +207,7 @@ async function adopt(found: { el: HTMLMediaElement; stream: MediaStream }, annou
 /**
  * Find the video, open its audio, and answer -- then record, without making
  * the answer wait for it. The answer is the reply to "begin" itself, so
- * nothing the background says afterwards can overwrite it (APP-133).
+ * nothing the background says afterwards can overwrite it.
  */
 async function begin(next: Settings): Promise<BeginAnswer> {
   settings = next;
@@ -247,7 +247,7 @@ async function begin(next: Settings): Promise<BeginAnswer> {
 }
 
 /**
- * Which video this is, as well as the page can tell (APP-153).
+ * Which video this is, as well as the page can tell.
  *
  * Its length, to the second, and its source. A player swapping to the next
  * film changes both; changing quality on the same film changes the source
@@ -264,7 +264,7 @@ function fingerprint(el: HTMLMediaElement): string {
 /**
  * Record whatever is playing, for as long as the session runs.
  *
- * Starting on an ad was the third case in APP-133: the largest playing video
+ * Starting on an ad was the third case reported: the largest playing video
  * at Start was a fifteen-second pre-roll, and when it ended the extension
  * went on saying "Listening" over a film it was not reading. So when the
  * video being read ends or is replaced, this looks for what is playing now
@@ -293,7 +293,7 @@ async function record() {
         const reply = (await tell<FromPage>({ kind: "window", audio, mime: w.blob.type, offset: w.offset, take: mine })) as
           | { lost?: boolean }
           | undefined;
-        // The background lost this session (APP-121: suspended by the
+        // The background lost this session (suspended by the
         // browser). It has said so; recording on would only send audio
         // nowhere.
         if (reply?.lost) halt();
@@ -350,7 +350,7 @@ function halt() {
 // on it survives between injections. Without the flag a second Start leaves
 // two copies listening: both receive "begin", both record, every window goes
 // to the engine twice, and the engine's one-deep queue drops half of them --
-// which looks exactly like transcription failing to keep up (APP-110).
+// which looks exactly like transcription failing to keep up.
 const INSTALLED = "__opensubsOverlay";
 const world = globalThis as unknown as Record<string, boolean>;
 if (!world[INSTALLED]) {
@@ -399,7 +399,7 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
 // A page that navigates away (an SPA route change, a next episode) leaves a
 // recorder pointed at a detached element. Stop rather than record silence --
 // and say that the page is going, so the subtitles kept for it after a Stop
-// go with it instead of being offered for the next page (APP-146).
+// go with it instead of being offered for the next page.
 window.addEventListener("pagehide", () => {
   halt();
   void tell<FromPage>({ kind: "gone" });

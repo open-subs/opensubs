@@ -4,9 +4,9 @@
  * Its own module, as ./remote is, so that it can be tested without the engine
  * or the demuxer that asr.ts pulls in. What it reads, in which order, what it
  * tells the screen while it does, and which reads it can skip are all decided
- * here, and none of it needs a model to check (APP-112).
+ * here, and none of it needs a model to check.
  *
- * APP-112, in one line: this ran after the progress bar had reached
+ * In one line: this ran after the progress bar had reached
  * "Listening to the audio · 100%", reported nothing, and took 76 to 233
  * seconds of a two-minute clip -- a finished-looking screen that was still
  * working, and part of that work was reading the same empty span again.
@@ -161,7 +161,7 @@ async function fillRound(
   // countable. It used to be invisible: this ran after the progress bar said
   // "Listening to the audio · 100%" and reported nothing, for 76 to 233
   // seconds on a two-minute clip, which is a finished-looking screen that is
-  // still working (APP-112).
+  // still working.
   const todo: { from: number; to: number; language: string; key: string }[] = [];
   let skipped = 0;
   for (const run of runs) {
@@ -244,7 +244,7 @@ async function fillRound(
   if (todo.length || skipped) {
     if (todo.length) onProgress?.({ stage: "transcribing", fraction: 1, note });
     // One line per pass, at debug level so it is out of the way unless asked
-    // for. APP-112 was diagnosed by reading this code and timing the screen;
+    // for. It was diagnosed by reading this code and timing the screen;
     // the next report about this pass should be able to start from a log.
     console.debug(
       `opensubs: missed-line pass ${round + 1}: ${todo.length} span(s) read, ` +

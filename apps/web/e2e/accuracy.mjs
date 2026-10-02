@@ -1,6 +1,6 @@
 // How accurate is the recogniser, in a number somebody can check.
 //
-// APP-34 asks for a comparison against BurnSub. A comparison needs both
+// The request was for a comparison against BurnSub. A comparison needs both
 // sides measured the same way, and until this existed neither side was
 // measured at all — the product page said "accurate" and the llms.txt draft
 // carried figures nobody could point at a run for.

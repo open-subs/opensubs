@@ -1,6 +1,6 @@
 // Does the voice detector agree with reality on real clips?
 //
-// APP-54. The rule this replaces looked decisive on one file and was
+// The rule this replaces looked decisive on one file and was
 // wrong on two others, so this suite is built the other way round: most
 // of it is clips that must NOT be flagged.
 //

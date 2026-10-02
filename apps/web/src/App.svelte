@@ -165,7 +165,7 @@
    */
   let restored = $state<SavedWork | null>(null);
   /**
-   * Which video the subtitles on screen were made for (APP-72).
+   * Which video the subtitles on screen were made for.
    *
    * `null` when they belong to no video -- an .srt opened before any video
    * was loaded, which is a real way people use this and must not be
@@ -258,7 +258,7 @@
   let originalScale = $state(0.8);
   let translateError = $state<string | null>(null);
   /**
-   * Some lines came back untranslated (APP-141). Not an error: everything
+   * Some lines came back untranslated. Not an error: everything
    * else was translated and is on screen, so this sits beside the result and
    * says what to do about the rest.
    */
@@ -270,7 +270,7 @@
    * Where the local model runs, when this machine offers a choice.
    *
    * "gpu" follows the machine: WebGPU where there is one. "cpu" is the
-   * user's override (APP-111) -- measured faster than WebGPU on an Intel
+   * user's override -- measured faster than WebGPU on an Intel
    * integrated GPU, and the way out on a machine where WebGPU is present
    * and misbehaves. Only offered where WebGPU exists; without it the CPU
    * is the only way this runs and there is nothing to choose.
@@ -288,7 +288,7 @@
   );
 
   /**
-   * Said before the button, not after the upload (APP-70, APP-71).
+   * Said before the button, not after the upload.
    *
    * Both of these were previously found out by the service: the user
    * pressed Generate, waited through a decode that on a fourteen-minute
@@ -338,7 +338,7 @@
    * CPU switch as well as the machine, and never over a model the user picked
    * for themselves.
    */
-  // APP-32. Small on WebGPU, Base without it.
+  // Small on WebGPU, Base without it.
   //
   // Small is plainly the better recogniser on Chinese: on the reported
   // clip it fixed 抵押区 -> 低压区 and 广网 -> 往往, and 27 differences
@@ -354,7 +354,7 @@
   // So the machines that can afford Small get it, and the ones that
   // cannot are not asked to.
   //
-  // APP-111 refined "can afford". On an Intel Iris Xe, WebGPU is present and
+  // What "can afford" means, refined. On an Intel Iris Xe, WebGPU is present and
   // Small was the slowest thing the machine could be asked to do: 517 s for a
   // 114 s clip, against 250 s for Base on the same GPU and 186 s for Base on
   // the CPU. An integrated Intel GPU now gets Base; discrete cards and Apple
@@ -832,7 +832,7 @@
 
     void asrSupport().then((s) => {
       asr = s;
-      // Firefox, with an adapter that says nothing (APP-121): start on the
+      // Firefox, with an adapter that says nothing: start on the
       // CPU, which then settles the model on Base. The switch stays.
       if (s.cpuFirst) asrBackend = "cpu";
       settleDefaultModel();
@@ -949,7 +949,7 @@
     clearBurned();
 
     // Before videoName is overwritten, and only when the subtitles on
-    // screen were actually made for a different video (APP-72). Exporting
+    // screen were actually made for a different video. Exporting
     // them against this one would produce a file whose timings belong to
     // footage that is no longer here.
     staleCues =
@@ -1406,12 +1406,12 @@
       // same Rust the CLI runs.
       const { transcript, audio, audioOffset } = result;
 
-      // APP-54. A clip with nobody speaking in it comes back with a full
+      // A clip with nobody speaking in it comes back with a full
       // set of confident subtitles, because the decoder always writes
       // something. Saying so is the whole fix -- an empty subtitle list
       // with no explanation reads as a failure of the app, and a page of
       // invented English over a cooking video reads as a working one.
-      // APP-54. Nobody spoke, so there is nothing to transcribe, and
+      // Nobody spoke, so there is nothing to transcribe, and
       // Whisper would have written a confident page of English anyway.
       //
       // An offer rather than a refusal: singing is not speech to the
@@ -1889,7 +1889,7 @@
           <label class="field field-wide">
             <span class="field-label">{t("Model")}</span>
             <!--
-              A datalist, not a <select> (APP-71). The column beside this one
+              A datalist, not a <select>. The column beside this one
               says the route works with "any server of your own", and a closed
               list would make that untrue for every self-hosted endpoint. This
               suggests the four models known to return timings while leaving
@@ -1921,7 +1921,7 @@
             ? t("Whisper runs here, on your machine, on the GPU. The audio is never uploaded; only the model is downloaded, once.")
             : t("Whisper runs here, on your machine. The audio is never uploaded; only the model is downloaded, once.")}
           {#if asr?.integrated}
-            <!-- APP-111 measured this hardware: say what it is and what it costs,
+            <!-- This hardware was measured: say what it is and what it costs,
                  rather than only quietly choosing the smaller model. -->
             {t(
               "This machine has built-in graphics ({gpu}), which are slow for this work: on one of them a two-minute video took about four minutes with Base and about nine with Small. Base is chosen here for that reason. For anything faster, use your own API key above, which runs a bigger model elsewhere.",
@@ -2069,7 +2069,7 @@
 
 {#snippet noSpeechNotice()}
   <!--
-    APP-54. The detector found no voice in the clip. Whisper would have
+    The detector found no voice in the clip. Whisper would have
     written a page of confident English over it, which is the fault this
     replaces -- but singing is not speech to the detector either, so this
     asks rather than refuses.

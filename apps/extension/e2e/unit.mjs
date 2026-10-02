@@ -28,7 +28,7 @@ ok(
 // --- stitch --------------------------------------------------------------
 
 {
-  // The APP-51/52 shape, at a window seam: window N ends mid-sentence and
+  // That shape, at a window seam: window N ends mid-sentence and
   // window N+1 says the whole thing.
   const kept = [
     { start: 10, end: 12, text: "First we should mention that the" },
@@ -107,7 +107,7 @@ ok(
   ok("past an hour the clock still reads correctly", srt.includes("01:02:05,001"), srt.split("\n")[1]);
 }
 
-// --- a seam where the tail of one line is the head of the next (APP-110) --
+// --- a seam where the tail of one line is the head of the next --
 //
 // The three seams below are verbatim from a two-minute lecture captured
 // through the installed extension, once the windows genuinely overlapped.
@@ -205,7 +205,7 @@ for (const [name, kept, incoming, keptWant] of [
   eq("a line wholly repeated by the next is not kept", out.map((c) => c.text), ["Hello.", "A young tailor named Jacob Davis notices"]);
 }
 
-// --- audio on the wire (APP-109) -----------------------------------------
+// --- audio on the wire -----------------------------------------
 //
 // protocol.ts reaches for the `chrome` global as it loads, which Node does
 // not have. Nothing here calls it; it only has to exist.
@@ -258,7 +258,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
 
 // -------------------------------------------------------------------------
 
-// --- keeping pace (APP-110, APP-121) --------------------------------------
+// --- keeping pace --------------------------------------
 {
   const { startsOnCpu, enqueue, maxWaiting, behindNote } = await import("../src/lib/pace.ts");
 
@@ -285,7 +285,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("unless it is already the one in use", !/Tiny model/.test(behindNote(3, "onnx-community/whisper-tiny")));
 }
 
-// --- whose frame is it (APP-133, retest) ----------------------------------
+// --- whose frame is it (retest) ----------------------------------
 {
   const { siteOf, MIN_WINDOW_MS } = await import("../src/lib/capture.ts");
   ok("Dailymotion's player frame is Dailymotion's own site", siteOf("geo.dailymotion.com") === siteOf("www.dailymotion.com"));
@@ -293,7 +293,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("a window under a second is not sent (the ad's last instant)", MIN_WINDOW_MS === 1000);
 }
 
-// --- what goes on the video while transcription trails it (APP-139) ------
+// --- what goes on the video while transcription trails it ------
 {
   const { liveLine, BEHIND_S } = await import("../src/lib/pace.ts");
   // Lines for the first 40 seconds, while the video plays on past them --
@@ -337,7 +337,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("the threshold between the two is five seconds", BEHIND_S === 5);
 }
 
-// --- which model "Automatic" reads with (APP-142) -------------------------
+// --- which model "Automatic" reads with -------------------------
 {
   const { pickModel, AUTO_FAST, AUTO_GOOD, AUTO_BEHIND } = await import("../src/lib/pace.ts");
   ok("on the GPU, Automatic reads with Base", pickModel("auto", "webgpu", false) === AUTO_GOOD);
@@ -350,7 +350,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("two windows waiting is the point of giving up on Base", AUTO_BEHIND === 2);
 }
 
-// --- adjacent lines must not repeat each other (APP-154) -----------------
+// --- adjacent lines must not repeat each other -----------------
 //
 // Reported on rc.14 and rc.15, from three machines and three videos. Every
 // sample below is verbatim from the report.
@@ -456,7 +456,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("the same short line half a minute later is a new line", out.length === 2, joined(out));
 }
 
-// --- the subtitle sizes (APP-147) ----------------------------------------
+// --- the subtitle sizes ----------------------------------------
 {
   const { SIZES, DEFAULT_SIZE, nearestSize } = await import("../src/lib/pace.ts");
   const { DEFAULT_SETTINGS } = await import("../src/lib/protocol.ts");
@@ -475,7 +475,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("nonsense falls back to the default", nearestSize(0) === DEFAULT_SIZE && nearestSize(NaN) === DEFAULT_SIZE);
 }
 
-// --- the first window is short (APP-148) ---------------------------------
+// --- the first window is short ---------------------------------
 {
   const { FIRST_WINDOW_S } = await import("../src/lib/pace.ts");
   const { MIN_WINDOW_BYTES, MIN_WINDOW_MS } = await import("../src/lib/capture.ts");

@@ -204,7 +204,7 @@ export interface AsrResult {
    *
    * Reported rather than silently applied: the caller shows the reader
    * why there are no subtitles, which is a far better answer than a
-   * confident page of English over a cooking video (APP-54), and a far
+   * confident page of English over a cooking video, and a far
    * better one than an empty screen with no explanation.
    */
   noSpeech?: boolean;
@@ -251,7 +251,7 @@ export interface AsrOptions {
   /**
    * Run on the CPU even where WebGPU is available.
    *
-   * The user's to choose (APP-111): on an integrated Intel GPU the CPU was
+   * The user's to choose: on an integrated Intel GPU the CPU was
    * measured faster, and on some machines WebGPU is present and misbehaves.
    * "webgpu" cannot be forced -- where the browser has none, there is only
    * the CPU -- so anything but "wasm" means "whatever this machine has".
@@ -263,7 +263,7 @@ export interface AsrOptions {
    * For a caller whose thread must stay responsive while the model works:
    * the extension on Firefox runs Whisper in its background page, and
    * single-threaded inference there blocked the page long enough for Firefox
-   * to suspend it as idle, session and all (APP-121). The web page does not
+   * to suspend it as idle, session and all. The web page does not
    * set it. It is ONNX Runtime's own proxy, and only for its WASM backend,
    * and it takes effect for the first CPU model loaded on this page.
    */
@@ -277,7 +277,7 @@ export interface AsrSupport {
   reason?: string;
   /**
    * An Intel GPU built into the processor. On one of these WebGPU was
-   * measured slower than the CPU for this work (APP-111), so the default
+   * measured slower than the CPU for this work, so the default
    * model is chosen differently; see ./device.
    */
   integrated?: boolean;
@@ -285,7 +285,7 @@ export interface AsrSupport {
   gpu?: string;
   /**
    * WebGPU is there, but start on the CPU: Firefox, whose adapter says
-   * nothing about itself (APP-121). See ./device startsOnCpu.
+   * nothing about itself. See ./device startsOnCpu.
    */
   cpuFirst?: boolean;
 }
@@ -521,7 +521,7 @@ export async function transcribeRemotely(
   const model = options.remoteModel || "whisper-1";
 
   // Both checks happen before `extractAudio`, and that is the point of
-  // them (APP-70). Decoding a fourteen-minute video takes over a minute,
+  // them. Decoding a fourteen-minute video takes over a minute,
   // and both of these failures were previously discovered by the service
   // after that minute had been spent -- so the user waited, and then got
   // a truncated JSON body for their trouble.
@@ -676,7 +676,7 @@ function wavFrom(samples: Float32Array, sampleRate = TARGET_SAMPLE_RATE): ArrayB
 }
 
 /**
- * Gemini's native route (APP-74): the clip in pieces, each cut where the
+ * Gemini's native route: the clip in pieces, each cut where the
  * audio is quietest near the thirty-second mark, each answered with JSON
  * segments that are shifted back into clip time. Two pieces in flight at
  * a time -- enough to hide the round trip, few enough to stay clear of
@@ -1091,7 +1091,7 @@ function quietestNear(audio: Float32Array, centre: number, radius: number): numb
  * Split out so a caller can start the download before it has any audio.
  * The extension presses Start and records for twenty seconds before the
  * first window exists; until this, nothing was fetched in that time and the
- * first subtitle was a whole window later than it needed to be (APP-143).
+ * first subtitle was a whole window later than it needed to be.
  * The promise is the same one `transcribeLocally` waits on, so calling both
  * loads once.
  */

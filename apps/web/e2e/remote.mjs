@@ -3,7 +3,7 @@
 // Every error body below is the one quoted in the report, verbatim. That
 // matters more than usual here: the bug was not that the app failed, it
 // was that it showed the service's raw JSON, truncated mid-key, to
-// somebody who cannot be expected to read it (APP-70). A test written
+// somebody who cannot be expected to read it. A test written
 // against a tidy invented payload would pass while the real one still
 // produced a wall of braces.
 //
@@ -65,7 +65,7 @@ const BODY_413 = JSON.stringify({
   },
 });
 
-// --- APP-71: which models can produce subtitles at all ------------------
+// --- which models can produce subtitles at all ------------------
 
 test("the three reported models are known to have no timings", () => {
   for (const model of ["gpt-4o-transcribe", "gpt-4o-mini-transcribe", "gpt-transcribe"]) {
@@ -94,7 +94,7 @@ test("a model nobody has heard of is not condemned", () => {
   }
 });
 
-// --- APP-70: the length guard -------------------------------------------
+// --- the length guard -------------------------------------------
 
 test("the length limit matches the bytes the service actually counted", () => {
   // 26,214,400 bytes at 16 kHz mono 16-bit. The report's own numbers.
@@ -117,7 +117,7 @@ test("the limit is only claimed for the service known to enforce it", () => {
   assert.equal(hasKnownUploadLimit("not a url"), false);
 });
 
-// --- APP-70: what the user is shown -------------------------------------
+// --- what the user is shown -------------------------------------
 
 const raw = (e) => e.message;
 
@@ -177,7 +177,7 @@ test("a missing model is told apart from a model that cannot do timings", () => 
 });
 
 
-// APP-74: Gemini through its native API, since the OpenAI-compatible
+// Gemini through its native API, since the OpenAI-compatible
 // layer has no transcription endpoint (measured: 404).
 test("a gemini model is routed natively, whisper models are not", () => {
   assert.equal(isGemini("gemini-2.5-flash"), true);

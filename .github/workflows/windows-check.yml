@@ -1,10 +1,10 @@
 name: windows check
 
-# The desktop app and the CLI share one pipeline, and until APP-119 it had
+# The desktop app and the CLI share one pipeline, and until then it had
 # never run on Windows: every absolute path there starts `C:\`, which
 # ffmpeg's filter syntax reads as an option separator and escapes. This runs
 # the real thing on a real Windows machine for every release candidate --
-# the ffmpeg the app itself offers to install (APP-120), a model where the
+# the ffmpeg the app itself offers to install, a model where the
 # app downloads models to, and a two-minute English burn with an SRT.
 #
 # It does not gate the release; it is evidence. Read its log before calling
@@ -71,7 +71,7 @@ jobs:
           & $env:FFMPEG -hide_banner -v error -stream_loop 10 -i "$env:RUNNER_TEMP\jfk.wav" -f lavfi -i "color=c=0x1e2836:s=1280x720:r=30" -map 1:v -map 0:a -t 120 -c:v libx264 -preset ultrafast -c:a aac "$env:RUNNER_TEMP\en.mp4"
           Get-Item "$env:RUNNER_TEMP\en.mp4"
 
-      # APP-119 as reported: the whisper filter with the paths unescaped,
+      # As reported: the whisper filter with the paths unescaped,
       # the way the app built it before. This must fail.
       - name: Before -- the unescaped filter the app used to build
         run: |
@@ -81,8 +81,8 @@ jobs:
           $out = & $env:FFMPEG -v error -i "$env:RUNNER_TEMP\en.mp4" -af "whisper=model=${model}:language=en:format=json:destination=${dest}:queue=3" -t 5 -f null - 2>&1
           $code = $LASTEXITCODE
           $out | Select-Object -First 3
-          if ($code -eq 0) { throw "the unescaped filter worked -- this check is not reproducing APP-119" }
-          if (-not ($out -match "No option name near")) { throw "failed, but not the way APP-119 reported" }
+          if ($code -eq 0) { throw "the unescaped filter worked -- this check is not the defect" }
+          if (-not ($out -match "No option name near")) { throw "failed, but not the way the report said" }
           "FAILED AS REPORTED (exit $code)"
           # The runner fails a step on a nonzero exit code; this one was expected.
           $global:LASTEXITCODE = 0
@@ -92,7 +92,7 @@ jobs:
 
       # The real burn, with every ffmpeg taken off PATH so the app has to
       # find the one it installed the way it would on a user's machine,
-      # where PATH was fixed before the install (APP-120).
+      # where PATH was fixed before the install.
       - name: After -- burn two minutes of English, with an SRT
         run: |
           $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'ffmpeg.exe')) }) -join ';'
@@ -107,7 +107,7 @@ jobs:
           Get-Content "$env:RUNNER_TEMP\en.srt" -TotalCount 12
           if ($cues -lt 10) { throw "only $cues cues for two minutes of speech" }
 
-      # APP-120, retested: on an account without administrator rights winget
+      # Retested: on an account without administrator rights winget
       # makes no Links shortcut. It unpacks into Packages and puts that on the
       # user's PATH in the registry -- neither of which the running app had.
       # This runner is an administrator, so the shape is made by hand: take

@@ -108,11 +108,11 @@ fn gap_between(a: &[&Word], b: &[&Word]) -> f64 {
 ///
 /// Three ways to put a brief group back, tried in this order:
 ///
-/// 1. **Into the group before it** (APP-73). A fragment is most often the
+/// 1. **Into the group before it**. A fragment is most often the
 ///    tail of the phrase it follows, and the group before it is the one
 ///    that tends to have room: the twelve cases in the report all had a
 ///    one-line cue ahead of the fragment and a full two-line cue after it.
-/// 2. **Into the group after it** (APP-52), when the one before is full or
+/// 2. **Into the group after it**, when the one before is full or
 ///    absent.
 /// 3. **Re-cut three groups as two**, when both neighbours are full. The
 ///    words of all three are pooled and split once, at the word boundary
@@ -342,7 +342,7 @@ pub fn segment(t: &Transcript, fps: Rational, cfg: &SegmentConfig) -> Vec<Cue> {
 
     // Second pass: put back together the groups that would flicker.
     //
-    // APP-52. `must_break` closes a group as soon as the text would run
+    // `must_break` closes a group as soon as the text would run
     // past `max_cps`, which is right on its own terms and wrong in its
     // consequences on a fast speaker. A dense passage becomes a run of
     // two-word groups; each cue is then pulled back by `enforce_gaps` to
@@ -553,7 +553,7 @@ mod tests {
         }
     }
 
-    /// APP-52. thea's clip, cues 22-28: a fast passage that `must_break`
+    /// A real clip, cues 22-28: a fast passage that `must_break`
     /// cut into two-word groups, each then clipped by the next one's
     /// start to about half a second.
     #[test]
@@ -623,7 +623,7 @@ mod tests {
         assert!(cues[0].lines.join(" ").contains("Yes."));
     }
 
-    /// APP-73. The reported shape, twelve times over: a one-line cue, a
+    /// The reported shape, twelve times over: a one-line cue, a
     /// brief fragment, then a cue already two lines full. Backward merge
     /// is blocked by capacity; the fragment belongs to the line before it.
     #[test]
@@ -633,7 +633,7 @@ mod tests {
         // before the long words (30 chars in 1.55 s). That leaves "this, of
         // course." as a group of its own, shown for 0.85 s until the next
         // group starts -- the fragment. The long words behind it fill two
-        // lines, so the APP-52 merge into the next group is blocked by
+        // lines, so the merge into the next group is blocked by
         // capacity; only the group before has room.
         let mut specs: Vec<(f64, f64, String)> = vec![
             (0.0, 0.35, "We".into()),
@@ -674,7 +674,7 @@ mod tests {
         }
     }
 
-    /// APP-73, the case that neither merge can fix: full on both sides.
+    /// The case that neither merge can fix: full on both sides.
     /// Both neighbours sit at 83 of the 84-character capacity, so the
     /// fragment fits into neither. The three are cut again so that no cue
     /// is brief, and nothing is lost.

@@ -3,11 +3,11 @@
   A readable view of sitemap.xml.
 
   Not decoration. Since the sitemap started carrying hreflang alternates
-  (APP-49's translated pages), Chromium stops applying its built-in XML
+  (the translated pages), Chromium stops applying its built-in XML
   pretty-printer to it: the document contains elements in the XHTML
   namespace, so Blink treats it as renderable markup and lays the text out
   instead. The result is every URL, date and priority run together in one
-  paragraph — which is what APP-69 reported.
+  paragraph — which is what the report said.
 
   The file itself was always valid, and Bing accepted it. What was missing
   was any instruction for how to *display* it, so the browser fell back on

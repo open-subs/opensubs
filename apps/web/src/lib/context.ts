@@ -109,7 +109,7 @@ const MIN_REACH = 4;
  * How much farther a full stop may be than the nearest comma and still
  * be preferred to it, in characters.
  *
- * APP-53, fourth round. A full stop used to win outright whenever one was
+ * Fourth round. A full stop used to win outright whenever one was
  * within reach, however close the comma. The measured case:
  *
  *     …发生变化。它是适应性的，| 就像塑料和…   the split lands on the comma
@@ -152,7 +152,7 @@ export function joinGroup(parts: string[]): string {
 /**
  * The pieces a translation may be broken into.
  *
- * APP-53. This used to be "words if the translation has any, characters
+ * This used to be "words if the translation has any, characters
  * otherwise", which reads sensibly and is wrong for exactly the case it
  * was written for. A Chinese translation of two sentences comes back as
  *
@@ -230,7 +230,7 @@ export function spread(translated: string, sources: string[]): string[] {
     // ...but never at the cost of this one. The reservation above can go
     // to zero -- or negative -- when there are fewer units than cues, and
     // then the loop below runs zero times and *this* cue is the one left
-    // blank. That is APP-53's visible half: the first cue of a group kept
+    // blank. That is the visible half: the first cue of a group kept
     // its untranslated source while the whole translation landed on the
     // second. A cue that gets nothing has to be a later one, never an
     // earlier one, because the reader meets it first.
@@ -252,7 +252,7 @@ export function spread(translated: string, sources: string[]): string[] {
     // is a much better place to end a subtitle, and moving to it costs at
     // most a few characters of drift against the audio.
     //
-    // APP-53, second round. This searched *backwards* only, and every
+    // This searched *backwards* only, and every
     // case that got through had its punctuation a few characters ahead:
     //
     //     …大脑并没 | 有改变，…      the comma is three characters on
@@ -268,7 +268,7 @@ export function spread(translated: string, sources: string[]): string[] {
     // what a move costs is the drift between the words on screen and the
     // words being spoken -- and that is measured in text, not in units.
     //
-    // APP-53, third round. This was a count of *units* against a budget
+    // Third round. This was a count of *units* against a budget
     // measured in *characters*. For Chinese the two are the same thing, so
     // every reported case behaved; for a language with spaces a unit is a
     // whole word, and a 50-character piece bought a reach of twelve words.

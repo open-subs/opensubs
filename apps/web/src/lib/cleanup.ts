@@ -311,7 +311,7 @@ export function isSignOff(text: string): boolean {
 /**
  * The vocabulary a subtitle annotation is built from.
  *
- * APP-51. The first version of this rule only recognised an annotation
+ * The first version of this rule only recognised an annotation
  * that was a whole line and properly closed -- "[Music]", "(applause)".
  * Whisper does not oblige. On a fresh English clip it produced twelve of
  * these in five seconds after the narration ended:
@@ -368,7 +368,7 @@ export function isNonSpeech(text: string): boolean {
 
   // Most, not all.
   //
-  // APP-51, second round. Requiring *every* word to be in the vocabulary
+  // Requiring *every* word to be in the vocabulary
   // meant one truncation vetoed the whole line, and the model truncates
   // constantly: the reported segment was
   //
@@ -499,7 +499,7 @@ function overlap(a: string, b: string): number {
  * A span of audio that could not hold the words attributed to it, where
  * those words are already said properly next door.
  *
- * APP-52, second round. The six unreadable cues were not a timing defect
+ * The six unreadable cues were not a timing defect
  * on their own -- they were one segment the engine had cut up, and that
  * segment said in one second what the segment after it says in five and a
  * half:
@@ -582,7 +582,7 @@ export function cleanUp(segments: Spoken[], options: CleanUpOptions): CleanUpRes
   // The debris comes off before anything else, because a line can be a
   // real sentence with a loop stuck to the end of it, and because the
   // runs below are runs of what the text *is* once that is gone.
-  // APP-31. The echo trim runs first: a line that ends by repeating
+  // The echo trim runs first: a line that ends by repeating
   // itself is shorter afterwards, and every rule below judges the line
   // it is given. Running it after would have them weigh the copy.
   const texts = segments.map((s) => trimInlineEcho(trimTail(s.text)));
@@ -605,7 +605,7 @@ export function cleanUp(segments: Spoken[], options: CleanUpOptions): CleanUpRes
     texts[i - 1] = trimDebrisTail(texts[i - 1]);
   }
 
-  // APP-51. An annotation block is contiguous: the outro arrives as a run
+  // An annotation block is contiguous: the outro arrives as a run
   // of them, and a fragment sitting inside that run belongs to it even
   // when its own words are not in the vocabulary. The run is grown from
   // the lines that *are* certain, outwards, over neighbours that are short
@@ -711,7 +711,7 @@ export function cleanUp(segments: Spoken[], options: CleanUpOptions): CleanUpRes
  * Give every cue long enough on screen to be read, by joining the ones
  * that are not rather than dropping them.
  *
- * APP-52. This is not a hallucination and none of the rules above touch
+ * This is not a hallucination and none of the rules above touch
  * it: the words are right, the timing is not. Measured on an English
  * clip, one second holding six cues:
  *
@@ -782,7 +782,7 @@ function median(values: number[]): number {
 /**
  * Cut a phrase the line has already said, when the line ends on it.
  *
- * APP-31. On a Japanese lesson video, 2:11 came back as
+ * On a Japanese lesson video, 2:11 came back as
  *
  *     どうでしたかすみませんはいろいろなときによく使いますどうでしたか?
  *     └── どうでしたか ──┘                              └── どうでしたか ──┘

@@ -7,7 +7,7 @@
 //! OpenSubs needs two filters from ffmpeg: `whisper`, which transcribes, and
 //! `ass` (libass), which burns. The install is per platform, because the
 //! only thing that used to be offered was Homebrew -- a macOS package
-//! manager, shown to Windows users as the one way forward (APP-120).
+//! manager, shown to Windows users as the one way forward.
 
 use std::io::BufRead;
 use std::path::{Path, PathBuf};

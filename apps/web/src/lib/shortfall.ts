@@ -14,7 +14,7 @@ export type Batch = (texts: string[]) => Promise<string[]>;
  *
  * A model asked for nineteen lines sometimes answers with eighteen, and it
  * is not reproducible: the same file, model and settings succeeded twice and
- * failed once (APP-141). Throwing away the whole batch cost the user the
+ * failed once. Throwing away the whole batch cost the user the
  * call they had paid for and left every subtitle untranslated, with only
  * "The model returned 18 lines for 19 subtitles." to go on.
  *

@@ -121,7 +121,7 @@ def save_renamed(font: TTFont, stem: str, family: str, out: Path) -> None:
 # of the 2,965 JIS level-1 kanji and 1,176 of Big5's 5,401 common
 # characters -- 択 in 選択, 労 in 労働, 閘 in 閘門. Japanese and Traditional
 # subtitles burned in with empty rectangles, and the warning told people to
-# delete words their language cannot do without (APP-84).
+# delete words their language cannot do without.
 #
 # Adding more of Noto Sans SC does not fix it: all 102 of its slices
 # together still miss 52 JIS level-1 and 308 Big5 common characters, because
@@ -213,9 +213,9 @@ CJK_REQUIRED = [
     ("JIS X 0208 level 1", JIS_LEVEL1, ""),
     ("Big5 common", BIG5_COMMON, "姅杗歜穋觼詨跦鑤"),
     ("GB2312 level 1", GB2312_LEVEL1, ""),
-    # Every character that burned in empty in the APP-84 reporter's own
+    # Every character that burned in empty in the reported
     # Japanese, Traditional and Simplified subtitle files.
-    ("APP-84 subtitles", {ord(c) for c in "麺択拡釈虜労懐峠枠閘瞞掙撿繳矚犧綻濺凈詭癥絹"}, ""),
+    ("reported subtitles", {ord(c) for c in "麺択拡釈虜労懐峠枠閘瞞掙撿繳矚犧綻濺凈詭癥絹"}, ""),
 ]
 
 

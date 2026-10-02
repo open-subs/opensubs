@@ -114,7 +114,7 @@ html {
 }
 
 /* A mismatch, not a failure: the subtitles are intact and correct, they
-   are simply about a video that is no longer loaded (APP-72). */
+   are simply about a video that is no longer loaded. */
 .banner-warning {
   background: var(--warning-bg);
   color: var(--warning-fg);

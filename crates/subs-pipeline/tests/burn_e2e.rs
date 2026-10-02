@@ -955,7 +955,7 @@ fn a_trimmed_burn_is_a_zero_based_clip_with_its_subtitles_on_it() {
     }
 }
 
-/// APP-119: a burn from a working directory with a Windows path in it.
+/// A burn from a working directory with a Windows path in it.
 ///
 /// On Windows every absolute path starts `C:\`, and the `ass=` filter read
 /// the drive colon as the end of its option and the backslashes as escapes,

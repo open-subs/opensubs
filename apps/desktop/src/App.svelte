@@ -358,7 +358,7 @@
         // The install itself worked; this app cannot see it. On Windows,
         // winget without administrator rights writes the new folder to the
         // user's PATH in the registry, and a program keeps the PATH it
-        // started with -- so a restart is the honest answer (APP-120).
+        // started with -- so a restart is the honest answer.
         installError = ffmpeg?.found
           ? "Installed, but that ffmpeg still cannot do the whole job. The log above says what it did."
           : "Installed. Close OpenSubs and open it again to use it -- a program only sees a new install once it starts afresh.";

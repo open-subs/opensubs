@@ -52,7 +52,7 @@ const report = (verdict: string, detail: Record<string, unknown>) =>
 
 // ?model= and ?language= pick what is measured; the defaults are the iOS
 // floor check's (the smallest model, English). ?clip= picks the file under
-// public/testmedia. APP-112 measures on Base with the language on auto,
+// public/testmedia. The measurement is on Base with the language on auto,
 // because that is the web app's default and the case the report timed.
 const params = new URLSearchParams(location.search);
 const MODEL = params.get("model") ?? ASR_MODELS[0].id;
@@ -68,7 +68,7 @@ const START = Number(params.get("start") ?? "0");
 /**
  * When the bar last said it was finished, and every stage after it.
  *
- * APP-112 is the time between "Listening to the audio · 100%" and the
+ * What is measured is the time between "Listening to the audio · 100%" and the
  * subtitles appearing -- up to four minutes on a two-minute clip, with the
  * screen saying nothing. This records that interval directly rather than
  * inferring it from the total.

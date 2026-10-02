@@ -47,7 +47,7 @@ if (videos.length === 0) {
   console.error("usage: node e2e/videos.mjs [--label name] video.mp4 ...");
   process.exit(2);
 }
-// APP-32: the same clip through a different model, to answer "would Small
+// The same clip through a different model, to answer "would Small
 // fix this" with the clip that raised the question rather than a fixture.
 const modelAt = args.indexOf("--model");
 const MODEL = modelAt >= 0 ? args[modelAt + 1] : "";
@@ -203,7 +203,7 @@ for (const video of videos) {
     page
       .waitForSelector('.card:has-text("Subtitles") .field-error', { timeout: 3600000 })
       .then(() => "error"),
-    // APP-54. A clip with nobody speaking produces neither a cue nor an
+    // A clip with nobody speaking produces neither a cue nor an
     // error -- it produces an offer to transcribe it anyway. Without
     // this the race never settles and the run hangs for the full hour,
     // which is exactly what it did the first time.

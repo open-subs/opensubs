@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [svelte()],
   // Absolute from the site root, not relative. The site is multi-page now
-  // (APP-49), and a relative `./assets/...` resolves against the *directory*
+  //, and a relative `./assets/...` resolves against the *directory*
   // of the current URL: correct at /, and wrong the moment a landing page is
   // requested with a trailing slash. The app is only ever served from the
   // root of opensubs.app, so there is nothing left for a relative base to

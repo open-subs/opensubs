@@ -5,7 +5,7 @@
  * Separate from asr.ts so it can be imported on its own: asr.ts pulls in
  * the Rust engine and the demuxer, and none of the rules below need
  * either. That is what lets e2e/remote.mjs check them against the exact
- * error bodies the reports quoted (APP-70, APP-71).
+ * error bodies the reports quoted.
  */
 
 /**
@@ -37,7 +37,7 @@ export const REMOTE_MODELS: { id: string; note: string }[] = [
 ];
 
 /**
- * Gemini (APP-74).
+ * Gemini.
  *
  * Google's OpenAI-compatible layer has no `/audio/transcriptions` -- it
  * answers 404 -- so a Gemini key typed into this route only ever failed.
@@ -220,7 +220,7 @@ export function parseGeminiSegments(
 }
 
 /**
- * Models that transcribe but cannot time what they transcribe (APP-71).
+ * Models that transcribe but cannot time what they transcribe.
  *
  * OpenAI's newer recognisers -- gpt-4o-transcribe and its relatives --
  * return `json` or `text` and nothing else. Subtitles are timings as much
@@ -280,7 +280,7 @@ export function hasKnownUploadLimit(baseUrl: string): boolean {
  *
  * What this replaces was the status code and the first 200 characters of
  * the body, which on a real failure is a truncated JSON object ending
- * mid-key (APP-70). It is accurate and unreadable, and worse than
+ * mid-key. It is accurate and unreadable, and worse than
  * unreadable when the answer is simple: the two failures people actually
  * hit are a model that cannot produce timings and a clip over the size
  * cap, and both have a plain sentence attached.

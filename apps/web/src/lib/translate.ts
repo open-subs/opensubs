@@ -218,7 +218,7 @@ export interface TranslateOptions {
   onProgress?: (done: number, total: number, note: string) => void;
   /**
    * Some lines came back untranslated after a retry and a split, and are in
-   * their original language (APP-141). Everything else was translated.
+   * their original language. Everything else was translated.
    */
   onShortfall?: (missed: number, total: number) => void;
   signal?: AbortSignal;
@@ -459,7 +459,7 @@ function readTranslationsArray(content: string): string[] {
   const list = (parsed as { translations?: unknown }).translations;
   if (!Array.isArray(list)) throw new Error('The model returned no "translations" array.');
   // The count is the caller's business: a short reply is retried and then
-  // split, rather than throwing the batch away (APP-141).
+  // split, rather than throwing the batch away.
   return list.map((v) => String(v ?? ""));
 }
 

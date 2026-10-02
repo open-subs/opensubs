@@ -59,7 +59,7 @@ interface Session {
 
 let session: Session | null = null;
 /**
- * What the last session transcribed, after it stopped (APP-146).
+ * What the last session transcribed, after it stopped.
  *
  * Stop used to drop the session, and the subtitles with it: the count went to
  * zero, Save .srt greyed out, and several minutes of transcription were gone
@@ -88,11 +88,11 @@ function stoppedNote(lines: number): string {
  * What went wrong last, kept after the session it ended. A Start that fails
  * clears the session, and the popup asks for state when it opens -- without
  * this it would open on nothing, and the reason would have been shown only
- * to a popup that happened to be open at the time (APP-133).
+ * to a popup that happened to be open at the time.
  */
 let lastError: Status | null = null;
 /**
- * Keeps an event page from being suspended while a session runs (APP-121).
+ * Keeps an event page from being suspended while a session runs.
  *
  * Firefox suspends an idle MV3 background page after 30 seconds and, with it,
  * everything in its memory -- on Firefox that is the session and the engine
@@ -176,7 +176,7 @@ async function page(tabId: number, message: ToPage): Promise<boolean> {
  * again, and overlay.ts guards itself against that -- so the catch only ever
  * hid real ones: a page the browser will not script (the Web Store, a PDF, a
  * browser page), a permission that was refused, and, in 1.0.1, a content.js
- * that was a syntax error from its first line (APP-109). Each of those left
+ * that was a syntax error from its first line. Each of those left
  * the popup saying "Listening" over a page with nothing in it.
  */
 async function inject(tabId: number): Promise<string | null> {
@@ -238,7 +238,7 @@ async function start(tabId: number, next: Settings) {
   await toEngine({ kind: "warm", model: next.model, backend: next.backend });
   // The page answers "begin" once it has found the video and opened its
   // audio, or with why it could not. Only then is "Listening" true -- set
-  // before, it overwrote the page's "no video" and stayed there (APP-133).
+  // before, it overwrote the page's "no video" and stayed there.
   // No answer at all is how 1.0.1 looked to everyone who tried it.
   const answer = await ask(tabId, { kind: "begin", settings: next });
   if (!answer) {
@@ -257,10 +257,10 @@ async function start(tabId: number, next: Settings) {
   session.url = answer.url;
   session.video = answer.video;
   // Start again on the same video and it is one file, carried on where it
-  // left off (APP-146); on another page, or another video within the same
+  // left off; on another page, or another video within the same
   // page -- YouTube's next film, which never navigates -- it is a new one,
   // because the two clocks both begin at zero and the lines would interleave
-  // into a file nobody can use (APP-153).
+  // into a file nobody can use.
   const sameVideo = kept && kept.tabId === tabId && kept.url === answer.url
     && kept.video === answer.video;
   const carried = sameVideo ? kept!.cues : [];
@@ -273,7 +273,7 @@ async function start(tabId: number, next: Settings) {
     stage: "listening",
     fraction: null,
     // Recording has to happen before there is anything to read, and on a
-    // second Start that wait is all there is to see (APP-148).
+    // second Start that wait is all there is to see.
     note: answer.waiting ?? `Listening -- recording the first ${FIRST_WINDOW_S} seconds`,
   });
 }
@@ -315,7 +315,7 @@ api.runtime.onMessage.addListener(
 
         // Settings changed while the popup is open. Kept for next time, and
         // applied to a running session at once: the subtitle size is a thing
-        // you judge by looking at it (APP-144).
+        // you judge by looking at it.
         case "settings": {
           const next = message.settings;
           await api.storage.local.set({ settings: next });
@@ -358,7 +358,7 @@ api.runtime.onMessage.addListener(
           }
           // A window from a take the page has moved past is stale (an ad's,
           // see "switched"). One from a *later* take means the page counted
-          // ahead of this session -- which cost APP-145 every window of a
+          // ahead of this session -- which cost the reported case every window of a
           // second Start -- so follow the page rather than drop its audio.
           if (session.tabId === tabId && message.take > session.take) session.take = message.take;
           if (session.tabId === tabId && message.take === session.take) {
@@ -406,7 +406,7 @@ api.runtime.onMessage.addListener(
         // Save .srt, from here rather than from the popup -- where that is
         // possible. Firefox's background is a document, so it has
         // createObjectURL and, unlike the popup, it is still there after the
-        // save dialog opens (APP-152). Chromium's is a service worker, which
+        // save dialog opens. Chromium's is a service worker, which
         // has neither, and says so: the popup then downloads it itself.
         case "save": {
           const lines = session?.cues ?? held(tabId);
@@ -425,7 +425,7 @@ api.runtime.onMessage.addListener(
           // the person has already given once. Asking always meant a dialog
           // on every save for people who had said they did not want one --
           // and on Firefox that dialog is what closed the popup and killed
-          // the download (APP-152).
+          // the download.
           void api.downloads.download({ url, filename: "subtitles.srt" })
             .catch((e: unknown) => {
               const why = e instanceof Error ? e.message : String(e);
@@ -441,7 +441,7 @@ api.runtime.onMessage.addListener(
         }
 
         // The popup's Clear: the lines go, whether a session is running or
-        // not, and the overlay stops showing them (APP-153).
+        // not, and the overlay stops showing them.
         case "clear":
           if (kept && (tabId === undefined || kept.tabId === tabId)) kept = null;
           if (session && (tabId === undefined || session.tabId === tabId)) {

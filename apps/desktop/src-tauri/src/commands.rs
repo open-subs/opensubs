@@ -626,7 +626,7 @@ pub struct InstallHint {
 
 /// Never an error: an ffmpeg that is not there is the commonest answer on
 /// Windows, and the banner needs to say what to do about it, not relay
-/// "program not found" (APP-120).
+/// "program not found".
 #[tauri::command]
 pub fn check_ffmpeg() -> FfmpegCheck {
     let install = subs_pipeline::install_method().map(|m| InstallHint {
@@ -906,7 +906,7 @@ mod tests {
 
     #[test]
     fn the_fix_offered_is_this_platforms_own() {
-        // APP-120: Windows was told to use Homebrew.
+        // Windows was told to use Homebrew.
         let m = missing_message(Path::new("ffmpeg"), &["whisper", "ass"]);
         if cfg!(windows) {
             assert!(m.contains("winget install --id Gyan.FFmpeg"), "{m}");

@@ -88,7 +88,7 @@ function tokens(text: string): { raw: string; key: string }[] {
  * two passes over the same audio and they disagree about the odd word: "the
  * ones crying out an agony" against "ones crying out in agony" is one phrase
  * heard twice, and a rule that wanted every token to match left both on
- * screen (APP-154). One word in four may differ, which is loose enough for
+ * screen. One word in four may differ, which is loose enough for
  * a misheard preposition and tight enough that two different sentences do
  * not match: they disagree about nearly every word, not one in four.
  */
@@ -167,7 +167,7 @@ function echoes(before: { key: string }[], after: { key: string }[]): number {
 const ECHO = 0.75;
 
 /**
- * A line that says the same thing twice in a row, said once (APP-154).
+ * A line that says the same thing twice in a row, said once.
  *
  * Whisper writes the tail of the window before it and then writes it again,
  * properly, as the sentence it belongs to: "We'll touch on this later. We'll
@@ -249,7 +249,7 @@ function settle(prev: Cue, next: Cue): Cue | null {
   // Anywhere from overlapping to a couple of seconds apart. It used to be
   // only where the two overlapped in time, and the seams that did not --
   // one line ending exactly where the next begins, which is what the
-  // trimming above produces -- kept their repeat (APP-154).
+  // trimming above produces -- kept their repeat.
   if (!(next.start > prev.start && next.start < prev.end + NEAR_S)) return prev;
   const k = tailIsHead(prev.text, next.text);
   if (worthTrimming(prev.text, k)) {
@@ -274,7 +274,7 @@ export function stitch(kept: Cue[], incoming: Cue[]): Cue[] {
   for (const raw of incoming) {
     if (!raw.text.trim()) continue;
     // A window whose opening seconds were also the end of the window before
-    // can come back with the phrase written twice inside one line (APP-154).
+    // can come back with the phrase written twice inside one line.
     const cue = { ...raw, text: unstutter(raw.text) };
     let replaced = -1;
     for (let i = out.length - 1; i >= 0; i -= 1) {
@@ -359,7 +359,7 @@ export function stitch(kept: Cue[], incoming: Cue[]): Cue[] {
     const spaced = /\s/.test(out[i].text.trim()) || /\s/.test(out[i - 1].text.trim());
     // Joined, with the join settled: these are two readings of overlapping
     // audio, so the end of one is often the start of the other, and running
-    // them together wrote the phrase twice into a single line (APP-154).
+    // them together wrote the phrase twice into a single line.
     const head = out[i - 1].text.trim();
     const tail = out[i].text.trim();
     const shared = tailIsHead(head, tail);

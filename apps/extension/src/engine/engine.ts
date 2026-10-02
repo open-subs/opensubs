@@ -118,7 +118,7 @@ export function createEngine(emit: Emit): Engine {
    * read replaced the one waiting, and its audio was lost. On a machine that
    * only just keeps up, that cost whole stretches of speech: on an Iris Xe
    * laptop the same video kept up on one run and dropped two or five windows
-   * on the next (APP-110, reopened), because the time a window takes varies
+   * on the next (reopened), because the time a window takes varies
    * and one slow window was enough to lose the next.
    *
    * So windows wait instead, up to fifteen minutes of audio (see pace.ts):
@@ -131,7 +131,7 @@ export function createEngine(emit: Emit): Engine {
    * This capture has fallen behind, so "Automatic" stops trying to carry
    * Base. Sticky for the capture: a machine that fell behind once will
    * again, and swapping models back and forth would reload the model each
-   * time (APP-142).
+   * time.
    */
   let behind = false;
   const waiting: Extract<ToEngine, { kind: "transcribe" }>[] = [];
@@ -147,7 +147,7 @@ export function createEngine(emit: Emit): Engine {
    * "Listening for the language" on top of the transcription, which put each
    * window at 35-45 seconds against 20 of audio. The engine could never catch
    * up, and dropped every other window to stay near the film -- half of a
-   * two-minute lecture came out with no subtitles at all (APP-110).
+   * two-minute lecture came out with no subtitles at all.
    *
    * So the first window that holds real speech in exactly one language names
    * it, and every window after is transcribed as that language, which skips
@@ -175,7 +175,7 @@ export function createEngine(emit: Emit): Engine {
    * call, because for a file it usually is. Here the pipeline is cached after
    * the first window and the "load" is instant -- but the words still flashed
    * up every twenty seconds, and read as the model being fetched again each
-   * time. That was the first thing APP-110's report blamed, reasonably, from
+   * time. That was the first thing the report blamed, reasonably, from
    * what the screen said.
    */
   let loaded: string | null = null;
@@ -210,9 +210,9 @@ export function createEngine(emit: Emit): Engine {
         // document's own thread. Single-threaded inference there blocks
         // everything else the extension does in that process: on Firefox the
         // background page counted as idle and was suspended mid-session
-        // (APP-121), and on Chrome the popup would not open while a
+        //, and on Chrome the popup would not open while a
         // transcription ran, because the toolbar popup and this offscreen
-        // document are the same renderer (APP-140).
+        // document are the same renderer.
         wasmProxy: true,
         start: 0,
         end: null,
@@ -345,7 +345,7 @@ export function createEngine(emit: Emit): Engine {
         // page records for twenty seconds before there is any audio to read,
         // and nothing used that time. The first subtitle was a whole window
         // later than it had to be, and the screen said only "Listening"
-        // meanwhile (APP-143). `run` waits on the same promise.
+        // meanwhile. `run` waits on the same promise.
         void warm(message.model, message.backend);
       }
     },

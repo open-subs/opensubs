@@ -9,7 +9,7 @@ if (!target) throw new Error("no #app element to mount into");
 
 // The target is not empty: index.html ships a static rendering of the
 // tool's first screen so a crawler sees the tool without running anything
-// (APP-48). `mount` appends rather than replaces, so without this the
+// `mount` appends rather than replaces, so without this the
 // skeleton would sit above the real app for the life of the page.
 target.replaceChildren();
 

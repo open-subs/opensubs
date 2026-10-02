@@ -1,7 +1,7 @@
 /**
  * The languages OpenSubs ships in.
  *
- * The same eight as the rest of the suite, confirmed under APP-42.
+ * The same eight as the rest of the suite.
  * Deliberately a short list: every locale here is a permanent
  * commitment — each new string in the product needs a translation in all
  * of them, forever, and a half-translated interface reads worse than an

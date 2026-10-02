@@ -47,7 +47,7 @@ eq("joining spaced text puts a space in", joinGroup(["one two", "three"]), "one 
 eq("joining Chinese does not", joinGroup(["地震是", "常见的"]), "地震是常见的");
 eq("empty parts are skipped", joinGroup(["", "a", ""]), "a");
 
-// --- APP-53 --------------------------------------------------------------
+// --- the context rules --------------------------------------------------------------
 
 {
   // The reported failure. Chrome returns the two sentences with a single
@@ -126,9 +126,9 @@ eq("an empty translation empties every cue", spread("   ", ["a", "b"]), ["", ""]
 }
 
 
-// --- APP-53, second round: the punctuation snap ------------------------
+// --- Second round: the punctuation snap -------------------------------
 //
-// The first fix ended the missing translations, which thea confirmed --
+// The first fix ended the missing translations, which was confirmed --
 // 26 of 26 translated, none left in English. What did not take effect was
 // the third part, aligning the break to nearby punctuation. Five of 25
 // split points still cut a word, and in one the full stop opened the next
@@ -183,7 +183,7 @@ for (const distance of [1, 2, 3, 4]) {
   ok("and no cue is left empty", out.every((p) => p.length > 0), JSON.stringify(out));
 }
 
-// --- the alignment budget is in characters, not units (APP-53, round 3) ---
+// --- the alignment budget is in characters, not units (round 3) ---
 //
 // The reach was a count of units against a budget measured in characters.
 // In Chinese a unit is a character, so every reported case behaved and this
@@ -224,7 +224,7 @@ for (const distance of [1, 2, 3, 4]) {
 }
 
 {
-  // thea's #13->#14: the full stop is the last character of the translation,
+  // Cues #13->#14: the full stop is the last character of the translation,
   // four ahead of the split. Taking it would leave the final cue empty, so
   // the break stays put -- correct, and the reason it can never align.
   const out = spread("变得更容易大脑去旅行这条途径。", ["a".repeat(47), "b".repeat(50), "c".repeat(38)]);
@@ -236,9 +236,9 @@ for (const distance of [1, 2, 3, 4]) {
   ok("and no cue in that group is empty", out.every((p) => p.length > 0), JSON.stringify(out));
 }
 
-// --- a split already on a comma stays there (APP-53, round 4) ---------
+// --- a split already on a comma stays there (round 4) ---------
 //
-// thea's #4 -> #5, from app_en2.srt on ELpfYCZa87g, Chrome's translation to
+// Cues #4 -> #5, from app_en2.srt on ELpfYCZa87g, Chrome's translation to
 // Simplified Chinese. The ideal split ends #4 on the comma, because
 // "它是适应性的，就像" is "It is adaptable, like" -- the last words of #4's
 // own audio. A full stop seven characters back used to win whenever it was

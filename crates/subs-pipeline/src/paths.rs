@@ -20,7 +20,7 @@ pub(crate) fn homebrew_dirs() -> impl Iterator<Item = PathBuf> {
 
 /// Where Windows package managers put `ffmpeg.exe`, for the same reason:
 /// the app's `PATH` was fixed when it started, so an ffmpeg installed from
-/// its own banner (APP-120) is not on it until the app restarts.
+/// its own banner is not on it until the app restarts.
 ///
 /// - winget links a portable package's commands from `Links`, per user or
 ///   machine-wide by install scope -- `Gyan.FFmpeg` is one;
@@ -52,7 +52,7 @@ pub(crate) fn windows_dirs() -> Vec<PathBuf> {
 /// ffmpeg-<version>-full_build\bin` and adds that to the user's `PATH` in
 /// the registry. An app that had already started -- the one that pressed the
 /// install button -- has neither, and reported that it still could not burn
-/// (APP-120, retested). Both are searched now.
+/// (retested). Both are searched now.
 fn winget_package_bins() -> Vec<PathBuf> {
     let Some(local) = std::env::var_os("LOCALAPPDATA") else {
         return Vec::new();
@@ -230,7 +230,7 @@ mod tests {
         }
     }
 
-    /// APP-120, retested: on an account without administrator rights winget
+    /// Retested: on an account without administrator rights winget
     /// makes no Links shortcut. It unpacks the package and puts that bin
     /// directory on the user's PATH in the registry, which the already
     /// running app does not have.

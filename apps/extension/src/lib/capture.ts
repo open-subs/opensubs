@@ -34,7 +34,7 @@ import { FIRST_WINDOW_S } from "./pace.ts";
  * cannot finish; with the overlap the next window hears it whole, and
  * `seam.ts` keeps the better reading. Measured on a two-minute lecture
  * before the overlap existed: nine seconds of speech at one seam produced
- * no subtitle at all (APP-110).
+ * no subtitle at all.
  */
 export const OVERLAP_S = 3;
 
@@ -74,7 +74,7 @@ export function siteOf(host: string): string {
 }
 
 /**
- * Why there is nothing to read, in words the user can act on (APP-133).
+ * Why there is nothing to read, in words the user can act on.
  *
  * A page with no video of its own but a frame of reasonable size almost
  * always has its player in that frame, and a content script cannot reach
@@ -213,7 +213,7 @@ export function recordWindow(
   // the recorder had started earlier than it had -- but nothing ever started
   // it earlier, so every window after the first was stamped three seconds
   // before its own audio, and every subtitle showed three seconds before the
-  // words (APP-110). The overlap is now real, in `recordWindows`, and this is
+  // words. The overlap is now real, in `recordWindows`, and this is
   // just the truth.
   const offset = at();
   const rec = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : undefined);
@@ -228,7 +228,7 @@ export function recordWindow(
       // A window stopped almost as soon as it started -- the video ended just
       // after it began, as an ad does -- holds a container with no audio in
       // it, and the engine rejected it as "The clip has no length." and ended
-      // the session over nothing (APP-133). There is nothing in it to read.
+      // the session over nothing. There is nothing in it to read.
       const long = performance.now() - began >= MIN_WINDOW_MS;
       const blob = parts.length ? new Blob(parts, { type: mime || parts[0].type }) : null;
       resolve(blob && long && blob.size >= MIN_WINDOW_BYTES ? { blob, offset } : null);
@@ -253,7 +253,7 @@ export function recordWindow(
  * one is still recording, so there are briefly two MediaRecorders on the
  * track -- which is allowed, and each still produces a self-contained file.
  * The first window is FIRST_WINDOW_S long rather than `seconds`, so the
- * first subtitle does not wait out a whole pass (APP-148).
+ * first subtitle does not wait out a whole pass.
  *
  * `onWindow` is called in order and never twice at once, so a slow consumer
  * cannot be handed two windows together. It must not be used to throttle
@@ -278,7 +278,7 @@ export async function recordWindows(
 
   const live = new Set<() => void>();
   // The first window is short, so something is on screen long before a full
-  // pass of audio has played (APP-148). The full-length window still starts
+  // pass of audio has played. The full-length window still starts
   // at the same moment, rather than after it: a short window is a worse read
   // of the same audio -- Whisper writes debris over a few seconds of music
   // where it would have transcribed the sentence that followed -- and if the

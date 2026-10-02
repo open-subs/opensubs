@@ -120,7 +120,7 @@ impl Transcriber for FfmpegWhisperTranscriber {
 /// parsers: the graph (`\ ' [ ] , ;`) and then the filter's own
 /// `key=value:...` list (`\ ' : =`), so the option list is escaped first.
 ///
-/// Every absolute path on Windows needs this (APP-119). The model lives in
+/// Every absolute path on Windows needs this. The model lives in
 /// `C:\Users\<name>\.cache\opensubs-models` and the output in the temp
 /// directory, and unescaped the drive colon ended the option while the
 /// backslashes were eaten as escapes: "No option name near
@@ -286,7 +286,7 @@ pub fn synthesize_words(text: &str, start_ms: f64, end_ms: f64) -> Vec<Word> {
 mod tests {
     use super::*;
 
-    /// APP-119: the model and output paths from the report, as ffmpeg must
+    /// The model and output paths from the report, as ffmpeg must
     /// be handed them. Unescaped, this was "No option name near
     /// 'Usersycan4.cacheopensubs-models...'" on every Windows machine.
     #[test]

@@ -10,7 +10,7 @@ search engine knows the eight are the same page.
 ## Why not translate in the browser
 
 Because the static HTML exists precisely so the copy is readable without
-running anything (APP-48), and swapping it with JavaScript hands a
+running anything, and swapping it with JavaScript hands a
 crawler the English page and a reader the German one. It would also
 leave one URL claiming to be eight languages, which is not something
 hreflang can express and not something a search engine can serve: the
@@ -73,7 +73,7 @@ PAGES = {
     # on. They differ here, and only here: the page is served at /privacy,
     # with nginx's `try_files $uri $uri.html` finding privacy.html, so that
     # every page in the site has one extensionless address and not two
-    # (APP-151 §2.3). The old `/privacy.html` 301s to it.
+    # The old `/privacy.html` 301s to it.
     "privacy.html": ("privacy", "2026-08-29", "yearly", "0.3"),
 }
 
@@ -83,7 +83,7 @@ PAGES = {
 # version declared is real, not that every language is present. The
 # Portuguese guide is the first page written in one language and not the
 # other six, and a ring auto-filled to eight would have declared six
-# addresses that 404 -- worse than having no ring at all (APP-180).
+# addresses that 404 -- worse than having no ring at all.
 #
 # The footer row still offers all eight: a language with no copy of *this*
 # page links to that language's home, which exists, and the reader gets
@@ -181,7 +181,7 @@ def localise_link(href, locale):
     if ASSET_HREF.search(path.split("?")[0]):
         # ...except a page that happens to end in .html rather than being an
         # asset. None ships that way today -- /privacy stopped being one in
-        # APP-151 -- but a link written by hand still can.
+        # -- but a link written by hand still can.
         if not path.endswith(".html"):
             return href
     if path == "/":
@@ -190,7 +190,7 @@ def localise_link(href, locale):
         # No copy of that page in this language. The English one exists and
         # says something; `/zh-Hant/blog/srt-to-vtt` is a 404. The seven
         # blog posts and the two landing pages are English-only, and the
-        # home page links all of them (APP-180).
+        # home page links all of them.
         return href
     return f"/{locale}{path}{sep}{fragment}"
 
@@ -351,7 +351,7 @@ def translate_page(raw, page, locale, catalogue, stats):
 # Pages that exist in one language and not in English, so the English
 # footer this generator translates cannot know about them. Without this the
 # Portuguese guide has nothing pointing at it from any Portuguese page --
-# which is the condition APP-180 was filed about, reintroduced one language
+# which is the condition that was reported, reintroduced one language
 # further in.
 LOCALE_ONLY = {
     "pt": [("/pt/blog/how-to-add-captions-to-a-video", "Guia")],
@@ -391,7 +391,7 @@ def offer_locale_only(out, locale):
 ANCHOR = re.compile(r"""(<a\b[^>]*?\shref=")([^"]*)("[^>]*>)""")
 # A link that says which language it points at is already pointing where it
 # means to: the switcher's own links name all eight, and moving them into
-# this locale would leave every page offering only itself (APP-151).
+# this locale would leave every page offering only itself.
 SPEAKS_FOR_ITSELF = re.compile(r"\shreflang=")
 
 
@@ -439,7 +439,7 @@ def last_changed(path, fallback):
 
     A date typed into the table above is right on the day it is typed and
     wrong from then on: the home page said 2026-09-10 while the copy on it
-    had been rewritten twice since (APP-180). `git log` knows, and it knows
+    had been rewritten twice since. `git log` knows, and it knows
     per file, so a page that has not changed keeps its old date -- which is
     the point of the field. Falls back to the table where git cannot answer,
     as in a tarball with no history.
@@ -459,7 +459,7 @@ def last_changed(path, fallback):
 # changefreq and priority for the hand-written pages, where the default
 # below undersells them. Both are hints a search engine is free to ignore
 # and Google says it does -- kept only so the generated sitemap does not
-# silently walk back what was set by hand (APP-180).
+# silently walk back what was set by hand.
 HINTS = {
     "blog": ("weekly", "0.7"),
     "subtitle-sites": ("monthly", "0.8"),
@@ -473,7 +473,7 @@ def handwritten():
     The blog, the two landing pages and the Portuguese guide are written by
     hand into the deploy directory; this script writes the sitemap. Listing
     only its own pages dropped eleven URLs from it -- including the whole
-    blog -- every time it ran (APP-180). Rather than a second list to keep
+    blog -- every time it ran. Rather than a second list to keep
     in step, each page is read for what it already declares: its canonical,
     its own hreflang ring, and whether it asks to be indexed at all.
     """
@@ -499,7 +499,7 @@ def handwritten():
 # What a search result has room for. Google measures pixels; columns are the
 # workable stand-in, and the two disagreements that matter are both handled
 # below: a CJK character occupies two columns, and `&mdash;` is seven
-# characters of source that a reader sees as one (APP-180).
+# characters of source that a reader sees as one.
 TITLE_COLUMNS = 60
 DESCRIPTION_COLUMNS = (100, 170)
 
@@ -546,7 +546,7 @@ def sitemap():
     only in one place -- so both are generated from the same table.
     """
     # The stylesheet is for people, not for crawlers, and it is not
-    # optional decoration (APP-69). Once this sitemap started carrying
+    # optional decoration. Once this sitemap started carrying
     # hreflang alternates it gained elements in the XHTML namespace, and
     # Chromium then declines to apply its built-in XML pretty-printer:
     # it treats the document as renderable markup and lays the text out,

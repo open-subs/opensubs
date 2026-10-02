@@ -1151,7 +1151,7 @@ if (FIXTURE) {
 
   console.log("Japanese and Traditional glyphs");
   {
-    // APP-84. The CJK font was Noto Sans SC's Simplified slice and nothing
+    // The CJK font was Noto Sans SC's Simplified slice and nothing
     // else, so 択 in 選択, 労 in 労働 and 閘 in 閘門 burned in as empty
     // rectangles -- 7.3% of real Japanese subtitle lines -- and the warning
     // told people to delete words their language cannot do without.
@@ -1714,7 +1714,7 @@ check(
   const sitemap = await readFile(join(DIST, "sitemap.xml"), "utf8");
   const robots = await readFile(join(DIST, "robots.txt"), "utf8");
 
-  // APP-45: all three titles used "subtitle" as a verb, so the page never
+  // All three titles used "subtitle" as a verb, so the page never
   // contained the noun phrase anybody searches for.
   check(
     "the homepage title names a subtitle generator",
@@ -1734,13 +1734,13 @@ check(
     home.includes("Subtitle any video, without uploading it anywhere."),
   );
 
-  // APP-48: the tool is client-rendered, so the served HTML had no trace of
+  // The tool is client-rendered, so the served HTML had no trace of
   // it. A file input is the smallest proof that it does now.
   check("the served HTML contains the tool's file input", /type="file"/.test(home));
   check("the landing page carries it too", /type="file"/.test(landing));
   check("and the site links to #app", /href="#app"/.test(home));
 
-  // APP-49: a second indexable URL, with its own title and its own canonical.
+  // A second indexable URL, with its own title and its own canonical.
   check(
     "the landing page has its own title",
     /burn subtitles into video/i.test(landing.match(/<title>([^<]*)<\/title>/)?.[1] ?? ""),
@@ -1753,7 +1753,7 @@ check(
   // URLs is duplicate structured data, not twice as much of it.
   check("only the homepage carries the FAQ schema", !landing.includes('"FAQPage"'));
 
-  // APP-48.3: a sitemap that does not list a page is a page nobody crawls.
+  // 3: a sitemap that does not list a page is a page nobody crawls.
   const listed = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   const pages = ["https://opensubs.app/", "https://opensubs.app/privacy.html",
                  "https://opensubs.app/burn-subtitles-into-video"];
@@ -1763,13 +1763,13 @@ check(
     `sitemap has ${listed.join(", ")}`,
   );
 
-  // APP-47: some crawlers read only their own User-agent block.
+  // Some crawlers read only their own User-agent block.
   for (const bot of ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"]) {
     check(`robots.txt names ${bot}`, robots.includes(bot));
   }
 }
 
-// APP-32: which model the page starts on, and why it depends on WebGPU.
+// Which model the page starts on, and why it depends on WebGPU.
 {
   const modelSelect = '.card:has-text("Subtitles") select';
   const chosen = async (pg) => {

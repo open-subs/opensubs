@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn a_boxed_preset_carries_a_visible_box_colour() {
         // Both packs: the free `Boxed` had the same problem as `Podcast` and
-        // `Reel Box` (APP-83) and this used to look only at this one.
+        // `Reel Box` and this used to look only at this one.
         // `outline` is not read for a box -- the ASS writer pads the box from
         // the type size -- so it stays 0 rather than implying it does anything.
         for s in crate::all_presets() {
