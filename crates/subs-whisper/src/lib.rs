@@ -52,6 +52,24 @@ fn read_samples(path: &Path) -> Result<Vec<f32>, AsrError> {
         .map_err(|e| AsrError::Backend(format!("decoding {}: {e}", path.display())))
 }
 
+/// The language to give whisper.cpp, or `None` to have it detect one.
+///
+/// An English-only model (`ggml-*.en.bin`) has no language tokens, yet
+/// whisper.cpp still runs its detector on "auto", reading the logits of
+/// whichever tokens sit where the language tokens would be. The text is
+/// English regardless; only the reported language is noise -- `ms` or `fa`
+/// for plainly English speech. That label becomes the source language the
+/// offline translator is told, and M2M-100 handed English marked as Malay
+/// mostly copies it through, so a translated export came out half in
+/// English. Such a model can only ever produce English: say so, and skip
+/// the detector.
+fn language_for(model_is_multilingual: bool, requested: Option<&str>) -> Option<&str> {
+    if !model_is_multilingual {
+        return Some("en");
+    }
+    requested.filter(|l| *l != "auto")
+}
+
 impl Transcriber for WhisperTranscriber {
     fn transcribe(&self, audio: &AudioRef, opts: &AsrOptions) -> Result<Transcript, AsrError> {
         let samples = read_samples(&audio.path)?;
@@ -64,11 +82,10 @@ impl Transcriber for WhisperTranscriber {
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         // `None` is auto-detect, as it is for the ffmpeg filter's "auto".
-        let wanted = opts
-            .language
-            .as_deref()
-            .or(self.language.as_deref())
-            .filter(|l| *l != "auto");
+        let wanted = language_for(
+            ctx.is_multilingual(),
+            opts.language.as_deref().or(self.language.as_deref()),
+        );
         params.set_language(Some(wanted.unwrap_or("auto")));
         params.set_print_progress(false);
         params.set_print_realtime(false);
@@ -101,5 +118,26 @@ impl Transcriber for WhisperTranscriber {
             });
         }
         Ok(transcript_from_segments(segments, &language))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::language_for;
+
+    #[test]
+    fn an_english_only_model_always_reports_english() {
+        // Detection on such a model returns a language it cannot transcribe.
+        assert_eq!(language_for(false, None), Some("en"));
+        assert_eq!(language_for(false, Some("auto")), Some("en"));
+        // Asking it for another language changes nothing it outputs.
+        assert_eq!(language_for(false, Some("ja")), Some("en"));
+    }
+
+    #[test]
+    fn a_multilingual_model_detects_unless_told() {
+        assert_eq!(language_for(true, None), None);
+        assert_eq!(language_for(true, Some("auto")), None);
+        assert_eq!(language_for(true, Some("ja")), Some("ja"));
     }
 }
