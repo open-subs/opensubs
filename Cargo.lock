@@ -3719,6 +3719,7 @@ name = "subs-m2m"
 version = "1.0.2"
 dependencies = [
  "ct2rs",
+ "dunce",
  "subs-translate",
 ]
 
@@ -3812,6 +3813,7 @@ dependencies = [
 name = "subs-whisper"
 version = "1.0.2"
 dependencies = [
+ "dunce",
  "hound",
  "subs-asr",
  "whisper-rs",

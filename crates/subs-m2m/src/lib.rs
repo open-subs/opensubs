@@ -10,7 +10,7 @@
 //! M2M-100 is told both languages: the source as a token in front of the
 //! text (`__en__`), the target as the first token of the output (`__ja__`).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ct2rs::sys::Translator as Ct2Translator;
 use ct2rs::tokenizers::sentencepiece::Tokenizer;
@@ -26,13 +26,29 @@ impl M2mTranslator {
     /// `dir` holds the converted model: model.bin, config.json,
     /// shared_vocabulary.json and sentencepiece.bpe.model.
     pub fn new(dir: &Path) -> Result<Self, TranslateError> {
+        let dir = native_dir(dir);
         let spm_path = dir.join("sentencepiece.bpe.model");
         let spm = Tokenizer::from_file(&spm_path, &spm_path)
             .map_err(|e| TranslateError::Backend(format!("loading the tokenizer: {e}")))?;
-        let model = Ct2Translator::new(dir, &Config::default())
+        let model = Ct2Translator::new(&dir, &Config::default())
             .map_err(|e| TranslateError::Backend(format!("loading {}: {e}", dir.display())))?;
         Ok(Self { model, spm })
     }
+}
+
+/// The model directory as CTranslate2 must be given it on Windows: without
+/// the `\\?\` verbatim prefix.
+///
+/// The desktop app finds the model under Tauri's resource directory, which
+/// is built from a canonicalized executable path and so arrives as
+/// `\\?\C:\...\models\m2m100`. CTranslate2 opens `dir + "/model.bin"`,
+/// and inside a verbatim path Windows does not turn `/` into a separator:
+/// it looks for a file literally named `m2m100/model.bin` and fails with
+/// "Unable to open file 'model.bin'", although the file is there. `dunce`
+/// drops the prefix only when the plain form means the same file, and
+/// leaves every other path, and every path off Windows, as it was.
+fn native_dir(dir: &Path) -> PathBuf {
+    dunce::simplified(dir).to_path_buf()
 }
 
 /// The codes M2M-100 knows, in the form its language tokens use. Subtags
@@ -113,18 +129,28 @@ mod tests {
 
     /// The model the desktop installer carries. It is not in the
     /// repository (~470 MB), so these tests pass vacuously without it;
-    /// `OPENSUBS_M2M_DIR` points them at another copy.
-    fn model() -> Option<M2mTranslator> {
+    /// `OPENSUBS_M2M_DIR` points them at another copy, and
+    /// `OPENSUBS_REQUIRE_M2M=1` makes a missing model a failure instead.
+    fn model_dir() -> Option<PathBuf> {
         let dir = std::env::var_os("OPENSUBS_M2M_DIR")
-            .map(std::path::PathBuf::from)
+            .map(PathBuf::from)
             .unwrap_or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/desktop/src-tauri/bundled/models/m2m100")
             });
         if !dir.join("model.bin").exists() {
+            assert!(
+                std::env::var_os("OPENSUBS_REQUIRE_M2M").is_none(),
+                "OPENSUBS_REQUIRE_M2M is set but there is no M2M-100 model at {}",
+                dir.display()
+            );
             eprintln!("skipping: no M2M-100 model at {}", dir.display());
             return None;
         }
-        Some(M2mTranslator::new(&dir).expect("load the model"))
+        Some(dir)
+    }
+
+    fn model() -> Option<M2mTranslator> {
+        Some(M2mTranslator::new(&model_dir()?).expect("load the model"))
     }
 
     fn has_cjk(s: &str) -> bool {
@@ -180,6 +206,49 @@ mod tests {
             assert!(has_cjk(t), "left in English: {src:?} -> {t:?}");
             assert!(longest_repeat(t) < 3, "looped: {t}");
         }
+    }
+
+    #[test]
+    fn an_ordinary_model_dir_reaches_ctranslate2_unchanged() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("models").join("m2m100");
+        assert_eq!(native_dir(&dir), dir);
+    }
+
+    /// The directory exactly as the Windows installer leaves it and the
+    /// desktop app resolves it: per-user, under %LOCALAPPDATA%.
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_model_dir_reaches_ctranslate2_without_its_prefix() {
+        let resolved = Path::new(r"\\?\C:\Users\someone\AppData\Local\OpenSubs\models\m2m100");
+        let handed_over = native_dir(resolved);
+        assert_eq!(handed_over, Path::new(r"C:\Users\someone\AppData\Local\OpenSubs\models\m2m100"));
+        assert!(!handed_over.to_string_lossy().starts_with(r"\\?\"));
+    }
+
+    /// The real model, opened through a verbatim path made the way Tauri
+    /// makes its resource directory: `std::fs::canonicalize`. CTranslate2
+    /// given that path itself cannot find model.bin; through
+    /// `M2mTranslator::new` it loads and translates.
+    #[cfg(windows)]
+    #[test]
+    fn the_model_loads_and_translates_from_a_verbatim_path() {
+        let Some(dir) = model_dir() else { return };
+        let verbatim = std::fs::canonicalize(&dir).unwrap();
+        assert!(verbatim.to_string_lossy().starts_with(r"\\?\"), "not verbatim: {}", verbatim.display());
+        assert!(verbatim.join("model.bin").is_file(), "model.bin is missing from {}", verbatim.display());
+
+        let unaided = Ct2Translator::new(&verbatim, &Config::default())
+            .err()
+            .expect("CTranslate2 opened model.bin through a verbatim path; the premise of this test no longer holds");
+        assert!(unaided.to_string().contains("Unable to open file 'model.bin'"), "{unaided}");
+        eprintln!("CTranslate2 given {} directly: {unaided}", verbatim.display());
+
+        let m2m = M2mTranslator::new(&verbatim).expect("load the model from a verbatim path");
+        let out = m2m
+            .translate(&["Good morning everyone.".to_string()], &TranslateRequest::to("zh-Hans").from_language("en"))
+            .unwrap();
+        assert!(has_cjk(&out[0]), "not translated: {}", out[0]);
+        eprintln!("M2mTranslator::new({}) translated: {}", verbatim.display(), out[0]);
     }
 
     #[test]

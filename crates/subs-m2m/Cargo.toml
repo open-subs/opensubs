@@ -10,3 +10,6 @@ subs-translate = { workspace = true }
 # The portable `ruy` backend: no MKL, OpenBLAS or CUDA to find on the build
 # machine, so it builds the same on macOS and Windows runners.
 ct2rs = { version = "0.10", default-features = false, features = ["sentencepiece", "ruy"] }
+# Strips the `\\?\` prefix from a Windows model path before CTranslate2,
+# which appends "/model.bin" to it, gets it. See `native_dir`.
+dunce = "1"

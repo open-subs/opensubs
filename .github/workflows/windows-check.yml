@@ -146,6 +146,37 @@ jobs:
           cargo test --release -p subs-pipeline --test burn_e2e a_burn_runs_from_a_windows_shaped_path
           if ($LASTEXITCODE -ne 0) { throw "the Windows-path burn failed" }
 
+      # The offline translator, opened the way the installed app opens it.
+      # The app finds the model under Tauri's resource directory, which on
+      # Windows is a canonicalized, verbatim path (\\?\C:\...); CTranslate2
+      # appends "/model.bin" to the directory it is given, and a verbatim
+      # path does not turn that "/" into a separator. The tests open the
+      # real model through such a path, and show CTranslate2 failing on it
+      # unaided. Static C runtime as in the release build: CTranslate2 is
+      # built with /MT. Runs even when a burn step failed.
+      - name: Offline translation from a verbatim model path
+        if: ${{ !cancelled() }}
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+          OPENSUBS_REQUIRE_M2M: "1"
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "m2m100"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $url = "https://github.com/open-subs/opensubs/releases/download/models-m2m100-418m-int8"
+          foreach ($f in "model.bin", "config.json", "shared_vocabulary.json", "sentencepiece.bpe.model", "SHA256SUMS") {
+            curl.exe -fsSL "$url/$f" -o (Join-Path $dir $f)
+            if ($LASTEXITCODE -ne 0) { throw "fetching $f failed" }
+          }
+          foreach ($line in Get-Content (Join-Path $dir "SHA256SUMS")) {
+            $sum, $name = $line -split '\s+', 2
+            $got = (Get-FileHash (Join-Path $dir $name.TrimStart('*')) -Algorithm SHA256).Hash.ToLower()
+            if ($got -ne $sum) { throw "checksum mismatch for $name" }
+          }
+          "model verified in $dir"
+          $env:OPENSUBS_M2M_DIR = $dir
+          cargo test --release -p subs-m2m -- --nocapture --test-threads=1
+          if ($LASTEXITCODE -ne 0) { throw "subs-m2m tests failed on Windows" }
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

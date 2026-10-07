@@ -9,6 +9,7 @@ description = "Speech recognition with whisper.cpp linked into the binary, behin
 subs-asr = { workspace = true }
 whisper-rs = "0.16"
 hound = "3"
+dunce = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }

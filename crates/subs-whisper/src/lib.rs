@@ -23,8 +23,14 @@ pub struct WhisperTranscriber {
 }
 
 impl WhisperTranscriber {
+    /// A `\\?\` verbatim path -- which is what the desktop app's resource
+    /// directory is on Windows -- is handed to whisper.cpp in its plain
+    /// form. whisper.cpp opens the file it is given as is, so the verbatim
+    /// form does load today; it is native code that never expects one, and
+    /// the plain form is also what the user reads in an error.
     pub fn new(model_path: impl Into<PathBuf>) -> Self {
-        Self { model_path: model_path.into(), language: None }
+        let model_path = model_path.into();
+        Self { model_path: dunce::simplified(&model_path).to_path_buf(), language: None }
     }
 
     /// The spoken language, as the ffmpeg backend took it: the pipeline asks
