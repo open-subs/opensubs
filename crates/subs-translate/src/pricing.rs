@@ -76,6 +76,23 @@ pub fn quote_translation(lines: &[String], target: &str, rates: Rates) -> Quote 
     quote(input, output, rates)
 }
 
+/// The most lines one request to the OpenSubs gateway may carry.
+pub const GATEWAY_MAX_LINES: usize = 500;
+
+/// What OpenSubs' own cloud translation charges for these lines, in credits.
+///
+/// The gateway prices every request with [`quote_translation`] at
+/// [`Rates::DEEPSEEK_CHAT`], so an app that shows this number before the
+/// job runs shows the number the gateway will charge. Lines are split into
+/// requests of at most [`GATEWAY_MAX_LINES`], each priced on its own, which
+/// is how a client that sends that many is billed.
+pub fn quote_cloud_translation(lines: &[String], target: &str) -> u32 {
+    lines
+        .chunks(GATEWAY_MAX_LINES)
+        .map(|chunk| quote_translation(chunk, target, Rates::DEEPSEEK_CHAT).credits)
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,5 +195,21 @@ mod scale {
                 q.margin() * 100.0
             );
         }
+    }
+
+    #[test]
+    fn the_cloud_quote_is_the_gateways_quote() {
+        let few = lines(40);
+        assert_eq!(
+            quote_cloud_translation(&few, "ja"),
+            quote_translation(&few, "ja", Rates::DEEPSEEK_CHAT).credits
+        );
+        // Past one request's worth, each request is priced on its own.
+        let many = lines(GATEWAY_MAX_LINES + 10);
+        let expected = quote_translation(&many[..GATEWAY_MAX_LINES], "ja", Rates::DEEPSEEK_CHAT)
+            .credits
+            + quote_translation(&many[GATEWAY_MAX_LINES..], "ja", Rates::DEEPSEEK_CHAT).credits;
+        assert_eq!(quote_cloud_translation(&many, "ja"), expected);
+        assert_eq!(quote_cloud_translation(&[], "ja"), 0);
     }
 }

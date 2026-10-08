@@ -4,6 +4,19 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import Icon from "./lib/Icon.svelte";
+  import AccountPanel from "./lib/AccountPanel.svelte";
+  import {
+    InsufficientCredits,
+    NotSignedIn,
+    PACK,
+    balance as accountBalance,
+    dollars,
+    onAccountChange,
+    priceLabel,
+    signedIn as accountSignedIn,
+    translateOnBackend,
+  } from "./lib/account";
+  import { openSignIn, onSignedIn } from "./lib/signin";
   import {
     probe,
     listStyles,
@@ -27,6 +40,9 @@
     type FfmpegInstallOutputPayload,
     type ModelOptionDto,
     type ModelDownloadProgressPayload,
+    type BurnOptions,
+    type TranscribedDto,
+    transcribeForCloud,
   } from "./lib/api";
 
   const VIDEO_EXTENSIONS = ["mp4", "mov", "mkv", "webm", "avi", "m4v"];
@@ -59,6 +75,17 @@
   let writeVtt = $state(false);
 
   let translateTo = $state("");
+  /** "device": the offline model, free. "cloud": our servers, credits. */
+  let translateVia = $state<"device" | "cloud">("device");
+
+  let showAccount = $state(false);
+  let loggedIn = $state(accountSignedIn());
+  let credits = $state<number | null>(null);
+
+  /** A cloud-translated export waiting for the person to agree to its price. */
+  let pendingCloud = $state<TranscribedDto | null>(null);
+  let pricing = $state(false);
+  let cloudError = $state<string | null>(null);
   let languages = $state<LanguageDto[]>([]);
   let canTranslate = $state<boolean | null>(null);
 
@@ -143,6 +170,8 @@
   // --- lifecycle -----------------------------------------------------------
 
   let unlistenDragDrop: (() => void) | null = null;
+  let stopAccount: (() => void) | null = null;
+  let unlistenSignIn: UnlistenFn | null = null;
 
   onMount(async () => {
     listStyles()
@@ -172,6 +201,20 @@
         ffmpegCheckError = String(e);
       });
 
+    const refreshAccount = () => {
+      loggedIn = accountSignedIn();
+      if (!loggedIn) {
+        credits = null;
+        return;
+      }
+      accountBalance()
+        .then((b) => (credits = b))
+        .catch(() => (credits = null));
+    };
+    refreshAccount();
+    stopAccount = onAccountChange(refreshAccount);
+    unlistenSignIn = await onSignedIn(refreshAccount);
+
     const webview = getCurrentWebview();
     unlistenDragDrop = await webview.onDragDropEvent((event) => {
       if (event.payload.type === "over") {
@@ -188,6 +231,8 @@
 
   onDestroy(() => {
     unlistenDragDrop?.();
+    stopAccount?.();
+    unlistenSignIn?.();
   });
 
   // --- actions -------------------------------------------------------------
@@ -308,7 +353,72 @@
     trimEnd = null;
   }
 
-  async function doBurn() {
+  function burnOptions(): BurnOptions {
+    return {
+      start: trim.start > 0 ? trim.start : null,
+      end: trim.end,
+      height: exportHeight === "" ? null : Number(exportHeight),
+      translateTo: translateTo === "" ? null : translateTo,
+      writeSrt,
+      writeVtt,
+    };
+  }
+
+  const usesCloud = $derived(translateTo !== "" && translateVia === "cloud");
+
+  // A price belongs to one video, model, clip and language. Change any of
+  // them and the person is shown a new price rather than charged an old one.
+  $effect(() => {
+    void [videoPath, modelPath, trim.start, trim.end, translateTo, translateVia];
+    pendingCloud = null;
+  });
+
+  function doBurn() {
+    if (usesCloud) void priceCloudTranslation();
+    else void runBurn(burnOptions());
+  }
+
+  /** Step one of a cloud-translated export: listen, then show the price. */
+  async function priceCloudTranslation() {
+    if (!canBurn || !videoPath || !modelPath) return;
+    cloudError = null;
+    burnError = null;
+    outputPath = null;
+    if (!accountSignedIn()) {
+      cloudError = new NotSignedIn().message;
+      return;
+    }
+    pricing = true;
+    try {
+      pendingCloud = await transcribeForCloud(videoPath, modelPath, burnOptions());
+      credits = await accountBalance().catch(() => credits);
+    } catch (e) {
+      cloudError = String(e);
+    } finally {
+      pricing = false;
+    }
+  }
+
+  /** Step two: the person agreed to the price. Translate, then export. */
+  async function confirmCloudTranslation() {
+    const job = pendingCloud;
+    if (!job || translateTo === "") return;
+    cloudError = null;
+    burning = true;
+    try {
+      const result = await translateOnBackend(job.lines, translateTo, job.language);
+      credits = result.newBalance;
+      pendingCloud = null;
+      burning = false;
+      await runBurn({ ...burnOptions(), cloud: { jobId: job.jobId, translations: result.translations } });
+    } catch (e) {
+      burning = false;
+      cloudError = e instanceof Error ? e.message : String(e);
+      if (e instanceof InsufficientCredits || e instanceof NotSignedIn) showAccount = true;
+    }
+  }
+
+  async function runBurn(options: BurnOptions) {
     if (!canBurn || !videoPath || !modelPath) return;
     burning = true;
     progress = 0;
@@ -320,14 +430,7 @@
       unlistenProgress = await listen<BurnProgressPayload>("burn-progress", (event) => {
         progress = event.payload.percent;
       });
-      outputPath = await burn(videoPath, selectedStyle, modelPath, null, {
-        start: trim.start > 0 ? trim.start : null,
-        end: trim.end,
-        height: exportHeight === "" ? null : Number(exportHeight),
-        translateTo: translateTo === "" ? null : translateTo,
-        writeSrt,
-        writeVtt,
-      });
+      outputPath = await burn(videoPath, selectedStyle, modelPath, null, options);
       progress = 100;
     } catch (e) {
       burnError = String(e);
@@ -399,13 +502,36 @@
 
 <main class="screen" class:drag-over={isDragOver}>
   <header class="app-header">
-    <div class="brand">
-      <span class="brand-open">Open</span><span class="brand-name">Subs</span><span
-        class="brand-dot">.</span
+    <div class="app-header-row">
+      <div class="brand">
+        <span class="brand-open">Open</span><span class="brand-name">Subs</span><span
+          class="brand-dot">.</span
+        >
+      </div>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm account-btn"
+        aria-expanded={showAccount}
+        aria-label={loggedIn ? "Account and credits" : "Sign in for cloud translation"}
+        onclick={() => (showAccount = !showAccount)}
       >
+        <Icon name="user" size={16} />
+        {#if loggedIn && credits !== null}
+          <span class="oa-mono">{priceLabel(credits)}</span>
+        {:else if !loggedIn}
+          <span>Sign in</span>
+        {/if}
+      </button>
     </div>
     <p class="oa-caption">Subtitle a video: drop a file, pick a look, burn it in.</p>
   </header>
+
+  {#if showAccount}
+    <section class="card account-card">
+      <h2 class="section-title">Account</h2>
+      <AccountPanel />
+    </section>
+  {/if}
 
   {#if ffmpegOk === false}
     <div class="banner banner-danger">
@@ -632,18 +758,47 @@
         </label>
       </div>
 
-      {#if canTranslate === false}
-        <p class="oa-caption">
-          Translation calls the Claude API with your own key, at your own cost. Set
-          <code class="oa-mono">ANTHROPIC_API_KEY</code> and restart to enable it.
-        </p>
-      {:else if translateTo !== ""}
-        <p class="oa-caption">
-          Translated on this computer by the model that came with the app, with no
-          network and no key &mdash; quick, but more literal than a hosted model. Set
-          <code class="oa-mono">ANTHROPIC_API_KEY</code> to use Claude instead.
-          Subtitle timings are unchanged; only the text is replaced.
-        </p>
+      {#if translateTo !== ""}
+        <fieldset class="translate-via" disabled={burning || pricing}>
+          <legend class="field-label">Translate with</legend>
+          <label class="radio">
+            <input
+              type="radio"
+              name="translate-via"
+              value="device"
+              bind:group={translateVia}
+              disabled={canTranslate === false}
+            />
+            <span>
+              <strong>This computer</strong> &middot; free
+              <span class="oa-caption radio-note">
+                {#if canTranslate === false}
+                  Not available in this build.
+                {:else}
+                  The model that came with the app, with no network and no account. Quick, but
+                  more literal.
+                {/if}
+              </span>
+            </span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="translate-via" value="cloud" bind:group={translateVia} />
+            <span>
+              <strong>Cloud</strong> &middot; uses credits
+              <span class="oa-caption radio-note">
+                Reads more naturally. You see the exact price before anything is charged, and a
+                failed translation costs nothing. {PACK.credits.toLocaleString("en")} credits
+                cost ${PACK.usd}.
+                {#if !loggedIn}
+                  <button type="button" class="link-btn" onclick={() => void openSignIn()}>
+                    Sign in to use it
+                  </button>
+                {/if}
+              </span>
+            </span>
+          </label>
+        </fieldset>
+        <p class="oa-caption">Subtitle timings are unchanged; only the text is replaced.</p>
       {/if}
 
       <div class="checkbox-row">
@@ -792,16 +947,83 @@
       </div>
     </section>
   {:else}
+    {#if pendingCloud}
+      {@const need = pendingCloud.credits}
+      {@const short = credits !== null && credits < need}
+      <section class="card price-card" aria-live="polite">
+        <h2 class="section-title">Cloud translation: {priceLabel(need)}</h2>
+        <p class="oa-caption">
+          {pendingCloud.lines.length}
+          {pendingCloud.lines.length === 1 ? "subtitle" : "subtitles"}, about {dollars(need)}.
+          {#if credits !== null}You have {priceLabel(credits)}.{/if}
+          You are charged this price only once the translation succeeds.
+        </p>
+        <div class="price-actions">
+          {#if short}
+            <p class="oa-caption">
+              You need {priceLabel(need - (credits ?? 0))} more.
+            </p>
+            <button type="button" class="btn btn-primary btn-sm" onclick={() => (showAccount = true)}>
+              Buy credits
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={burning}
+              onclick={() => void confirmCloudTranslation()}
+            >
+              Translate and burn &middot; {priceLabel(need)}
+            </button>
+          {/if}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            disabled={burning}
+            onclick={() => (pendingCloud = null)}
+          >
+            Cancel
+          </button>
+        </div>
+      </section>
+    {/if}
+    {#if cloudError}
+      <div class="banner banner-danger" role="alert">
+        <Icon name="alert-triangle" />
+        <div class="banner-body">
+          <p class="oa-caption">{cloudError}</p>
+          {#if !loggedIn}
+            <button type="button" class="btn btn-secondary btn-sm" onclick={() => void openSignIn()}>
+              Sign in
+            </button>
+          {/if}
+        </div>
+      </div>
+    {/if}
     <div class="burn-row">
-      {#if burning}
+      {#if pendingCloud}
+        <!-- The price card above carries this step's buttons. -->
+      {:else if pricing}
+        <span class="oa-caption">Listening to the video to work out the price&hellip;</span>
+      {:else if burning}
         <div class="progress-track" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
           <div class="progress-fill" style:width={`${progress}%`}></div>
         </div>
         <span class="oa-mono progress-label">{progress.toFixed(0)}%</span>
       {:else}
-        <button type="button" class="btn btn-primary" disabled={!canBurn} onclick={doBurn}>
-          Burn subtitles
+        <button
+          type="button"
+          class="btn btn-primary"
+          disabled={!canBurn || pendingCloud !== null || (usesCloud && !loggedIn)}
+          onclick={doBurn}
+        >
+          {usesCloud ? "See the price" : "Burn subtitles"}
         </button>
+        {#if usesCloud && !loggedIn}
+          <span class="oa-caption">Cloud translation needs an account.
+            <button type="button" class="link-btn" onclick={() => void openSignIn()}>Sign in</button>
+          </span>
+        {/if}
         {#if videoPath && !modelPath}
           <span class="oa-caption">Pick a whisper model to enable burning.</span>
         {:else if ffmpegOk === false}

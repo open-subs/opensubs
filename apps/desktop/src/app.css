@@ -47,6 +47,64 @@ body {
   padding-top: var(--space-2);
 }
 
+.app-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.translate-via {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.radio {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.radio input {
+  margin-top: 0.2rem;
+  accent-color: var(--text-strong);
+}
+
+.radio-note {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.link-btn {
+  padding: 0;
+  font: inherit;
+  color: var(--text-brand);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.price-card .price-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
 .brand {
   font: var(--type-h2);
   letter-spacing: var(--tracking-display);

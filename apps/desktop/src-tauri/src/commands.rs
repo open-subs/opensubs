@@ -19,8 +19,13 @@ use subs_media::{probe_args, MediaInfo, OutputSize, TrimRange, VideoEncoder};
 use subs_pipeline::{plan_job, write_ass, JobSpec, ProgressParser};
 use subs_style::{BorderStyle, Rgba, StyleTemplate};
 use subs_subtitle::{to_srt, to_vtt};
+use subs_asr::{AsrOptions, AudioRef, Transcriber};
 use subs_translate::{ClaudeTranslator, TranslateRequest, Translator};
 
+use crate::cloud::{
+    asr_work_dir, CachedTranscriber, CloudTranslation, PendingTranscripts, PresetTranslator,
+    TranscribedDto, TranscriptKey,
+};
 use crate::settings::{self, DesktopSettings};
 
 // ---------------------------------------------------------------------
@@ -111,6 +116,9 @@ pub struct BurnOptions {
     /// Write `<output>.srt` / `.vtt` alongside the video.
     pub write_srt: bool,
     pub write_vtt: bool,
+    /// Translations already bought from OpenSubs' cloud translation, for a
+    /// transcript `transcribe_for_cloud` made. See `cloud`.
+    pub cloud: Option<CloudTranslation>,
 }
 
 impl BurnOptions {
@@ -127,6 +135,15 @@ impl BurnOptions {
             .as_ref()
             .filter(|t| !t.trim().is_empty())
             .map(TranslateRequest::to)
+    }
+
+    fn transcript_key(&self, path: &str, model: &str) -> TranscriptKey {
+        TranscriptKey {
+            path: path.to_string(),
+            model: model.to_string(),
+            start: self.start,
+            end: self.end,
+        }
     }
 }
 
@@ -361,12 +378,34 @@ fn run_burn_job_in(
         model_path,
     } = paths;
 
+    // An export with paid cloud translations reuses the transcript they
+    // were priced from: listening again could produce different cues, and
+    // the translations would no longer line up.
+    let cached = match &options.cloud {
+        Some(cloud) => {
+            if options.translate_request().is_none() {
+                return Err("cloud translations were supplied without a target language".into());
+            }
+            let key = options.transcript_key(
+                &input.to_string_lossy(),
+                &model_path.to_string_lossy(),
+            );
+            Some(app.state::<PendingTranscripts>().get(&cloud.job_id, &key)?)
+        }
+        None => None,
+    };
+    let preset = options
+        .cloud
+        .as_ref()
+        .map(|c| PresetTranslator::new(c.translations.clone()));
+
     // Built before the transcription runs: a missing API key must be
     // reported now, not after the user has waited out a full transcribe.
     //
     // Claude when there is a key for it; otherwise the offline model the
     // installer carries, so translating needs neither a key nor a network.
     let translator: Option<Box<dyn Translator>> = match options.translate_request() {
+        Some(_) if preset.is_some() => None,
         Some(_) => Some(match ClaudeTranslator::from_env() {
             Ok(claude) => Box::new(claude) as Box<dyn Translator>,
             Err(no_key) => match bundled_translator(app) {
@@ -377,14 +416,18 @@ fn run_burn_job_in(
         None => None,
     };
 
-    let wav_path = work_dir.join("asr.wav");
-    extract_asr_audio(ffmpeg_bin, input, &wav_path, options.trim())
-        .map_err(|e| format!("extracting ASR audio from {}: {e}", input.display()))?;
-
     // whisper.cpp linked into the app, not ffmpeg's `whisper` filter: that
     // filter exists only in ffmpeg builds no installer can ship on macOS, and
     // needing one was the second install this app asked for.
-    let transcriber = WhisperTranscriber::new(model_path.to_path_buf());
+    let transcriber: Box<dyn Transcriber> = match cached {
+        Some(transcript) => Box::new(CachedTranscriber(transcript)),
+        None => {
+            let wav_path = work_dir.join("asr.wav");
+            extract_asr_audio(ffmpeg_bin, input, &wav_path, options.trim())
+                .map_err(|e| format!("extracting ASR audio from {}: {e}", input.display()))?;
+            Box::new(WhisperTranscriber::new(model_path.to_path_buf()))
+        }
+    };
 
     let spec = build_job_spec(
         input.to_path_buf(),
@@ -394,8 +437,15 @@ fn run_burn_job_in(
         options,
     );
 
-    let planned = plan_job(&spec, info, &transcriber, translator.as_deref())
+    let translator: Option<&dyn Translator> = match &preset {
+        Some(p) => Some(p),
+        None => translator.as_deref(),
+    };
+    let planned = plan_job(&spec, info, transcriber.as_ref(), translator)
         .map_err(|e| format!("transcription/planning failed: {e}"))?;
+    if preset.as_ref().is_some_and(|p| p.remaining() > 0) {
+        return Err("the paid translations did not match the subtitles; nothing was exported".into());
+    }
 
     write_ass(&planned).map_err(|e| format!("writing {}: {e}", planned.ass_path.display()))?;
 
@@ -724,6 +774,123 @@ pub fn set_model_path(app: AppHandle, path: String) -> Result<(), String> {
     settings::save(&settings_file, &updated).map_err(|e| e.to_string())
 }
 
+/// Listen to the video and price its cloud translation, without exporting.
+///
+/// The first step of a cloud-translated export (see `cloud`): the lines it
+/// returns are what the window sends for translation, and `credits` is the
+/// price the gateway will charge for them.
+#[tauri::command]
+pub async fn transcribe_for_cloud(
+    app: AppHandle,
+    path: String,
+    model: String,
+    options: Option<BurnOptions>,
+) -> Result<TranscribedDto, String> {
+    let options = options.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || transcribe_job(&app, &path, &model, &options))
+        .await
+        .map_err(|e| format!("transcription task panicked: {e}"))?
+}
+
+fn transcribe_job(
+    app: &AppHandle,
+    path: &str,
+    model: &str,
+    options: &BurnOptions,
+) -> Result<TranscribedDto, String> {
+    let target = options
+        .translate_request()
+        .ok_or("choose a language to translate into first")?
+        .target;
+    let heard = listen_for_lines(path, model, options)?;
+    let credits = subs_translate::pricing::quote_cloud_translation(&heard.lines, &target);
+    let job_id = app
+        .state::<PendingTranscripts>()
+        .insert(options.transcript_key(path, model), heard.transcript);
+    Ok(TranscribedDto {
+        job_id,
+        lines: heard.lines,
+        language: heard.language,
+        credits,
+    })
+}
+
+/// A transcript and the subtitle lines an export of it will carry.
+pub(crate) struct Heard {
+    pub transcript: subs_asr::Transcript,
+    pub lines: Vec<String>,
+    pub language: String,
+}
+
+/// Listen to `path` and work out the cues an export with `options` will
+/// burn, without exporting.
+pub(crate) fn listen_for_lines(
+    path: &str,
+    model: &str,
+    options: &BurnOptions,
+) -> Result<Heard, String> {
+    let input = PathBuf::from(path);
+    let model_path = PathBuf::from(model);
+    if !model_path.is_file() {
+        return Err(format!(
+            "whisper model not found at {} -- pick a .ggml/.bin model in the model picker",
+            model_path.display()
+        ));
+    }
+    let ffmpeg_bin = resolve_ffmpeg();
+    let info = probe_media(&resolve_ffprobe(&ffmpeg_bin), &input)
+        .map_err(|e| format!("probe of {}: {e}", input.display()))?;
+    options
+        .trim()
+        .validate(info.duration)
+        .map_err(|e| format!("{e} (the video is {:.2}s long)", info.duration))?;
+
+    let work_dir = asr_work_dir();
+    std::fs::create_dir_all(&work_dir)
+        .map_err(|e| format!("could not create {}: {e}", work_dir.display()))?;
+    let wav = work_dir.join("asr.wav");
+    let heard = extract_asr_audio(&ffmpeg_bin, &input, &wav, options.trim())
+        .map_err(|e| format!("extracting ASR audio from {}: {e}", input.display()))
+        .and_then(|()| {
+            WhisperTranscriber::new(model_path.clone())
+                .transcribe(&AudioRef::new(&wav), &AsrOptions::default())
+                .map_err(|e| format!("transcription failed: {e}"))
+        });
+    let _ = std::fs::remove_dir_all(&work_dir);
+    let transcript = heard?;
+
+    // The same planning the export does, with nothing to translate yet, so
+    // these lines are exactly the cues the export will ask translations for.
+    let style = subs_style::all_presets()
+        .first()
+        .cloned()
+        .ok_or("no subtitle styles are built in")?;
+    let mut untranslated = options.clone();
+    untranslated.translate_to = None;
+    let spec = build_job_spec(input.clone(), default_output(&input), style, work_dir, &untranslated);
+    let planned = plan_job(&spec, &info, &CachedTranscriber(transcript.clone()), None)
+        .map_err(|e| format!("planning failed: {e}"))?;
+    let lines: Vec<String> = planned.source_cues.iter().map(|c| c.text()).collect();
+    if lines.is_empty() {
+        return Err("no speech was found in this video, so there is nothing to translate".into());
+    }
+    Ok(Heard {
+        language: transcript.language.clone(),
+        transcript,
+        lines,
+    })
+}
+
+/// Close the window that asks. For the sign-in window, which cannot close
+/// itself reliably from script: a window made at runtime reports the main
+/// window's label to the JS API, so `getCurrentWindow().close()` closed the
+/// main window. Tauri resolves this `Window` from the webview that sent the
+/// call, which is the one identity it cannot get wrong.
+#[tauri::command]
+pub fn close_window(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn burn(
     app: AppHandle,
@@ -1001,6 +1168,53 @@ mod tests {
         assert_eq!(from_empty, BurnOptions::default());
     }
 
+    /// Real speech, real model: the lines priced for cloud translation are
+    /// exactly the cues the export then asks translations for, so the paid
+    /// translations land one-to-one. Needs ffmpeg on PATH, a whisper model
+    /// and a video with speech:
+    ///   OPENSUBS_TEST_VIDEO=… OPENSUBS_TEST_MODEL=… cargo test -- --ignored priced_lines
+    #[test]
+    #[ignore]
+    fn priced_lines_are_the_cues_the_export_translates() {
+        let (Ok(video), Ok(model)) = (
+            std::env::var("OPENSUBS_TEST_VIDEO"),
+            std::env::var("OPENSUBS_TEST_MODEL"),
+        ) else {
+            panic!("set OPENSUBS_TEST_VIDEO and OPENSUBS_TEST_MODEL");
+        };
+        let options = BurnOptions {
+            translate_to: Some("zh-Hans".into()),
+            ..BurnOptions::default()
+        };
+        let heard = listen_for_lines(&video, &model, &options).unwrap();
+        assert!(!heard.lines.is_empty());
+        let paid: Vec<String> = heard.lines.iter().map(|l| format!("T:{l}")).collect();
+
+        let input = PathBuf::from(&video);
+        let info = probe_media(&resolve_ffprobe(&resolve_ffmpeg()), &input).unwrap();
+        let spec = spec_with(&options);
+        let preset = PresetTranslator::new(paid.clone());
+        let planned = plan_job(&spec, &info, &CachedTranscriber(heard.transcript), Some(&preset)).unwrap();
+        assert_eq!(preset.remaining(), 0, "translations left over");
+        // Each cue carries its own translation. Compared without whitespace,
+        // because a translation is re-wrapped for its script on the way in.
+        let squash = |t: &str| t.split_whitespace().collect::<String>();
+        let burned: Vec<String> = planned.cues.iter().map(|c| squash(&c.text())).collect();
+        let expected: Vec<String> = paid.iter().map(|p| squash(p)).collect();
+        assert_eq!(burned, expected);
+    }
+
+    #[test]
+    fn paid_translations_arrive_with_the_job_they_were_priced_for() {
+        let options: BurnOptions = serde_json::from_str(
+            r#"{"translateTo":"zh-Hans","cloud":{"jobId":"job-1","translations":["你好"]}}"#,
+        )
+        .unwrap();
+        let cloud = options.cloud.unwrap();
+        assert_eq!(cloud.job_id, "job-1");
+        assert_eq!(cloud.translations, ["你好"]);
+    }
+
     #[test]
     fn options_reach_the_spec() {
         let options = BurnOptions {
@@ -1011,6 +1225,7 @@ mod tests {
             style_file: None,
             write_srt: true,
             write_vtt: false,
+            cloud: None,
         };
         let spec = spec_with(&options);
         assert_eq!(spec.trim, TrimRange::new(3.0, Some(9.0)));

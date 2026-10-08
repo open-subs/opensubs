@@ -8,16 +8,21 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:e2e": "node e2e/account.spec.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@openapps/sdk": "file:../web/vendor/openapps/sdk",
+    "@openapps/ui": "file:../web/vendor/openapps/ui",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2"
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tauri-apps/cli": "^2",
+    "playwright": "^1.62.1",
     "svelte": "^5.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.0.3"

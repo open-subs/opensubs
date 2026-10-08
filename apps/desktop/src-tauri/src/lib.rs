@@ -1,6 +1,7 @@
 //! The opensubs desktop shell: a Tauri 2 window around the already-tested
 //! `subs-*` engine crates. See `commands` for the whole command surface.
 
+mod cloud;
 mod commands;
 mod models;
 mod settings;
@@ -9,6 +10,8 @@ mod settings;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(cloud::PendingTranscripts::default())
         .invoke_handler(tauri::generate_handler![
             commands::probe,
             commands::list_styles,
@@ -26,6 +29,8 @@ pub fn run() {
             commands::get_model_path,
             commands::set_model_path,
             commands::burn,
+            commands::transcribe_for_cloud,
+            commands::close_window,
             commands::reveal,
         ])
         .run(tauri::generate_context!())

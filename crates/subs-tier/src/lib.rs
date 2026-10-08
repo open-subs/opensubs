@@ -84,11 +84,21 @@ pub struct FeatureInfo {
 
 impl FeatureInfo {
     const fn free(id: &'static str, title: &'static str, why: &'static str) -> Self {
-        Self { id, title, cost: Cost::Free, why }
+        Self {
+            id,
+            title,
+            cost: Cost::Free,
+            why,
+        }
     }
 
     const fn costing(id: &'static str, title: &'static str, cost: Cost, why: &'static str) -> Self {
-        Self { id, title, cost, why }
+        Self {
+            id,
+            title,
+            cost,
+            why,
+        }
     }
 }
 
@@ -217,8 +227,18 @@ mod tests {
 
     #[test]
     fn output_quality_is_never_paid_for() {
-        for id in ["no_watermark", "unlimited_length", "burn", "asr", "export_resolution"] {
-            assert_eq!(feature(id).unwrap().cost, Cost::Free, "{id} costs something");
+        for id in [
+            "no_watermark",
+            "unlimited_length",
+            "burn",
+            "asr",
+            "export_resolution",
+        ] {
+            assert_eq!(
+                feature(id).unwrap().cost,
+                Cost::Free,
+                "{id} costs something"
+            );
         }
     }
 
@@ -236,15 +256,32 @@ mod tests {
     #[test]
     fn descriptions_are_written_for_users() {
         const INTERNAL: &[&str] = &[
-            "competitor", "study", "spec", "\u{a7}", "conversion", "p1 ", "tier",
-            "premium", "captions is", "submagic", "opus clip", "monetis", "table stakes",
+            "competitor",
+            "study",
+            "spec",
+            "\u{a7}",
+            "conversion",
+            "p1 ",
+            "tier",
+            "premium",
+            "captions is",
+            "submagic",
+            "opus clip",
+            "monetis",
+            "table stakes",
         ];
         let mut texts: Vec<(&str, &str)> = Vec::new();
         for f in catalog() {
             texts.push((f.id, f.why));
             texts.push((f.id, f.title));
         }
-        for cost in [Cost::Free, Cost::FreeOrOwnKey, Cost::FreeOrCredits, Cost::OwnKey, Cost::Paid] {
+        for cost in [
+            Cost::Free,
+            Cost::FreeOrOwnKey,
+            Cost::FreeOrCredits,
+            Cost::OwnKey,
+            Cost::Paid,
+        ] {
             texts.push(("cost", cost.label()));
             texts.push(("cost", cost.explanation()));
         }
@@ -266,12 +303,20 @@ mod tests {
     #[test]
     fn summary_has_one_line_per_feature() {
         assert_eq!(summary_lines().len(), catalog().len());
-        assert!(summary_lines().iter().any(|l| l.contains("Free, or credits")));
+        assert!(summary_lines()
+            .iter()
+            .any(|l| l.contains("Free, or credits")));
     }
 
     #[test]
     fn every_cost_explains_itself() {
-        for cost in [Cost::Free, Cost::FreeOrOwnKey, Cost::FreeOrCredits, Cost::OwnKey, Cost::Paid] {
+        for cost in [
+            Cost::Free,
+            Cost::FreeOrOwnKey,
+            Cost::FreeOrCredits,
+            Cost::OwnKey,
+            Cost::Paid,
+        ] {
             assert!(!cost.label().is_empty());
             assert!(!cost.explanation().is_empty());
         }

@@ -56,6 +56,16 @@ export interface BurnOptions {
   styleFile?: string | null;
   writeSrt?: boolean;
   writeVtt?: boolean;
+  /** Translations bought from cloud translation, for a priced transcript. */
+  cloud?: { jobId: string; translations: string[] } | null;
+}
+
+/** A transcript priced for cloud translation; see `transcribeForCloud`. */
+export interface TranscribedDto {
+  jobId: string;
+  lines: string[];
+  language: string;
+  credits: number;
 }
 
 export interface BurnProgressPayload {
@@ -189,6 +199,15 @@ export function burn(
   options?: BurnOptions,
 ): Promise<string> {
   return invoke("burn", { path, style, model, output, options: options ?? null });
+}
+
+/** Listen to the video and price its cloud translation, without exporting. */
+export function transcribeForCloud(
+  path: string,
+  model: string,
+  options: BurnOptions,
+): Promise<TranscribedDto> {
+  return invoke("transcribe_for_cloud", { path, model, options });
 }
 
 export function reveal(path: string): Promise<void> {
