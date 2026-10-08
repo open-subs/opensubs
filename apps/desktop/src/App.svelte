@@ -65,6 +65,15 @@
   let features = $state<FeatureDto[]>([]);
   let showFeatures = $state(false);
 
+  // Windows paths separate with backslashes, and a bundled model's path comes
+  // back from Tauri with the `\\?\` prefix; the file name is what to show.
+  const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+  const revealLabel = navigator.userAgent.includes("Windows")
+    ? "Show in Explorer"
+    : navigator.userAgent.includes("Mac")
+      ? "Reveal in Finder"
+      : "Show in folder";
+
   let modelPath = $state<string | null>(null);
   let downloadableModels = $state<ModelOptionDto[]>([]);
   let showModelDownloads = $state(false);
@@ -477,7 +486,7 @@
           {#if probing}
             <p class="oa-mono">Probing&hellip;</p>
           {:else if probeError}
-            <p class="filename">{videoPath.split("/").pop()}</p>
+            <p class="filename">{fileName(videoPath)}</p>
             <p class="error-text">{probeError}</p>
           {:else if mediaInfo}
             <p class="filename">{mediaInfo.filename}</p>
@@ -654,7 +663,7 @@
     <h2 class="section-title">Model</h2>
     {#if modelPath}
       <div class="model-row">
-        <span class="oa-mono model-path">{modelPath.split("/").pop()}</span>
+        <span class="oa-mono model-path">{fileName(modelPath)}</span>
         <div class="model-row-actions">
           <button
             type="button"
@@ -771,13 +780,13 @@
     <section class="card success-card">
       <Icon name="check-circle" size={22} />
       <div class="success-body">
-        <p class="success-title">Wrote {outputPath.split("/").pop()}</p>
+        <p class="success-title">Wrote {fileName(outputPath)}</p>
         <p class="oa-mono file-meta">{outputPath}</p>
       </div>
       <div class="success-actions">
         <button type="button" class="btn btn-secondary btn-sm" onclick={doReveal}>
           <Icon name="folder-open" size={14} />
-          Reveal in Finder
+          {revealLabel}
         </button>
         <button type="button" class="btn btn-ghost btn-sm" onclick={reset}>Start over</button>
       </div>
