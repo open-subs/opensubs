@@ -8,7 +8,7 @@
 
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command as Process, Stdio};
+use std::process::Stdio;
 use std::thread;
 
 use serde::{Deserialize, Serialize};
@@ -194,7 +194,7 @@ fn resolve_ffprobe(ffmpeg_bin: &Path) -> PathBuf {
 }
 
 fn probe_media(ffprobe: &Path, input: &Path) -> Result<MediaInfo, String> {
-    let out = Process::new(ffprobe)
+    let out = subs_media::command(ffprobe)
         .args(probe_args(input))
         .output()
         .map_err(|e| format!("failed to run {}: {e}", ffprobe.display()))?;
@@ -250,7 +250,7 @@ fn extract_asr_audio(
     // The same span the burn will export, so the transcript's clock and
     // the clip's clock are the same clock.
     let argv = subs_media::extract_audio_args(input, out_wav, trim);
-    let out = Process::new(ffmpeg_bin)
+    let out = subs_media::command(ffmpeg_bin)
         .args(&argv)
         .output()
         .map_err(|e| format!("failed to spawn {}: {e}", ffmpeg_bin.display()))?;
@@ -290,7 +290,7 @@ fn run_burn_ffmpeg(
     argv: &[String],
     total_duration: f64,
 ) -> Result<(), String> {
-    let mut child = Process::new(ffmpeg_bin)
+    let mut child = subs_media::command(ffmpeg_bin)
         .args(argv)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -739,17 +739,42 @@ pub async fn burn(
     .map_err(|e| format!("burn task panicked: {e}"))?
 }
 
+/// Show the finished file in the system's file manager: selected in Finder
+/// and Explorer, its folder opened on Linux.
 #[tauri::command]
 pub fn reveal(path: String) -> Result<(), String> {
-    let status = Process::new("open")
-        .arg("-R")
-        .arg(&path)
-        .status()
-        .map_err(|e| format!("failed to run 'open -R {path}': {e}"))?;
-    if !status.success() {
-        return Err(format!("'open -R {path}' exited with {status}"));
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Explorer wants the quotes around the path alone, not around the
+        // whole `/select,` argument as Rust would put them; and it exits 1
+        // even when the window opened, so only a failure to start counts.
+        subs_media::command("explorer")
+            .raw_arg(format!("/select,\"{path}\""))
+            .spawn()
+            .map_err(|e| format!("failed to run explorer: {e}"))?;
+        Ok(())
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        let mut cmd = if cfg!(target_os = "macos") {
+            let mut open = subs_media::command("open");
+            open.arg("-R").arg(&path);
+            open
+        } else {
+            let dir = Path::new(&path).parent().unwrap_or(Path::new("."));
+            let mut open = subs_media::command("xdg-open");
+            open.arg(dir);
+            open
+        };
+        let status = cmd
+            .status()
+            .map_err(|e| format!("failed to show {path}: {e}"))?;
+        if !status.success() {
+            return Err(format!("showing {path} exited with {status}"));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

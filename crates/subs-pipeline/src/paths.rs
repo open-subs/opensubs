@@ -96,7 +96,7 @@ fn registry_path_dirs() -> Vec<PathBuf> {
     ];
     let mut dirs = Vec::new();
     for key in KEYS {
-        let Ok(out) = std::process::Command::new("reg")
+        let Ok(out) = subs_media::command("reg")
             .args(["query", key, "/v", "Path"])
             .output()
         else {

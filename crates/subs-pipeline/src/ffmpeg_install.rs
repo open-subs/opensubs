@@ -11,7 +11,7 @@
 
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::process::{Command as Process, Stdio};
+use std::process::Stdio;
 use std::sync::mpsc;
 use std::thread;
 
@@ -41,7 +41,7 @@ pub fn missing_from_listing(listing: &str) -> Vec<&'static str> {
 /// whole job. `Err` means it could not be run at all -- most often, not
 /// installed.
 pub fn missing_filters(ffmpeg_bin: &Path) -> Result<Vec<&'static str>, String> {
-    let out = Process::new(ffmpeg_bin)
+    let out = subs_media::command(ffmpeg_bin)
         .arg("-filters")
         .output()
         .map_err(|e| format!("failed to run {} -filters: {e}", ffmpeg_bin.display()))?;
@@ -147,7 +147,7 @@ fn run_streaming(
     args: &[&str],
     mut on_line: impl FnMut(&str),
 ) -> Result<(), String> {
-    let mut child = Process::new(program)
+    let mut child = subs_media::command(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
