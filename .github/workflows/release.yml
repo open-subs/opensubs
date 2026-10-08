@@ -47,6 +47,10 @@ jobs:
         with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        # whisper-rs-sys does not rebuild when GGML_NATIVE changes, so a
+        # target dir cached before it was set would keep the runner-tuned
+        # build. A new key never restores one.
+        with: { key: ggml-portable }
       - name: Linux build dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -72,6 +76,25 @@ jobs:
           # (RuntimeLibrary mismatch). whisper.cpp's cmake build follows
           # the flag, and the installer stops needing the VC++ runtime.
           RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
+          # ggml defaults to GGML_NATIVE: it compiles for whatever CPU the
+          # runner happens to have. On a runner with AVX-512 that gave an
+          # installer which died with an illegal instruction (0xc000001d)
+          # the moment transcription started, on every machine without it --
+          # most laptops. whisper-rs-sys hands GGML_* through to cmake, and
+          # with native off ggml targets AVX2, which any x86-64 CPU from
+          # 2013 on has. CTranslate2 picks its instruction set at run time
+          # and needs nothing here.
+          GGML_NATIVE: "OFF"
+      # The flag above is easy to lose and the failure only shows on someone
+      # else's computer, so check what cmake actually configured.
+      - name: whisper.cpp built for any CPU, not the runner's
+        shell: bash
+        run: |
+          cache="$(ls target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)"
+          echo "$cache"
+          grep -E '^GGML_(NATIVE|AVX512[A-Z_0-9]*):BOOL=' "$cache"
+          grep -q '^GGML_NATIVE:BOOL=OFF' "$cache" || { echo "ggml was built for this runner's CPU" >&2; exit 1; }
+          ! grep -qE '^GGML_AVX512[A-Z_0-9]*:BOOL=ON' "$cache" || { echo "ggml was built with AVX-512" >&2; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
