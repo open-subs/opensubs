@@ -29,9 +29,11 @@ export interface StyleDto {
 export interface FeatureDto {
   id: string;
   title: string;
-  tier: "Free" | "Premium";
+  /** `subs_tier::Cost`, kebab-case. */
+  cost: "free" | "free-or-own-key" | "free-or-credits" | "own-key" | "paid";
+  costLabel: string;
+  costNote: string;
   why: string;
-  unlocked: boolean;
 }
 
 export interface LanguageDto {

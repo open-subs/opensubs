@@ -1,49 +1,36 @@
-//! Which capabilities are free, which are premium, and what is unlocked
-//! right now.
+//! What each capability is, and what it costs the person using it.
 //!
-//! The competitor study (`市场洞察与竞品研究 - 产品竞争格局调研`, §5.2) split
-//! this category's features into a free acquisition set and three paid
-//! conversion points, and the design spec (§7) then constrained where a gate
-//! may ever fall: **volume and automation, never quality.** Those two
-//! documents disagree on two rows -- the study assumes the industry-standard
-//! watermark and length cap on the free tier, which §7 forbids outright --
-//! and this module is where that disagreement is resolved in code rather
-//! than in prose. See [`PREMIUM_UNLOCKED`].
+//! One catalogue, read by the desktop app's "What's included" panel, the web
+//! app's equivalent and the CLI's `features` command, so the three can never
+//! describe the product differently.
 //!
-//! Nothing here gates anything. Every call site asks [`is_unlocked`] and is
-//! told `true`, because [`PREMIUM_UNLOCKED`] is `true`. The point of routing
-//! the question through a single function anyway is that the day a gate does
-//! arrive, it arrives *here*, with the whole catalogue visible in one screen
-//! -- rather than as a scatter of `if paid` scattered through the pipeline,
-//! which is how the billing complaints in §5.3 start.
+//! The rule it encodes: **everything that runs on the user's machine is
+//! free.** Their CPU does that work whether or not anyone is paid, and the
+//! source is open, so a "paid" switch on local work would be a suggestion
+//! rather than a price. What can honestly cost money is work done on our
+//! backend with a key we hold -- today that is cloud translation, paid for
+//! in credits, priced before it runs and charged only when it succeeds.
+//!
+//! The text in this module is shown to users verbatim. Keep it about what a
+//! feature does for them; [`tests::descriptions_are_written_for_users`]
+//! refuses internal vocabulary and untranslated text.
 
 use serde::Serialize;
 
-/// **Premium features are unlocked for every user.**
-///
-/// Flipping this to `false` is deliberately not enough to ship a paywall:
-/// there is no licence check, no account, and no entitlement source behind
-/// it. It exists so that the catalogue can answer "is this gated?" honestly
-/// today, and so that the eventual gate has exactly one place to live.
-pub const PREMIUM_UNLOCKED: bool = true;
-
-/// What a capability actually costs the person using it, today.
-///
-/// Distinct from [`Tier`], which says where revenue *would* come from.
-/// A user does not care about that; they care whether pressing the button
-/// costs them anything, and if so, whom they pay. Keeping the two separate
-/// is what lets the interface be honest about both at once.
+/// What a capability costs the person using it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Cost {
     /// Runs on the user's machine. No key, no account, no bill.
     Free,
-    /// Free on-device, with a better paid route available if they want it.
+    /// Free on-device, with a better route through the user's own API key.
     FreeOrOwnKey,
+    /// Free on-device, with a better route on our backend, paid in credits.
+    FreeOrCredits,
     /// Needs the user's own API key. They pay that provider directly; we
     /// never see the traffic or take a cut.
     OwnKey,
-    /// Billed by us, through our own backend. Free during testing.
+    /// Runs on our backend and is paid in credits.
     Paid,
 }
 
@@ -53,8 +40,9 @@ impl Cost {
         match self {
             Self::Free => "Free",
             Self::FreeOrOwnKey => "Free, or your own key",
+            Self::FreeOrCredits => "Free, or credits",
             Self::OwnKey => "Your own API key",
-            Self::Paid => "Paid",
+            Self::Paid => "Credits",
         }
     }
 
@@ -65,29 +53,18 @@ impl Cost {
             Self::FreeOrOwnKey => {
                 "Works for free on this device. Bring an API key for better quality."
             }
-            Self::OwnKey => {
-                "Calls a service with your own key. You pay that provider directly;                  the key stays in this tab."
+            Self::FreeOrCredits => {
+                "Free on this device. The cloud option is more fluent and uses credits; \
+                 you see the price before it runs."
             }
-            Self::Paid => "Runs on our backend. Free while we are testing.",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Tier {
-    /// Free forever, per design spec §7. Gating any of these would make the
-    /// product the thing its own thesis is a reaction to.
-    Free,
-    /// Positioned as paid by the competitor study, shipped unlocked today.
-    Premium,
-}
-
-impl Tier {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Free => "Free",
-            Self::Premium => "Premium",
+            Self::OwnKey => {
+                "Calls a service with your own key. You pay that provider directly; \
+                 the key stays on your device."
+            }
+            Self::Paid => {
+                "Runs on our servers and uses credits. You see the price before it runs, \
+                 and a job that fails costs nothing."
+            }
         }
     }
 }
@@ -99,207 +76,118 @@ pub struct FeatureInfo {
     /// by the desktop UI; never rename one without updating both.
     pub id: &'static str,
     pub title: &'static str,
-    pub tier: Tier,
-    /// What using it costs the person using it, right now.
+    /// What using it costs the person using it.
     pub cost: Cost,
-    /// Why it sits in that tier -- the finding, not a marketing line.
+    /// One sentence for the user: what the feature is and what it does.
     pub why: &'static str,
-    /// Whether this build actually lets the user have it.
-    pub unlocked: bool,
 }
 
 impl FeatureInfo {
     const fn free(id: &'static str, title: &'static str, why: &'static str) -> Self {
-        Self {
-            id,
-            title,
-            tier: Tier::Free,
-            cost: Cost::Free,
-            why,
-            unlocked: true,
-        }
+        Self { id, title, cost: Cost::Free, why }
     }
 
-    const fn premium(id: &'static str, title: &'static str, why: &'static str) -> Self {
-        Self {
-            id,
-            title,
-            tier: Tier::Premium,
-            cost: Cost::Free,
-            unlocked: PREMIUM_UNLOCKED,
-            why,
-        }
-    }
-
-    /// A premium row that costs the user something to actually run.
-    const fn premium_costing(
-        id: &'static str,
-        title: &'static str,
-        cost: Cost,
-        why: &'static str,
-    ) -> Self {
-        Self {
-            id,
-            title,
-            tier: Tier::Premium,
-            cost,
-            unlocked: PREMIUM_UNLOCKED,
-            why,
-        }
+    const fn costing(id: &'static str, title: &'static str, cost: Cost, why: &'static str) -> Self {
+        Self { id, title, cost, why }
     }
 }
 
-/// The free acquisition set: the study's §5.2 "user actually uses it, and
-/// every direct competitor gives it away" rows, plus the two the design
-/// spec's §7 promotes out of premium.
-const FREE: &[FeatureInfo] = &[
+const CATALOG: &[FeatureInfo] = &[
     FeatureInfo::free(
         "import",
         "Video import and probe",
-        "Every one of the twelve competitors surveyed gives basic import away; \
-         it is an entry ticket, not a differentiator.",
+        "Open a video and see its length, resolution and audio before you start.",
     ),
     FeatureInfo::free(
         "trim",
         "Trim to a clip",
-        "The study's headline scenario is 裁剪切片 -- cutting a clip out of a \
-         longer take. Charging for the scenario's first step would be charging \
-         for the product.",
+        "Cut out just the part you want before adding subtitles.",
     ),
     FeatureInfo::free(
         "asr",
         "Automatic subtitle generation",
-        "Accuracy is the category's entry expectation (6 of 9 competitors are \
-         praised for it by name in store reviews), so it cannot be the gate.",
+        "Turns the speech in your video into timed subtitles, on this computer.",
     ),
     FeatureInfo::free(
         "style_presets",
         "Subtitle style presets",
-        "Basic templates are table stakes; Captions is criticised in its own \
-         reviews for shipping too few of them.",
+        "Ready-made subtitle looks you can apply with one click.",
     ),
     FeatureInfo::free(
         "burn",
         "Burn-in export",
-        "The closed loop has to close, or the free tier is a demo rather than \
-         a product.",
+        "Writes the subtitles into the picture and saves a new MP4.",
     ),
     FeatureInfo::free(
         "sidecar_subtitles",
         "SRT and VTT sidecar files",
-        "Pure text serialisation of work already done. Withholding the user's \
-         own transcript is a hostage tactic, not a feature.",
+        "Saves the subtitles as SRT or VTT files you can edit or upload anywhere.",
     ),
     FeatureInfo::free(
         "no_watermark",
         "No watermark, at any resolution",
-        "The study reports the whole category monetises here (free = watermark, \
-         paid = clean). Design spec §7 refuses: gating output quality is the \
-         one move that would collapse the positioning.",
+        "Your video comes out clean, with nothing added to the picture.",
     ),
     FeatureInfo::free(
         "unlimited_length",
         "Unlimited clip length and no export quota",
-        "Same refusal. Submagic's 3-videos-a-month cap and Opus Clip's \
-         expiring exports are the top-cited free-tier grievances in §5.3.",
+        "Videos of any length, and as many exports as you like.",
     ),
-];
-
-/// The paid set. Every row here is shipped working and unlocked; the tier is
-/// a statement about where revenue would come from, not about what this
-/// build withholds.
-const PREMIUM: &[FeatureInfo] = &[
-    FeatureInfo::premium(
+    FeatureInfo::free(
         "high_accuracy_asr",
-        "Large ASR models",
-        "The study's first conversion point. Larger models cost real compute, \
-         which is the honest kind of thing to charge for -- so it is priced \
-         here, and given away today.",
+        "Larger speech models",
+        "Download a larger speech model for more accurate subtitles. It still runs on this computer.",
     ),
-    FeatureInfo::premium(
+    FeatureInfo::free(
         "export_resolution",
         "Export resolution and encoder control",
-        "The study's second conversion point (\"unlock HD\"). Inverted here: \
-         the control is offered rather than the quality withheld.",
+        "Choose the output resolution, from the original size down to smaller files.",
     ),
-    FeatureInfo::premium(
+    FeatureInfo::free(
         "advanced_styles",
         "Advanced style pack",
-        "The study's third conversion point, and the one gate design spec §7 \
-         endorses outright -- a style pack takes design labour and withholding \
-         it degrades nobody's output.",
+        "A second set of subtitle styles with bolder outlines, boxes and highlights.",
     ),
-    FeatureInfo::premium(
+    FeatureInfo::free(
         "custom_styles",
         "Custom style templates from JSON",
-        "Automation, which §7 names as fair to charge for.",
+        "Load your own subtitle style from a JSON file.",
     ),
-    FeatureInfo::premium_costing(
+    FeatureInfo::costing(
         "translation",
         "Translated subtitles",
-        Cost::FreeOrOwnKey,
-        "P1 differentiator in the study; all four competitors offering it \
-         charge for it. Costs a per-request API call, so it is priced with the \
-         cost.",
+        Cost::FreeOrCredits,
+        "Translate the subtitles into another language. On this computer it is free; \
+         cloud translation reads more naturally and uses credits.",
     ),
-    FeatureInfo::premium(
+    FeatureInfo::free(
         "batch_cli",
-        "Scriptable CLI",
-        "§7's structural differentiator: automation and volume, the two things \
-         a per-export competitor cannot give away.",
+        "Command-line tool",
+        "Subtitle videos from scripts and the terminal with the opensubs command.",
     ),
 ];
 
-/// Every catalogue row, free first.
+/// Every catalogue row.
 pub fn catalog() -> Vec<FeatureInfo> {
-    FREE.iter().chain(PREMIUM.iter()).copied().collect()
+    CATALOG.to_vec()
 }
 
 /// Look a row up by its stable id.
 pub fn feature(id: &str) -> Option<FeatureInfo> {
-    FREE.iter()
-        .chain(PREMIUM.iter())
-        .find(|f| f.id == id)
-        .copied()
+    CATALOG.iter().find(|f| f.id == id).copied()
 }
 
-/// Whether this build lets the user have `id`.
-///
-/// An unknown id is **not** unlocked: a typo in a call site must fail
-/// closed and loudly in tests, rather than silently granting whatever it
-/// meant to ask about.
-pub fn is_unlocked(id: &str) -> bool {
-    feature(id).is_some_and(|f| f.unlocked)
-}
-
-/// One line per row, for `opensubs features` and for the release notes.
+/// One line per row, for `opensubs features`.
 pub fn summary_lines() -> Vec<String> {
     catalog()
         .into_iter()
-        .map(|f| {
-            let state = if f.unlocked { "unlocked" } else { "locked" };
-            format!(
-                "{:<20} {:<8} {state:<9} {:<22} {}",
-                f.id,
-                f.tier.label(),
-                f.cost.label(),
-                f.title
-            )
-        })
+        .map(|f| format!("{:<20} {:<17} {}", f.id, f.cost.label(), f.title))
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_feature_is_unlocked_in_this_build() {
-        for f in catalog() {
-            assert!(f.unlocked, "{} is gated", f.id);
-            assert!(is_unlocked(f.id), "{} reports as gated", f.id);
-        }
-    }
 
     #[test]
     fn ids_are_unique_and_lookup_is_exact() {
@@ -311,62 +199,14 @@ mod tests {
 
         assert!(feature("translation").is_some());
         assert!(feature("Translation").is_none());
-    }
-
-    #[test]
-    fn an_unknown_feature_fails_closed() {
-        assert!(!is_unlocked("no_such_feature"));
         assert!(feature("no_such_feature").is_none());
     }
 
     #[test]
-    fn output_quality_is_never_a_premium_row() {
-        // Design spec §7: the free tier is any length, any resolution, no
-        // watermark. If either of these ever moves to Premium the thesis is
-        // gone, so the move has to break a test on the way out.
-        for id in ["no_watermark", "unlimited_length", "burn", "asr"] {
-            assert_eq!(
-                feature(id).unwrap().tier,
-                Tier::Free,
-                "{id} left the free tier"
-            );
-        }
-    }
-
-    #[test]
-    fn every_row_explains_itself() {
-        for f in catalog() {
-            assert!(!f.why.is_empty(), "{}: no rationale", f.id);
-            assert!(!f.title.is_empty(), "{}: no title", f.id);
-        }
-    }
-
-    #[test]
-    fn summary_has_one_line_per_feature() {
-        assert_eq!(summary_lines().len(), catalog().len());
-    }
-
-    #[test]
-    fn every_free_tier_row_is_free_to_run() {
-        // A "free forever" feature that costs money to use would be a
-        // contradiction the interface could not explain away.
-        for f in catalog() {
-            if f.tier == Tier::Free {
-                assert_eq!(
-                    f.cost,
-                    Cost::Free,
-                    "{} is free-tier but costs {:?}",
-                    f.id,
-                    f.cost
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn only_translation_costs_the_user_anything_today() {
-        // Everything else runs locally. If that changes, this test is the
-        // place to notice, because the badges in the UI come from here.
+    fn everything_local_is_free() {
+        // Only work on our backend may cost credits. If another row starts
+        // costing something, this is the place to notice, because the
+        // badges in every app come from here.
         let paying: Vec<&str> = catalog()
             .into_iter()
             .filter(|f| f.cost != Cost::Free)
@@ -376,18 +216,64 @@ mod tests {
     }
 
     #[test]
-    fn every_cost_explains_itself() {
-        for cost in [Cost::Free, Cost::FreeOrOwnKey, Cost::OwnKey, Cost::Paid] {
-            assert!(!cost.label().is_empty());
-            assert!(!cost.explanation().is_empty());
+    fn output_quality_is_never_paid_for() {
+        for id in ["no_watermark", "unlimited_length", "burn", "asr", "export_resolution"] {
+            assert_eq!(feature(id).unwrap().cost, Cost::Free, "{id} costs something");
         }
     }
 
     #[test]
-    fn the_summary_names_the_cost() {
-        assert!(summary_lines().iter().any(|l| l.contains("Free")));
-        assert!(summary_lines()
-            .iter()
-            .any(|l| l.contains("Free, or your own key")));
+    fn every_row_explains_itself() {
+        for f in catalog() {
+            assert!(!f.why.is_empty(), "{}: no description", f.id);
+            assert!(!f.title.is_empty(), "{}: no title", f.id);
+        }
+    }
+
+    /// The panel shows these strings to users as they are. Words that only
+    /// make sense inside the team, and text in another language inside an
+    /// English interface, have no place in them.
+    #[test]
+    fn descriptions_are_written_for_users() {
+        const INTERNAL: &[&str] = &[
+            "competitor", "study", "spec", "\u{a7}", "conversion", "p1 ", "tier",
+            "premium", "captions is", "submagic", "opus clip", "monetis", "table stakes",
+        ];
+        let mut texts: Vec<(&str, &str)> = Vec::new();
+        for f in catalog() {
+            texts.push((f.id, f.why));
+            texts.push((f.id, f.title));
+        }
+        for cost in [Cost::Free, Cost::FreeOrOwnKey, Cost::FreeOrCredits, Cost::OwnKey, Cost::Paid] {
+            texts.push(("cost", cost.label()));
+            texts.push(("cost", cost.explanation()));
+        }
+        for (id, text) in texts {
+            let lower = text.to_lowercase();
+            for word in INTERNAL {
+                assert!(!lower.contains(word), "{id}: {word:?} in {text:?}");
+            }
+            assert!(
+                !text.chars().any(|c| ('\u{2e80}'..='\u{9fff}').contains(&c)
+                    || ('\u{f900}'..='\u{faff}').contains(&c)
+                    || ('\u{ac00}'..='\u{d7af}').contains(&c)),
+                "{id}: CJK text in {text:?}"
+            );
+            assert!(!text.contains("  "), "{id}: doubled space in {text:?}");
+        }
+    }
+
+    #[test]
+    fn summary_has_one_line_per_feature() {
+        assert_eq!(summary_lines().len(), catalog().len());
+        assert!(summary_lines().iter().any(|l| l.contains("Free, or credits")));
+    }
+
+    #[test]
+    fn every_cost_explains_itself() {
+        for cost in [Cost::Free, Cost::FreeOrOwnKey, Cost::FreeOrCredits, Cost::OwnKey, Cost::Paid] {
+            assert!(!cost.label().is_empty());
+            assert!(!cost.explanation().is_empty());
+        }
     }
 }

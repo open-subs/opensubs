@@ -66,13 +66,11 @@ export interface Style {
 export interface Feature {
   id: string;
   title: string;
-  tier: "Free" | "Premium";
   /** Matches `subs_tier::Cost` — the shared vocabulary the badges use. */
-  cost: "free" | "free-or-own-key" | "own-key" | "paid";
+  cost: "free" | "free-or-own-key" | "free-or-credits" | "own-key" | "paid";
   costLabel: string;
   costNote: string;
   why: string;
-  unlocked: boolean;
 }
 
 export interface Language {

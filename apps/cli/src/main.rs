@@ -117,9 +117,10 @@ fn cmd_features() {
     for line in subs_tier::summary_lines() {
         println!("{line}");
     }
-    if subs_tier::PREMIUM_UNLOCKED {
-        println!("\nPremium features are unlocked in this build. Nothing is gated, there is\nno account, and no export is watermarked or length-limited.");
-    }
+    println!(
+        "\nEverything runs on this computer for free: no account, no watermark and no\n\
+         export limit. Only cloud translation, in the apps, uses credits."
+    );
 }
 
 fn media_info_to_json(info: &MediaInfo) -> serde_json::Value {

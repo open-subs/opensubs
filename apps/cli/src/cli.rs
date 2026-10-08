@@ -44,7 +44,7 @@ opensubs burn <INPUT> [options]
 
 opensubs styles [--export <NAME>]   list the presets, or print one as JSON
 opensubs languages                  list the translation targets
-opensubs features                   show what is free, premium, and unlocked
+opensubs features                   show what each feature does and costs
 opensubs probe <INPUT>              print MediaInfo as JSON";
 
 /// A misuse of the command line: bad flag, missing value, missing/duplicate

@@ -798,19 +798,16 @@ pub fn features_js() -> Result<String, String> {
     struct Feature {
         id: String,
         title: String,
-        tier: String,
         cost: String,
         cost_label: String,
         cost_note: String,
         why: String,
-        unlocked: bool,
     }
     let list: Vec<Feature> = subs_tier::catalog()
         .into_iter()
         .map(|f| Feature {
             id: f.id.to_string(),
             title: f.title.to_string(),
-            tier: f.tier.label().to_string(),
             cost: serde_json::to_value(f.cost)
                 .ok()
                 .and_then(|v| v.as_str().map(str::to_string))
@@ -818,7 +815,6 @@ pub fn features_js() -> Result<String, String> {
             cost_label: f.cost.label().to_string(),
             cost_note: f.cost.explanation().to_string(),
             why: f.why.to_string(),
-            unlocked: f.unlocked,
         })
         .collect();
     to_json(&list)
@@ -1002,18 +998,17 @@ mod tests {
     }
 
     #[test]
-    fn the_feature_catalogue_reaches_the_page_fully_unlocked() {
+    fn the_feature_catalogue_reaches_the_page_without_tiers() {
         let json = features_js().unwrap();
-        assert!(json.contains("\"tier\":\"Premium\""));
-        assert!(json.contains("\"tier\":\"Free\""));
-        assert!(!json.contains("\"unlocked\":false"));
+        assert!(!json.contains("\"tier\""), "{json}");
+        assert!(!json.contains("Premium"), "{json}");
     }
 
     #[test]
     fn the_catalogue_tells_the_page_what_each_row_costs() {
         let json = features_js().unwrap();
         assert!(json.contains("\"cost\":\"free\""), "{json}");
-        assert!(json.contains("\"cost\":\"free-or-own-key\""), "{json}");
+        assert!(json.contains("\"cost\":\"free-or-credits\""), "{json}");
         assert!(json.contains("costLabel"));
         assert!(json.contains("costNote"));
     }

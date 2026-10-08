@@ -532,7 +532,7 @@
     {#if advancedPresets.length > 0}
       <div class="subsection-head">
         <h3 class="subsection-title">Advanced pack</h3>
-        <span class="tag tag-unlocked">Included</span>
+        <span class="tag tag-free">Free</span>
       </div>
       <div class="style-grid">
         {#each advancedPresets as style (style.name)}
@@ -823,20 +823,21 @@
       >
         <h2 class="section-title">What's included</h2>
         <span class="oa-caption">
-          {showFeatures ? "Hide" : "Everything is unlocked"}
+          {showFeatures ? "Hide" : "Free on this computer"}
         </span>
       </button>
 
       {#if showFeatures}
         <p class="oa-caption card-intro">
-          No account, no watermark, no export limit, and nothing here is held back.
-          The tier column says where this would be paid for, not what is withheld.
+          No account, no watermark, no export limit.
         </p>
         <ul class="feature-list">
           {#each features as f (f.id)}
             <li class="feature-row">
               <span class="feature-title">{f.title}</span>
-              <span class="tag" class:tag-premium={f.tier === "Premium"}>{f.tier}</span>
+              <span class="tag" class:tag-free={f.cost === "free"} title={f.costNote}
+                >{f.costLabel}</span
+              >
               <span class="oa-caption feature-why">{f.why}</span>
             </li>
           {/each}

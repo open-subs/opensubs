@@ -564,7 +564,7 @@ body {
   accent-color: var(--brand);
 }
 
-/* --- tier tags and the included-features panel ------------------------- */
+/* --- cost tags and the included-features panel ------------------------- */
 
 .tag {
   padding: 0.1rem 0.45rem;
@@ -576,8 +576,7 @@ body {
   white-space: nowrap;
 }
 
-.tag-premium,
-.tag-unlocked {
+.tag-free {
   color: var(--text-brand);
   background: var(--brand-soft);
 }

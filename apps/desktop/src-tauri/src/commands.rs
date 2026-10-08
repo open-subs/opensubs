@@ -523,13 +523,14 @@ pub fn list_styles() -> Vec<StyleDto> {
 pub struct FeatureDto {
     pub id: String,
     pub title: String,
-    pub tier: String,
+    /// `subs_tier::Cost` in kebab-case, for the badge's styling.
+    pub cost: String,
+    pub cost_label: String,
+    pub cost_note: String,
     pub why: String,
-    pub unlocked: bool,
 }
 
-/// What is free, what is premium, and what this build actually gates --
-/// which is nothing. See `subs-tier`.
+/// What each feature does and what it costs the user. See `subs-tier`.
 #[tauri::command]
 pub fn list_features() -> Vec<FeatureDto> {
     subs_tier::catalog()
@@ -537,9 +538,13 @@ pub fn list_features() -> Vec<FeatureDto> {
         .map(|f| FeatureDto {
             id: f.id.to_string(),
             title: f.title.to_string(),
-            tier: f.tier.label().to_string(),
+            cost: serde_json::to_value(f.cost)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .unwrap_or_default(),
+            cost_label: f.cost.label().to_string(),
+            cost_note: f.cost.explanation().to_string(),
             why: f.why.to_string(),
-            unlocked: f.unlocked,
         })
         .collect()
 }
@@ -1035,12 +1040,19 @@ mod tests {
     }
 
     #[test]
-    fn the_feature_list_reaches_the_ui_fully_unlocked() {
+    fn the_feature_list_reaches_the_ui_with_its_costs() {
         let features = list_features();
         assert_eq!(features.len(), subs_tier::catalog().len());
-        assert!(features.iter().all(|f| f.unlocked));
-        assert!(features.iter().any(|f| f.tier == "Premium"));
-        assert!(features.iter().any(|f| f.tier == "Free"));
+        // Everything local is free; only translation offers a paid route.
+        let paid: Vec<&str> = features
+            .iter()
+            .filter(|f| f.cost != "free")
+            .map(|f| f.id.as_str())
+            .collect();
+        assert_eq!(paid, ["translation"]);
+        let t = features.iter().find(|f| f.id == "translation").unwrap();
+        assert_eq!(t.cost, "free-or-credits");
+        assert!(!t.cost_label.is_empty() && !t.cost_note.is_empty());
     }
 
     #[test]

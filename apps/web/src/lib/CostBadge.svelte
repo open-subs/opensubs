@@ -17,6 +17,7 @@
   const TEXT: Record<Cost, () => string> = {
     free: () => t("Free"),
     "free-or-own-key": () => t("Free · or your key"),
+    "free-or-credits": () => t("Free · or credits"),
     "own-key": () => t("Your own API key"),
     paid: () => t("Paid"),
   };
@@ -25,9 +26,12 @@
     free: () => t("Runs on your machine. No key, no account, nothing uploaded."),
     "free-or-own-key": () =>
       t("Works for free on this device. Bring an API key for better quality."),
+    "free-or-credits": () =>
+      t("Free on this device. The cloud option is more fluent and uses credits; you see the price before it runs."),
     "own-key": () =>
       t("Calls a service with your own key. You pay that provider directly; the key stays in this tab."),
-    paid: () => t("Runs on our backend. Free while we are testing."),
+    paid: () =>
+      t("Runs on our servers and uses credits. You see the price before it runs, and a job that fails costs nothing."),
   };
 </script>
 

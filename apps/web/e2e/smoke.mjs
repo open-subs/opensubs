@@ -445,9 +445,16 @@ check(
 );
 check(
   "the one thing that can cost money says so",
-  badges.some((b) => b.includes("your key")),
+  badges.some((b) => b.includes("credits")),
   badges.join(", "),
 );
+// The panel is read by users, so it carries user-facing copy only.
+{
+  const panel = await page.textContent(".features-card");
+  const internal = ["competitor", "study", "spec", "\u00a7", "conversion", "tier", "Premium", "Submagic", "Opus Clip"];
+  const found = internal.filter((w) => panel.toLowerCase().includes(w.toLowerCase()));
+  check("the included-features panel uses no internal vocabulary", found.length === 0, found.join(", "));
+}
 check("nothing is gated in this build", !(await page.textContent("body")).includes("Locked"));
 
 // The sample, before anything is loaded by hand.

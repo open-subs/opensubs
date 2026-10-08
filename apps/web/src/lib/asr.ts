@@ -57,7 +57,7 @@ import {
 /** Whisper's native input rate. Anything else is resampled to it. */
 
 /** Matches `subs_tier::Cost`; the badges come from one vocabulary. */
-export type Cost = "free" | "free-or-own-key" | "own-key" | "paid";
+export type Cost = "free" | "free-or-own-key" | "free-or-credits" | "own-key" | "paid";
 
 export interface AsrEngineOption {
   id: string;

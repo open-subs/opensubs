@@ -3025,7 +3025,7 @@
       </button>
       {#if showFeatures}
         <p class="oa-caption card-intro">
-          <Rich text={t("No account, no watermark and no export limit. The badge says what a thing costs *you*; the tier says where this would be paid for one day, which is not the same question.")} />
+          <Rich text={t("No account, no watermark and no export limit.")} />
         </p>
         <ul class="feature-list">
           {#each features as f (f.id)}
