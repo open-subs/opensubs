@@ -13,3 +13,15 @@ ct2rs = { version = "0.10", default-features = false, features = ["sentencepiece
 # Strips the `\\?\` prefix from a Windows model path before CTranslate2,
 # which appends "/model.bin" to it, gets it. See `native_dir`.
 dunce = "1"
+ferrous-opencc = "0.4"
+jieba-rs = "0.11"
+
+[dev-dependencies]
+# For examples/translate_video.rs: the desktop export's own path from audio
+# to translated cues (transcribe, segment, translate_cues), so a translation
+# problem reported on a real video can be reproduced from the command line.
+subs-asr = { workspace = true }
+subs-whisper = { workspace = true }
+subs-media = { workspace = true }
+subs-subtitle = { workspace = true }
+subs-translate = { workspace = true, features = ["cues"] }
