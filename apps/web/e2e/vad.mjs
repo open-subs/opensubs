@@ -57,9 +57,9 @@ async function speechSeconds(samples) {
 // are the ones expecting true: the previous attempt at this rule passed
 // the no-speech clip and condemned both of these.
 const CLIPS = [
-  { path: process.env.VAD_NOSPEECH ?? "/tmp/claude-501/nospeech.mp4", speech: false,
+  { path: process.env.VAD_NOSPEECH ?? "/tmp/nospeech.mp4", speech: false,
     why: "a cooking video: music and a wok, nobody talking (the reported clip)" },
-  { path: process.env.VAD_LOOPED ?? "/tmp/claude-501/adv-looped.mp4", speech: true,
+  { path: process.env.VAD_LOOPED ?? "/tmp/adv-looped.mp4", speech: true,
     why: "ten seconds of real narration looped twelve times -- repetitive, and speech" },
   { path: `${process.env.HOME}/Downloads/en.mp4`, speech: true, why: "English narration" },
   { path: `${process.env.HOME}/Downloads/zh.mp4`, speech: true, why: "Chinese narration" },

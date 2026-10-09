@@ -20,6 +20,16 @@ work and grants the Project Owner the right to distribute it under other terms a
 well. It is the same arrangement Qt, Grafana and Element use, and for the same
 reason.
 
+## Where the source lives
+
+The source of truth is a private GitLab repository. This GitHub repository
+mirrors its app code (not the website): after a change is pushed to GitLab
+`main`, a maintainer runs the mirror script, which commits the same tree
+here as one commit naming the GitLab commit it came from. Release tags
+are cut here, and GitHub Actions builds the installers from the mirrored tree.
+Pull requests opened here are ported to GitLab and come back through the
+mirror, so nothing is pushed to this repository's `main` by hand.
+
 ## Making a change
 
 1. Open an issue first for anything substantial, so the approach can be agreed

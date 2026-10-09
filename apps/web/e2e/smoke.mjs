@@ -427,7 +427,7 @@ await page.goto(base, { waitUntil: "networkidle" });
 await page.waitForSelector(".features-card", { timeout: 15000 });
 
 const footer = await page.textContent(".web-footer");
-check("engine version reported by the wasm module", /\d+\.\d+\.\d+/.test(footer), footer);
+check("engine version comes from the wasm module", /\d+\.\d+\.\d+/.test(footer), footer);
 
 await page.click(".features-toggle");
 await page.waitForSelector(".feature-row");
@@ -1163,8 +1163,8 @@ if (FIXTURE) {
     // rectangles -- 7.3% of real Japanese subtitle lines -- and the warning
     // told people to delete words their language cannot do without.
     //
-    // First the reporter's own repro line, then the whole of the two tables
-    // she asked for regression against, decoded from their legacy encodings
+    // First a line that showed the fault, then the whole of the two
+    // standard character tables, decoded from their legacy encodings
     // so there is no character list to keep in sync with anything.
     const importSrt = async (name, lines) => {
       const body = lines
@@ -1712,7 +1712,7 @@ check(
   check("the app mounts into that same page", html.includes('id="app"'));
 }
 
-// What the tracker asked for, checked against the built files rather than
+// What search engines need, checked against the built files rather than
 // against the running app: every one of these is a property of the HTML a
 // crawler is handed, and the crawler does not run our JavaScript.
 {

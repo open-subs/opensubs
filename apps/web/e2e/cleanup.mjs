@@ -316,7 +316,7 @@ test("the language is read at the time the segment was spoken", () => {
 console.log("\nannotations the model leaves behind");
 
 test("an annotation is recognised however broken it arrives", () => {
-  // Verbatim from the tracker. Unclosed brackets, the words in any order,
+  // Real decoder output, unedited. Unclosed brackets, the words in any order,
   // and every case the model felt like using.
   for (const line of ["PLAYING [\u266a OUTRO", "OUTRO MUSIC", "music playing [\u266a",
                       "playing [\u266a", "[outro music playing]", "[Music]", "\u266a\u266a\u266a",
@@ -358,7 +358,7 @@ test("case was never the problem", () => {
 });
 
 test("the outro arrives as one segment, and one truncation must not save it", () => {
-  // The actual root cause, found by running the reporter's own video.
+  // The actual root cause, found by running the failing video itself.
   // Requiring every word to be annotation vocabulary meant three
   // truncations of a word that is not a word vetoed nine that were --
   // and the engine then cut the survivor into six cues, which read as

@@ -45,7 +45,7 @@ const machines = [
   { name: "nvidia", label: "NVIDIA discrete", info: { vendor: "nvidia", architecture: "ampere" }, model: "whisper-small", switch: true },
   { name: "none", label: "no WebGPU", info: null, model: "whisper-base", switch: false },
   // Firefox withholds every field, so its GPU cannot be judged, and
-  // on the reporter's Iris Xe its WebGPU was dozens of times slower than its
+  // on an Intel Iris Xe laptop its WebGPU was dozens of times slower than its
   // CPU. It starts on the CPU, with Base, and keeps the switch.
   { name: "firefox", label: "Firefox, adapter says nothing", info: { vendor: "", architecture: "", device: "", description: "" },
     ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",

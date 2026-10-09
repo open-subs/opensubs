@@ -251,7 +251,7 @@ export class OpenApps {
                     // not the exchange worked. It is spent either way -- the server
                     // rejected it or consumed it -- and a code that failed pollutes a
                     // page-view report exactly as much as one that succeeded, which is
-                    // the harm this is here to prevent (APP-101). Leaving it also
+                    // the harm this is here to prevent. Leaving it also
                     // means a reload retries a code that can never work.
                     stripRedirectParams(options, ["code"]);
                 }
@@ -575,7 +575,7 @@ function currentPageUrl() {
  *     finds it, so every sign-in produces a unique "page" -- `/#code=oac_4fa4…`
  *     -- with exactly one visitor, for ever. openpixels.app's report filled up
  *     with them, and the funnel through `/#studio` was cut into slivers
- *     (APP-101). Nothing errors; the only symptom is in a dashboard nobody
+ *    . Nothing errors; the only symptom is in a dashboard nobody
  *     reads daily.
  *   - **The code lands in browser history.**
  *

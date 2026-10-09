@@ -2,7 +2,7 @@
 // the CPU.
 //
 // The adapter descriptions are the shapes Chrome reports through WebGPU's
-// GPUAdapterInfo, whose names come from Dawn. The first is the reporter's
+// GPUAdapterInfo, whose names come from Dawn. The first is a real
 // machine verbatim: i7-1360P, Intel Iris Xe, where WebGPU + Small was the
 // slowest of the three combinations measured.
 //
@@ -49,7 +49,7 @@ ok("the GPU is named for the one line that says so", describeGpu({ vendor: "inte
 // --- Firefox, whose adapter says nothing -------------------------
 //
 // The user agents are real ones, and the adapter is what Firefox 154 gave
-// on the reporter's Iris Xe: every field an empty string.
+// on that Iris Xe machine: every field an empty string.
 const UA = {
   firefoxWin: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",
   firefoxMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:155.0) Gecko/20100101 Firefox/155.0",
@@ -65,7 +65,7 @@ ok("whitespace is not a name", isAnonymousAdapter({ vendor: " ", architecture: "
 ok("Firefox is Firefox", isFirefox(UA.firefoxWin) && isFirefox(UA.firefoxMac));
 ok("Chrome, Edge and Safari are not", !isFirefox(UA.chromeWin) && !isFirefox(UA.edgeWin) && !isFirefox(UA.safariMac));
 
-ok("the reporter's Firefox starts on the CPU", startsOnCpu({ info: firefoxInfo, userAgent: UA.firefoxWin }));
+ok("Firefox on Windows starts on the CPU", startsOnCpu({ info: firefoxInfo, userAgent: UA.firefoxWin }));
 ok("so does Firefox with no info object at all", startsOnCpu({ info: undefined, userAgent: UA.firefoxWin }));
 ok("Chrome on the same machine does not -- it names the GPU, which is already handled",
   !startsOnCpu({ info: { vendor: "intel", architecture: "gen-12lp" }, userAgent: UA.chromeWin }));

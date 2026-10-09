@@ -302,7 +302,7 @@ export function trimTail(text: string): string {
 export function isSignOff(text: string): boolean {
   const flat = bare(text);
   if (SIGN_OFF_SET.has(flat)) return true;
-  // "MBC 뉴스 김철수입니다" -- the reporter's name changes, the frame does
+  // "MBC 뉴스 김철수입니다" -- the newsreader's name changes, the frame does
   // not, and this exact shape is what turned up in the Chinese clip.
   return /^(mbc|kbs|sbs|ytn)뉴스/.test(flat);
 }

@@ -21,7 +21,7 @@ Each line below was checked against Apple or the live server, not assumed.
   it exits 69 when it is not, which is what `archive.sh` tests — the notice
   goes to the terminal rather than to stdout, so grepping for it finds
   nothing and sails past the one thing in the way).
-- `Apple Distribution: DE JIAN KOH (JY2NWT5QFV)` is in the login keychain.
+- The team's `Apple Distribution` certificate is in the login keychain.
 - App ID `app.opensubs.mobile` is registered, with the **In-App Purchase**
   capability. Without that the profile is still valid and StoreKit finds no
   products at runtime.
@@ -85,7 +85,7 @@ webhook    400  notification verification: … three dot-separated parts
 ```
 
 A 404 would mean the route is absent and a 401 would prove only that
-something is listening. A *parse* error from the verifier is the answer
+something is listening. A *parse* error from the receipt check is the answer
 that separates a configured rail from a compiled one.
 
 What that took, all three of which were missing:
@@ -246,7 +246,7 @@ matters if any of it has to be redone:
    simulator with no GPU adapter.
 7. **Sandbox-test a real purchase through TestFlight before submitting.**
    This is the first moment the whole chain runs end to end — StoreKit,
-   the receipt, the server's verifier, the ledger — and the first moment
+   the receipt, the server's receipt check, the ledger — and the first moment
    Apple's real certificate chain is parsed by anything of ours. Check
    both halves of the rule while you are there: the credits appear, and
    killing the app between paying and being credited still ends with the

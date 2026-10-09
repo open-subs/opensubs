@@ -373,7 +373,7 @@
    * "auto" used to mean English. transformers.js does not implement
    * Whisper's language detection and quietly substitutes `en`, so a
    * Chinese interview came back as confident, fluent, invented English --
-   * reported by two people on the same bilingual news clip. It is real
+   * on a bilingual news clip, from more than one machine. It is real
    * detection now, per 30-second window, so one file can hold both
    * languages; this control is for overriding it when it guesses wrong.
    */

@@ -1,7 +1,7 @@
 name: release
 
 # Every tag builds artefacts and attaches them to a release, release
-# candidates included -- `v0.1.0-rc.1` is how a build reaches a tester.
+# candidates included -- `v0.1.0-rc.1` is how a build reaches people trying it.
 #
 # Nothing here submits to a store. Store submission lives in its own
 # workflow, filtered to tags with no hyphen in them, so an RC physically
@@ -47,10 +47,10 @@ jobs:
         with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        # whisper-rs-sys does not rebuild when GGML_NATIVE changes, so a
-        # target dir cached before it was set would keep the runner-tuned
-        # build. A new key never restores one.
-        with: { key: ggml-portable }
+        # whisper-rs-sys does not rebuild when a GGML_* variable changes, so
+        # a target dir cached under other settings would keep that build. A
+        # new key whenever the GGML_* levels below change never restores one.
+        with: { key: ggml-avx2-pinned }
       - name: Linux build dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -75,7 +75,11 @@ jobs:
           # and linking it into Rust's default /MD failed with LNK2038
           # (RuntimeLibrary mismatch). whisper.cpp's cmake build follows
           # the flag, and the installer stops needing the VC++ runtime.
-          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
+          #
+          # /MAP: the linker writes which library and object every address
+          # came from, so the instruction check after the build can tell
+          # ggml's code from code that picks its instruction set at run time.
+          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static -C link-arg=/MAP' || '' }}
           # ggml defaults to GGML_NATIVE: it compiles for whatever CPU the
           # runner happens to have. On a runner with AVX-512 that gave an
           # installer which died with an illegal instruction (0xc000001d)
@@ -84,7 +88,27 @@ jobs:
           # with native off ggml targets AVX2, which any x86-64 CPU from
           # 2013 on has. CTranslate2 picks its instruction set at run time
           # and needs nothing here.
+          #
+          # Every level is set rather than left to ggml's defaults, so a
+          # change of default upstream cannot move it. On x86 that is AVX2 +
+          # FMA + F16C + BMI2 and nothing above; MSVC takes FMA and F16C as
+          # implied by AVX2 and ignores those two. The ARM Mac ignores all of
+          # them. Change the rust-cache key above when changing any of these.
           GGML_NATIVE: "OFF"
+          GGML_SSE42: "ON"
+          GGML_AVX: "ON"
+          GGML_AVX2: "ON"
+          GGML_FMA: "ON"
+          GGML_F16C: "ON"
+          GGML_BMI2: "ON"
+          GGML_AVX_VNNI: "OFF"
+          GGML_AVX512: "OFF"
+          GGML_AVX512_VBMI: "OFF"
+          GGML_AVX512_VNNI: "OFF"
+          GGML_AVX512_BF16: "OFF"
+          GGML_AMX_TILE: "OFF"
+          GGML_AMX_INT8: "OFF"
+          GGML_AMX_BF16: "OFF"
       # The flag above is easy to lose and the failure only shows on someone
       # else's computer, so check what cmake actually configured.
       - name: whisper.cpp built for any CPU, not the runner's
@@ -92,9 +116,25 @@ jobs:
         run: |
           cache="$(ls target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)"
           echo "$cache"
-          grep -E '^GGML_(NATIVE|AVX512[A-Z_0-9]*):BOOL=' "$cache"
+          grep -E '^GGML_(NATIVE|SSE42|AVX|AVX2|BMI2|AVX_VNNI|AVX512[A-Z_0-9]*|AMX_[A-Z0-9]+):BOOL=' "$cache"
           grep -q '^GGML_NATIVE:BOOL=OFF' "$cache" || { echo "ggml was built for this runner's CPU" >&2; exit 1; }
-          ! grep -qE '^GGML_AVX512[A-Z_0-9]*:BOOL=ON' "$cache" || { echo "ggml was built with AVX-512" >&2; exit 1; }
+          ! grep -qE '^GGML_(AVX512[A-Z_0-9]*|AVX_VNNI|AMX_[A-Z0-9]+):BOOL=ON' "$cache" || { echo "ggml was built with an instruction set above AVX2" >&2; exit 1; }
+          if [ "${{ matrix.os }}" != macos-latest ]; then
+            grep -q '^GGML_AVX2:BOOL=ON' "$cache" || { echo "ggml was built without AVX2" >&2; exit 1; }
+          fi
+      # The same question asked of the finished exe instead of the build
+      # settings: every instruction is decoded, and only CTranslate2/ruy and
+      # aws-lc, which check the CPU before using them, may go above AVX2.
+      # v1.0.3-rc.13 fails this (33 ggml functions with AVX-512); rc.12 and
+      # rc.14 pass. Run it on any released exe without --map to audit it.
+      - name: no instruction above AVX2 outside runtime-dispatched code
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          python -m pip install --quiet iced-x86==1.21.0
+          map="$(ls -t target/release/deps/opensubs_desktop-*.map | head -1)"
+          echo "$map"
+          python scripts/check-windows-isa.py target/release/opensubs-desktop.exe --map "$map"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}

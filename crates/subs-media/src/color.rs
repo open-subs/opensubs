@@ -8,7 +8,7 @@ pub enum HdrKind {
     Hlg,
 }
 
-/// Colour metadata as reported by ffprobe. All fields are optional because
+/// Colour metadata as ffprobe reports it. All fields are optional because
 /// ffprobe omits them for untagged streams, which is itself meaningful.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ColorMeta {

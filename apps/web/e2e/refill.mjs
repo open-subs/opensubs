@@ -70,7 +70,7 @@ async function run({ seconds, segments, answer }) {
 
 const key = (s) => `${s.from.toFixed(2)}-${s.to.toFixed(2)}`;
 
-// --- the reporter's shape ------------------------------------------------
+// --- the measured shape -------------------------------------------------
 //
 // Two gaps in a two-minute clip. One is a span Whisper half-recovers each
 // time it is asked -- the case rounds exist for, since what it leaves is a new,

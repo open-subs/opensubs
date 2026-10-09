@@ -43,7 +43,7 @@ const cases = [
   { name: "one language, the whole clip", length: 124.37, cuts: [] },
   // A run of 29 s reads 32 s: two windows, where the run alone counts one.
   { name: "a run the lead-out tips into a second window", length: 124.37, cuts: [29] },
-  { name: "the reporter-sized clip split three ways", length: 114, cuts: [28.5, 48.5] },
+  { name: "a 114-second clip split three ways", length: 114, cuts: [28.5, 48.5] },
   { name: "many short runs", length: 120, cuts: [9, 18, 29, 47, 69, 88.5] },
 ];
 for (const c of cases) {
