@@ -1,6 +1,6 @@
 // What happens to the subtitles around Stop.
 //
-//   node e2e/kept.mjs [--package dist | --zip opensubs-chrome-1.0.2.zip] --video lecture.mp4
+//   node e2e/kept.mjs [--package dist | --zip opensubs-chrome-1.0.3.zip] --video lecture.mp4
 //
 // # Why this is not part of installed.mjs
 //

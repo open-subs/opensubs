@@ -18,7 +18,7 @@
 //           so the ad itself cannot be read: TED's Google-hosted pre-roll
 //
 //   node e2e/unsupported.mjs --package dist --video lecture.mp4 --ad ad.mp4 [--profile dir]
-//   node e2e/unsupported.mjs --zip opensubs-chrome-1.0.2.zip ...      # a release, unmodified
+//   node e2e/unsupported.mjs --zip opensubs-chrome-1.0.3.zip ...      # a release, unmodified
 //
 // Chromium only: the cases are about what the page and the background say
 // to each other, which is the same code in both browsers.

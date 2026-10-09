@@ -2,13 +2,33 @@ name: release
 
 # Every tag builds artefacts and attaches them to a release, release
 # candidates included -- `v0.1.0-rc.1` is how a build reaches people trying it.
+# A tag with a hyphen is a pre-release; one without (v1.0.3) is a full
+# release and becomes the repository's Latest.
 #
-# Nothing here submits to a store. Store submission lives in its own
-# workflow, filtered to tags with no hyphen in them, so an RC physically
-# cannot reach one.
+# Nothing in this repository submits to a store: there is no Chrome, Edge,
+# Firefox or winget workflow. A bare tag produces the GitHub release and
+# nothing else.
+#
+# workflow_dispatch builds without releasing anything, with the ggml levels
+# chosen by hand. It exists to prove the instruction check: dispatch it with
+# ggml_native=ON and ggml_avx512=ON and the Windows and Linux jobs must fail,
+# naming ggml and the AVX-512 instructions; dispatch it with both OFF and they
+# must pass.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ggml_native:
+        description: "GGML_NATIVE (OFF for every release)"
+        type: choice
+        options: ["OFF", "ON"]
+        default: "OFF"
+      ggml_avx512:
+        description: "GGML_AVX512 (OFF for every release)"
+        type: choice
+        options: ["OFF", "ON"]
+        default: "OFF"
 
 permissions:
   contents: write
@@ -16,6 +36,7 @@ permissions:
 jobs:
   extension:
     name: browser extension
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +71,9 @@ jobs:
         # whisper-rs-sys does not rebuild when a GGML_* variable changes, so
         # a target dir cached under other settings would keep that build. A
         # new key whenever the GGML_* levels below change never restores one.
-        with: { key: ggml-avx2-pinned }
+        # A dispatched build with other levels gets a key of its own, so it
+        # can never seed a release build.
+        with: { key: "ggml-native-${{ inputs.ggml_native || 'OFF' }}-avx512-${{ inputs.ggml_avx512 || 'OFF' }}" }
       - name: Linux build dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -66,6 +89,7 @@ jobs:
         shell: bash
         run: bash apps/desktop/scripts/fetch-bundled.sh
       - run: npx tauri build
+        id: build
         working-directory: apps/desktop
         env:
           # whisper.cpp (crates/subs-whisper) uses std::filesystem, which
@@ -96,7 +120,7 @@ jobs:
           # FMA + F16C + BMI2 and nothing above; MSVC takes FMA and F16C as
           # implied by AVX2 and ignores those two. The ARM Mac ignores all of
           # them. Change the rust-cache key above when changing any of these.
-          GGML_NATIVE: "OFF"
+          GGML_NATIVE: ${{ inputs.ggml_native || 'OFF' }}
           GGML_SSE42: "ON"
           GGML_AVX: "ON"
           GGML_AVX2: "ON"
@@ -104,7 +128,7 @@ jobs:
           GGML_F16C: "ON"
           GGML_BMI2: "ON"
           GGML_AVX_VNNI: "OFF"
-          GGML_AVX512: "OFF"
+          GGML_AVX512: ${{ inputs.ggml_avx512 || 'OFF' }}
           GGML_AVX512_VBMI: "OFF"
           GGML_AVX512_VNNI: "OFF"
           GGML_AVX512_BF16: "OFF"
@@ -124,13 +148,16 @@ jobs:
           if [ "${{ matrix.os }}" != macos-latest ]; then
             grep -q '^GGML_AVX2:BOOL=ON' "$cache" || { echo "ggml was built without AVX2" >&2; exit 1; }
           fi
-      # The same question asked of the finished exe instead of the build
+      # The same question asked of the finished binary instead of the build
       # settings: every instruction is decoded, and only CTranslate2/ruy and
       # aws-lc, which check the CPU before using them, may go above AVX2.
-      # v1.0.3-rc.13 fails this (33 ggml functions with AVX-512); rc.12 and
-      # rc.14 pass. Run it on any released exe without --map to audit it.
-      - name: no instruction above AVX2 outside runtime-dispatched code
-        if: matrix.os == 'windows-latest'
+      # It runs even when the CMakeCache check above failed, so a bad build
+      # is always reported with the library and the instructions. The
+      # result goes to the job summary and, as isa-check-*.md, into the
+      # release. v1.0.3-rc.13's Windows exe fails it (33 ggml functions with
+      # AVX-512); rc.12, rc.14 and rc.16 pass, on Windows and Linux.
+      - name: "instruction check: Windows exe"
+        if: matrix.os == 'windows-latest' && !cancelled() && steps.build.outcome == 'success'
         shell: bash
         run: |
           python -m pip install --quiet iced-x86==1.21.0
@@ -140,7 +167,31 @@ jobs:
             find target -maxdepth 3 -name '*.map' >&2
             exit 1
           fi
-          python scripts/check-windows-isa.py target/release/opensubs-desktop.exe --map "$map"
+          status=0
+          python scripts/check-isa.py target/release/opensubs-desktop.exe --map "$map" --report isa-check-windows.md || status=$?
+          cat isa-check-windows.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+      # The binaries the Linux packages actually carry: unpacked from the
+      # .deb and from the AppImage, not taken from target/.
+      - name: "instruction check: Linux deb and AppImage"
+        if: matrix.os == 'ubuntu-22.04' && !cancelled() && steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          python3 -m pip install --quiet iced-x86==1.21.0
+          deb="$(ls target/release/bundle/deb/*.deb | head -1)"
+          appimage="$(ls target/release/bundle/appimage/*.AppImage | head -1)"
+          mkdir -p "$RUNNER_TEMP/deb" "$RUNNER_TEMP/appimage"
+          dpkg-deb -x "$deb" "$RUNNER_TEMP/deb"
+          chmod +x "$appimage"
+          (cd "$RUNNER_TEMP/appimage" && "$GITHUB_WORKSPACE/$appimage" --appimage-extract usr/bin/opensubs-desktop >/dev/null)
+          sha256sum "$RUNNER_TEMP"/deb/usr/bin/opensubs-desktop "$RUNNER_TEMP"/appimage/squashfs-root/usr/bin/opensubs-desktop
+          status=0
+          python3 scripts/check-isa.py "$RUNNER_TEMP/deb/usr/bin/opensubs-desktop" --report isa-check-linux-deb.md || status=1
+          python3 scripts/check-isa.py "$RUNNER_TEMP/appimage/squashfs-root/usr/bin/opensubs-desktop" --report isa-check-linux-appimage.md || status=1
+          { echo "Linux, from $(basename "$deb")"; cat isa-check-linux-deb.md; echo; echo "Linux, from $(basename "$appimage")"; cat isa-check-linux-appimage.md; } > isa-check-linux.md
+          rm isa-check-linux-deb.md isa-check-linux-appimage.md
+          cat isa-check-linux.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
@@ -158,23 +209,45 @@ jobs:
             target/release/bundle/**/*.rpm
             target/release/bundle/**/*.msi
             target/release/bundle/**/*.exe
+            isa-check-*.md
           if-no-files-found: error
 
   publish:
     name: attach to the release
     needs: [extension, desktop]
-    # The desktop matrix is allowed to fail a platform without losing the
-    # extension build; a release with the extension on it is still a
-    # release, and an empty one is worse than a partial one.
-    if: always()
+    # Only a tag releases; a dispatched build stops at its artifacts. An RC
+    # may lose a desktop platform and still release what built -- a release
+    # with the extension on it is still a release. A full release (no hyphen)
+    # needs every job green: it becomes Latest, and a partial one would be
+    # what people download.
+    if: >-
+      always() && startsWith(github.ref, 'refs/tags/') &&
+      (contains(github.ref_name, '-') ||
+       (needs.desktop.result == 'success' && needs.extension.result == 'success'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with: { path: artifacts }
       - name: list what was built
         run: find artifacts -type f | sort
+      # The instruction checks' results, as the release's notes.
+      - name: release notes
+        run: |
+          {
+            echo "## Instruction check"
+            echo
+            echo "Each Windows and Linux desktop binary was decoded instruction by instruction by scripts/check-isa.py, which fails the build if anything outside runtime-dispatched code (CTranslate2/ruy, aws-lc) needs more than AVX2. The reports are also attached as isa-check-*.md."
+            echo
+            for os in windows linux; do
+              f="$(find artifacts -name "isa-check-$os.md" | head -1)"
+              if [ -n "$f" ]; then cat "$f"; else echo "**$os: no report, and no $os installer in this release** (its build or its check did not pass)."; fi
+              echo
+            done
+          } > release-notes.md
+          cat release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true

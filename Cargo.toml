@@ -26,7 +26,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 # AGPL-3.0-or-later, matching OpenCapture, which is the other AGPL product
 # in the suite. Two crates opt out of this deliberately -- see the note in

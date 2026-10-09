@@ -26,7 +26,9 @@ The source of truth is a private GitLab repository. This GitHub repository
 mirrors its app code (not the website): after a change is pushed to GitLab
 `main`, a maintainer runs the mirror script, which commits the same tree
 here as one commit naming the GitLab commit it came from. Release tags
-are cut here, and GitHub Actions builds the installers from the mirrored tree.
+are cut here, on `main` itself and only right after a sync, so at every
+release `main` and the release tag are the same commit; GitHub Actions
+builds the installers from that tree.
 Pull requests opened here are ported to GitLab and come back through the
 mirror, so nothing is pushed to this repository's `main` by hand.
 

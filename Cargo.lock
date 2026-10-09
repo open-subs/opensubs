@@ -2882,7 +2882,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opensubs"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde_json",
  "subs-asr",
@@ -2897,7 +2897,7 @@ dependencies = [
 
 [[package]]
 name = "opensubs-desktop"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "dirs 6.0.0",
  "reqwest",
@@ -4285,7 +4285,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "subs-asr"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -4294,14 +4294,14 @@ dependencies = [
 
 [[package]]
 name = "subs-credits"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "subs-m2m"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "ct2rs",
  "dunce",
@@ -4316,7 +4316,7 @@ dependencies = [
 
 [[package]]
 name = "subs-media"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -4325,7 +4325,7 @@ dependencies = [
 
 [[package]]
 name = "subs-pipeline"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "subs-asr",
  "subs-media",
@@ -4337,7 +4337,7 @@ dependencies = [
 
 [[package]]
 name = "subs-qa"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde_json",
  "subs-media",
@@ -4345,7 +4345,7 @@ dependencies = [
 
 [[package]]
 name = "subs-style"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -4354,7 +4354,7 @@ dependencies = [
 
 [[package]]
 name = "subs-subtitle"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "proptest",
  "serde",
@@ -4366,14 +4366,14 @@ dependencies = [
 
 [[package]]
 name = "subs-tier"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "subs-translate"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "reqwest",
  "serde",
@@ -4385,7 +4385,7 @@ dependencies = [
 
 [[package]]
 name = "subs-wasm"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "console_error_panic_hook",
  "serde",
@@ -4402,7 +4402,7 @@ dependencies = [
 
 [[package]]
 name = "subs-whisper"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "dunce",
  "hound",
