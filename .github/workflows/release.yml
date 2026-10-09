@@ -75,11 +75,13 @@ jobs:
           # and linking it into Rust's default /MD failed with LNK2038
           # (RuntimeLibrary mismatch). whisper.cpp's cmake build follows
           # the flag, and the installer stops needing the VC++ runtime.
-          #
-          # /MAP: the linker writes which library and object every address
-          # came from, so the instruction check after the build can tell
-          # ggml's code from code that picks its instruction set at run time.
-          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static -C link-arg=/MAP' || '' }}
+          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
+          # Windows: the linker writes which library and object every address
+          # of the exe came from (apps/desktop/src-tauri/build.rs passes
+          # /MAP for the binary only), so the instruction check after the
+          # build can tell ggml's code from code that picks its instruction
+          # set at run time.
+          OPENSUBS_LINKER_MAP: ${{ matrix.os == 'windows-latest' && format('{0}\target\opensubs-desktop.map', github.workspace) || '' }}
           # ggml defaults to GGML_NATIVE: it compiles for whatever CPU the
           # runner happens to have. On a runner with AVX-512 that gave an
           # installer which died with an illegal instruction (0xc000001d)
@@ -132,8 +134,12 @@ jobs:
         shell: bash
         run: |
           python -m pip install --quiet iced-x86==1.21.0
-          map="$(ls -t target/release/deps/opensubs_desktop-*.map | head -1)"
-          echo "$map"
+          map=target/opensubs-desktop.map
+          if [ ! -s "$map" ]; then
+            echo "no linker map at $map; maps under target/:" >&2
+            find target -maxdepth 3 -name '*.map' >&2
+            exit 1
+          fi
           python scripts/check-windows-isa.py target/release/opensubs-desktop.exe --map "$map"
       - uses: actions/upload-artifact@v4
         with:
