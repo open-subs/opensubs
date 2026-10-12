@@ -20,7 +20,7 @@ Functies
 • Automatische taaldetectie, of kies zelf
 • Ondertitel-overlay die je kunt uitschakelen
 • Exporteren als SRT
-• Open source onder AGPL-3.0
+• Open source onder AGPL-3.0-or-later
 
 OpenSubs is gemaakt voor mensen die liever geen audio naar de cloud sturen: studenten die collegeopnames terugkijken, kijkers die inhoud in een andere taal volgen, iedereen in een rumoerige ruimte en iedereen die om privacy geeft.
 
@@ -41,7 +41,7 @@ Functies
 - Automatische taaldetectie, of kies zelf
 - Ondertitel-overlay die je kunt uitschakelen
 - Exporteren als SRT
-- Open source onder AGPL-3.0
+- Open source onder AGPL-3.0-or-later
 
 OpenSubs is gemaakt voor mensen die liever geen audio naar de cloud sturen: studenten die collegeopnames terugkijken, kijkers die inhoud in een andere taal volgen, iedereen in een rumoerige ruimte en iedereen die om privacy geeft.
 

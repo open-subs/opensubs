@@ -20,7 +20,7 @@ Funktionen
 • Automatische Spracherkennung oder manuelle Auswahl
 • Untertitel-Einblendung, die du ausschalten kannst
 • Export als SRT
-• Open Source unter AGPL-3.0
+• Open Source unter AGPL-3.0-or-later
 
 OpenSubs ist für Menschen gemacht, die ihr Audio lieber nicht in die Cloud schicken möchten: Studierende, die Vorlesungsaufzeichnungen nochmal ansehen, Zuschauer, die sich durch fremdsprachige Inhalte arbeiten, alle in einem lauten Raum und alle, denen Privatsphäre wichtig ist.
 
@@ -41,7 +41,7 @@ Funktionen
 - Automatische Spracherkennung oder manuelle Auswahl
 - Untertitel-Einblendung, die du ausschalten kannst
 - Export als SRT
-- Open Source unter AGPL-3.0
+- Open Source unter AGPL-3.0-or-later
 
 OpenSubs ist für Menschen gemacht, die ihr Audio lieber nicht in die Cloud schicken möchten: Studierende, die Vorlesungsaufzeichnungen nochmal ansehen, Zuschauer, die sich durch fremdsprachige Inhalte arbeiten, alle in einem lauten Raum und alle, denen Privatsphäre wichtig ist.
 

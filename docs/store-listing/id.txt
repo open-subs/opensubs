@@ -20,7 +20,7 @@ Fitur
 • Deteksi bahasa otomatis, atau pilih sendiri
 • Overlay subtitle yang bisa Anda matikan
 • Ekspor sebagai SRT
-• Open source di bawah AGPL-3.0
+• Open source di bawah AGPL-3.0-or-later
 
 OpenSubs dibuat untuk orang-orang yang lebih memilih tidak mengirim audio ke cloud: mahasiswa yang menonton ulang rekaman kuliah, penonton yang memahami konten dalam bahasa lain, siapa pun di ruangan yang bising, dan siapa pun yang peduli privasi.
 
@@ -41,7 +41,7 @@ Fitur
 - Deteksi bahasa otomatis, atau pilih sendiri
 - Overlay subtitle yang bisa Anda matikan
 - Ekspor sebagai SRT
-- Open source di bawah AGPL-3.0
+- Open source di bawah AGPL-3.0-or-later
 
 OpenSubs dibuat untuk orang-orang yang lebih memilih tidak mengirim audio ke cloud: mahasiswa yang menonton ulang rekaman kuliah, penonton yang memahami konten dalam bahasa lain, siapa pun di ruangan yang bising, dan siapa pun yang peduli privasi.
 

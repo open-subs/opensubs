@@ -20,7 +20,7 @@ Funciones
 • Detección automática de idioma, o elígelo tú mismo
 • Superposición de subtítulos que puedes desactivar
 • Exportar como SRT
-• Código abierto bajo AGPL-3.0
+• Código abierto bajo AGPL-3.0-or-later
 
 OpenSubs está pensado para quienes prefieren no enviar audio a la nube: estudiantes que repasan grabaciones de clases, espectadores que consumen contenido en otro idioma, cualquiera en una sala ruidosa y cualquiera a quien le importe la privacidad.
 
@@ -41,7 +41,7 @@ Funciones
 - Detección automática de idioma, o elígelo tú mismo
 - Superposición de subtítulos que puedes desactivar
 - Exportar como SRT
-- Código abierto bajo AGPL-3.0
+- Código abierto bajo AGPL-3.0-or-later
 
 OpenSubs está pensado para quienes prefieren no enviar audio a la nube: estudiantes que repasan grabaciones de clases, espectadores que consumen contenido en otro idioma, cualquiera en una sala ruidosa y cualquiera a quien le importe la privacidad.
 

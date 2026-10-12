@@ -20,7 +20,7 @@ Funcionalidades
 • Detecção automática de idioma, ou escolha manual
 • Sobreposição de legendas que você pode desativar
 • Exportação em SRT
-• Código aberto sob licença AGPL-3.0
+• Código aberto sob licença AGPL-3.0-or-later
 
 O OpenSubs foi feito para quem prefere não enviar áudio para a nuvem: estudantes revendo gravações de aula, espectadores acompanhando conteúdo em outro idioma, qualquer pessoa em uma sala barulhenta, e qualquer pessoa que se importa com privacidade.
 
@@ -41,7 +41,7 @@ Funcionalidades
 - Detecção automática de idioma, ou escolha manual
 - Sobreposição de legendas que você pode desativar
 - Exportação em SRT
-- Código aberto sob licença AGPL-3.0
+- Código aberto sob licença AGPL-3.0-or-later
 
 O OpenSubs foi feito para quem prefere não enviar áudio para a nuvem: estudantes revendo gravações de aula, espectadores acompanhando conteúdo em outro idioma, qualquer pessoa em uma sala barulhenta, e qualquer pessoa que se importa com privacidade.
 

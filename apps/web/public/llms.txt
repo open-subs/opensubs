@@ -42,7 +42,7 @@ https://opensubs.app
   pipeline has no language detection at all; this is implemented on top of
   it.
 - **Exports:** .srt, .vtt and .ass, or an MP4 with the subtitles burned in.
-- **Licence:** AGPL-3.0.
+- **Licence:** AGPL-3.0-or-later.
 
 ## Honest limitations
 

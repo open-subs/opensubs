@@ -20,7 +20,7 @@ Kullanımı basit: videoyu başlatın, OpenSubs simgesine tıklayın, Start'a ba
 • Otomatik dil algılama veya kendiniz seçin
 • Kapatabileceğiniz altyazı kaplaması
 • SRT olarak dışa aktarma
-• AGPL-3.0 lisansıyla açık kaynak
+• AGPL-3.0-or-later lisansıyla açık kaynak
 
 OpenSubs, sesini buluta göndermek istemeyen kişiler için tasarlandı: ders kayıtlarını tekrar izleyen öğrenciler, başka bir dildeki içeriği takip eden izleyiciler, gürültülü bir odada olan herkes ve gizliliğe önem veren herkes.
 
@@ -41,7 +41,7 @@ Kullanımı basit: videoyu başlatın, OpenSubs simgesine tıklayın, Start'a ba
 - Otomatik dil algılama veya kendiniz seçin
 - Kapatabileceğiniz altyazı kaplaması
 - SRT olarak dışa aktarma
-- AGPL-3.0 lisansıyla açık kaynak
+- AGPL-3.0-or-later lisansıyla açık kaynak
 
 OpenSubs, sesini buluta göndermek istemeyen kişiler için tasarlandı: ders kayıtlarını tekrar izleyen öğrenciler, başka bir dildeki içeriği takip eden izleyiciler, gürültülü bir odada olan herkes ve gizliliğe önem veren herkes.
 

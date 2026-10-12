@@ -23,7 +23,7 @@ German result has to have a German URL to send people to.
   what you pick in the app; renaming it on the page sends a reader
   looking for a style that is not in the list.
 - **Numbers, and anything else marked `data-v`.**
-- **Proper nouns inside a sentence** -- Whisper, libass, ffmpeg, AGPL-3.0
+- **Proper nouns inside a sentence** -- Whisper, libass, ffmpeg, AGPL-3.0-or-later
   -- which stay English because the translations keep them.
 
 Anything with no entry in a catalogue falls back to English, so a gap is
@@ -132,7 +132,7 @@ def load_catalogue(locale):
 # languages have taken whole. Listed rather than allowed by a looser
 # check, so a genuine copy-paste still stands out.
 IDENTICAL = {
-    "OpenSubs", "AGPL-3.0", "CJK", "Paris, 1968", "Instagram Reels",
+    "OpenSubs", "AGPL-3.0-or-later", "CJK", "Paris, 1968", "Instagram Reels",
     "YouTube Shorts", "Twitch", "twitch", "TikTok", "tiktok", "Podcast",
     "podcast", "Reels", "reels", "Gaming", "gaming", "Fitness", "fitness",
     "Interview", "Meme", "meme", "Trailer", "Tutorial", "tutorial",

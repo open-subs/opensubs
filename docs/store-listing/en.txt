@@ -20,7 +20,7 @@ Features
 • Automatic language detection, or pick it yourself
 • Subtitle overlay you can turn off
 • Export as SRT
-• AGPL-3.0 open source
+• AGPL-3.0-or-later open source
 
 OpenSubs is built for people who would rather not send audio to the cloud: students rewatching lecture recordings, viewers working through content in another language, anyone in a noisy room, and anyone who cares about privacy.
 
@@ -41,7 +41,7 @@ Features
 - Automatic language detection, or pick it yourself
 - Subtitle overlay you can turn off
 - Export as SRT
-- AGPL-3.0 open source
+- AGPL-3.0-or-later open source
 
 OpenSubs is built for people who would rather not send audio to the cloud: students rewatching lecture recordings, viewers working through content in another language, anyone in a noisy room, and anyone who cares about privacy.
 

@@ -20,7 +20,7 @@ Fonctionnalités
 • Détection automatique de la langue, ou choix manuel
 • Incrustation de sous-titres que vous pouvez désactiver
 • Export au format SRT
-• Open source sous licence AGPL-3.0
+• Open source sous licence AGPL-3.0-or-later
 
 OpenSubs est conçu pour celles et ceux qui préfèrent ne pas envoyer d'audio vers le cloud : étudiants qui revisionnent des enregistrements de cours, spectateurs qui suivent un contenu dans une autre langue, toute personne dans une pièce bruyante, et toute personne soucieuse de sa vie privée.
 
@@ -41,7 +41,7 @@ Fonctionnalités
 - Détection automatique de la langue, ou choix manuel
 - Incrustation de sous-titres que vous pouvez désactiver
 - Export au format SRT
-- Open source sous licence AGPL-3.0
+- Open source sous licence AGPL-3.0-or-later
 
 OpenSubs est conçu pour celles et ceux qui préfèrent ne pas envoyer d'audio vers le cloud : étudiants qui revisionnent des enregistrements de cours, spectateurs qui suivent un contenu dans une autre langue, toute personne dans une pièce bruyante, et toute personne soucieuse de sa vie privée.
 

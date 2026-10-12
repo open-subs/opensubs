@@ -20,7 +20,7 @@ Tính năng
 • Tự động nhận diện ngôn ngữ, hoặc tự chọn
 • Lớp phủ phụ đề có thể tắt
 • Xuất dưới dạng SRT
-• Mã nguồn mở theo giấy phép AGPL-3.0
+• Mã nguồn mở theo giấy phép AGPL-3.0-or-later
 
 OpenSubs được xây dựng cho những người không muốn gửi âm thanh lên đám mây: sinh viên xem lại bản ghi bài giảng, người xem theo dõi nội dung bằng ngôn ngữ khác, bất kỳ ai đang ở trong phòng ồn ào, và bất kỳ ai quan tâm đến quyền riêng tư.
 
@@ -41,7 +41,7 @@ Tính năng
 - Tự động nhận diện ngôn ngữ, hoặc tự chọn
 - Lớp phủ phụ đề có thể tắt
 - Xuất dưới dạng SRT
-- Mã nguồn mở theo giấy phép AGPL-3.0
+- Mã nguồn mở theo giấy phép AGPL-3.0-or-later
 
 OpenSubs được xây dựng cho những người không muốn gửi âm thanh lên đám mây: sinh viên xem lại bản ghi bài giảng, người xem theo dõi nội dung bằng ngôn ngữ khác, bất kỳ ai đang ở trong phòng ồn ào, và bất kỳ ai quan tâm đến quyền riêng tư.
 
