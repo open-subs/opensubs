@@ -1,0 +1,182 @@
+name: msix
+
+# The Windows app as an MSIX package, for the Microsoft Store.
+#
+# The Store signs MSIX packages itself, so this is how the Windows app gets
+# a trusted signature without a code-signing certificate of our own. (An
+# .exe or .msi listed in the Store has to arrive already signed.)
+#
+# Nothing is rebuilt. The MSI a release already carries is unpacked with an
+# administrative install -- the files exactly as they would land on disk --
+# and packed again with a manifest. The package is unsigned, as the Store
+# wants it. A second copy is signed with a throwaway certificate so it can
+# be installed and tried on a PC, and is installed and started here once.
+#
+# The Store only takes a package whose identity matches what Partner Center
+# reserved for the app: copy Package/Identity/Name, Package/Identity/
+# Publisher and Package/Properties/PublisherDisplayName from the app's
+# Product identity page into the inputs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release whose MSI to package (no release candidates)
+        default: v1.0.3
+      identity_name:
+        description: Package/Identity/Name
+        default: OpenSubs.OpenSubs
+      publisher:
+        description: Package/Identity/Publisher
+        default: CN=OpenSubs
+      publisher_display_name:
+        description: Package/Properties/PublisherDisplayName
+        default: OpenSubs
+  push:
+    branches: [msix-package]
+
+jobs:
+  msix:
+    name: MSIX from the release MSI
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || 'v1.0.3' }}
+      IDENTITY_NAME: ${{ inputs.identity_name || 'OpenSubs.OpenSubs' }}
+      PUBLISHER: ${{ inputs.publisher || 'CN=OpenSubs' }}
+      PUBLISHER_DISPLAY_NAME: ${{ inputs.publisher_display_name || 'OpenSubs' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack the release MSI
+        run: |
+          gh release download $env:TAG --pattern '*_x64_en-US.msi' --dir msi
+          $msi = (Get-ChildItem msi -Filter *.msi | Select-Object -First 1).FullName
+          $out = Join-Path $PWD 'msi-out'
+          $p = Start-Process msiexec -Wait -PassThru -ArgumentList '/a', "`"$msi`"", '/qn', "TARGETDIR=`"$out`""
+          if ($p.ExitCode -ne 0) { throw "msiexec /a exited $($p.ExitCode)" }
+          $exe = Get-ChildItem $out -Recurse -Filter opensubs-desktop.exe | Select-Object -First 1
+          if (-not $exe) { throw 'no opensubs-desktop.exe in the MSI' }
+          New-Item -ItemType Directory pkg | Out-Null
+          Copy-Item "$($exe.DirectoryName)\*" pkg -Recurse
+          Get-ChildItem pkg -Recurse -File | ForEach-Object { '{0,12:N0}  {1}' -f $_.Length, $_.FullName.Substring((Resolve-Path pkg).Path.Length + 1) }
+
+      # What the installers promise: nothing to download before the first
+      # subtitle. If the MSI stopped carrying these, so would the package.
+      - name: The models and ffmpeg came along
+        run: |
+          foreach ($f in 'opensubs-desktop.exe', 'models\ggml-base.bin', 'models\m2m100\model.bin',
+                         'vendor\ffmpeg.exe', 'vendor\ffprobe.exe') {
+            if (-not (Test-Path "pkg\$f")) { throw "missing from the package: $f" }
+          }
+
+      - name: Tiles and manifest
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $src = [System.Drawing.Image]::FromFile((Resolve-Path apps/desktop/src-tauri/icons/icon.png))
+          New-Item -ItemType Directory pkg\Assets | Out-Null
+          foreach ($a in @(@('Square44x44Logo', 44), @('StoreLogo', 50), @('Square150x150Logo', 150))) {
+            $bmp = New-Object System.Drawing.Bitmap $a[1], $a[1]
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.DrawImage($src, 0, 0, $a[1], $a[1])
+            $bmp.Save("pkg\Assets\$($a[0]).png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose()
+          }
+          $src.Dispose()
+
+          # MSIX versions have four parts, and the Store needs the last at 0.
+          $version = "$($env:TAG.TrimStart('v')).0"
+          if ($version -notmatch '^\d+\.\d+\.\d+\.0$') { throw "not a release tag: $env:TAG" }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+          $esc = { param($s) [System.Security.SecurityElement]::Escape($s) }
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package
+            xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+            xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+            xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+            IgnorableNamespaces="uap rescap">
+            <Identity Name="$(& $esc $env:IDENTITY_NAME)" Publisher="$(& $esc $env:PUBLISHER)"
+                      Version="$version" ProcessorArchitecture="x64" />
+            <Properties>
+              <DisplayName>OpenSubs</DisplayName>
+              <PublisherDisplayName>$(& $esc $env:PUBLISHER_DISPLAY_NAME)</PublisherDisplayName>
+              <Logo>Assets\StoreLogo.png</Logo>
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+            </Dependencies>
+            <Resources>
+              <Resource Language="en-us" />
+            </Resources>
+            <Applications>
+              <Application Id="OpenSubs" Executable="opensubs-desktop.exe" EntryPoint="Windows.FullTrustApplication">
+                <uap:VisualElements DisplayName="OpenSubs"
+                  Description="Subtitle any video without uploading it anywhere."
+                  BackgroundColor="transparent"
+                  Square150x150Logo="Assets\Square150x150Logo.png"
+                  Square44x44Logo="Assets\Square44x44Logo.png" />
+              </Application>
+            </Applications>
+            <Capabilities>
+              <rescap:Capability Name="runFullTrust" />
+            </Capabilities>
+          </Package>
+          "@ | Set-Content pkg\AppxManifest.xml -Encoding utf8
+          Get-Content pkg\AppxManifest.xml
+
+      - name: Pack
+        run: |
+          $sdk = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter makeappx.exe |
+            Where-Object { $_.DirectoryName -like '*\x64' } | Sort-Object FullName | Select-Object -Last 1).DirectoryName
+          "SDK=$sdk" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory out | Out-Null
+          & "$sdk\makeappx.exe" pack /d pkg /p "out\OpenSubs_$($env:VERSION)_x64.msix" /o
+          if ($LASTEXITCODE) { throw "makeappx exited $LASTEXITCODE" }
+
+      # Only for trying the package before the Store has it. Windows installs
+      # a sideloaded MSIX only when it trusts the signer, so the certificate
+      # goes alongside: import it into Local Machine > Trusted People first.
+      - name: Test-signed copy
+        run: |
+          $cert = New-SelfSignedCertificate -Type Custom -Subject $env:PUBLISHER -KeyUsage DigitalSignature `
+            -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(1) `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+          $test = "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix"
+          Copy-Item "out\OpenSubs_$($env:VERSION)_x64.msix" $test
+          & "$env:SDK\signtool.exe" sign /fd SHA256 /sha1 $cert.Thumbprint $test
+          if ($LASTEXITCODE) { throw "signtool exited $LASTEXITCODE" }
+          Export-Certificate -Cert $cert -FilePath out\OpenSubs-test-certificate.cer | Out-Null
+          Import-Certificate -FilePath out\OpenSubs-test-certificate.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+
+      # The package installs, the app starts from its read-only install
+      # folder and stays up, and the ffmpeg inside it runs.
+      - name: Install and start
+        run: |
+          Add-AppxPackage "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix"
+          $pkg = Get-AppxPackage -Name $env:IDENTITY_NAME
+          $pkg | Format-List Name, Version, PackageFamilyName, InstallLocation
+          & "$($pkg.InstallLocation)\vendor\ffmpeg.exe" -hide_banner -version | Select-Object -First 1
+          if ($LASTEXITCODE) { throw 'the packaged ffmpeg did not run' }
+          Start-Process "shell:AppsFolder\$($pkg.PackageFamilyName)!OpenSubs"
+          Start-Sleep 20
+          $running = Get-Process opensubs-desktop -ErrorAction SilentlyContinue
+          if (-not $running) { throw 'OpenSubs was not running 20 seconds after starting it' }
+          $running | Format-Table Id, Path, WorkingSet64
+          $running | Stop-Process
+          Remove-AppxPackage $pkg.PackageFullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msix
+          path: out/*
+          if-no-files-found: error
+          # The package is the same 600 MB of models and ffmpeg as the
+          # installers; zipping it again only costs time.
+          compression-level: 0
