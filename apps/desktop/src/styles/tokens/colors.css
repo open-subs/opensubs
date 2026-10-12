@@ -155,30 +155,10 @@
   --accent-17:var(--mulberry);
   --accent-18:var(--petrol);
 
-  /* ---- App accents ----
-     The OpenApps suite's own assignment. These are aliases: consuming products should
-     either re-point them or use the --accent-N slots directly. */
-  --app-notes:var(--accent-6);
-  --app-tasks:var(--accent-1);
-  --app-calendar:var(--accent-5);
-  --app-mail:var(--accent-4);
-  --app-files:var(--accent-7);
-  --app-draw:var(--accent-3);
-  --app-terminal:var(--accent-8);
-  --app-vault:var(--gray-600);
-  /* OpenScreenCapture — a product in the family, with its own mobile app and extension. */
-  --app-screenshot:var(--accent-2);
-  /* Shipped products. These were defined only in downstream copies of this
-     file until 7 September 2026, which is why --app-pdfedit resolved to
-     nothing wherever the local copy was not the one in use. Promoted here so
-     the source of truth actually holds them. */
-  --app-pdfedit:var(--accent-5);
-  --app-frame:var(--accent-3);
-  /* OpenSubs was OpenVidSub. The product renamed; the token had not, and
-     opensubs' local copy carried a note asking for exactly this rename.
-     --app-vidsub stays as a legacy alias so no existing surface breaks. */
-  --app-opensubs:var(--accent-4);
-  --app-vidsub:var(--app-opensubs);
+  /* ---- App accent ----
+     One role, not one name per product: this product's slot (4, orange).
+     Stylesheets read var(--app-accent). */
+  --app-accent:var(--accent-4);
 
   /* ---- 3. Semantic aliases (use these) ---- */
   --brand:var(--green);

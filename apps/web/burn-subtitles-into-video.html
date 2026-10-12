@@ -232,8 +232,8 @@
     width: 26px;
     height: 26px;
     border-radius: 7px;
-    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
-    color: var(--app-opensubs);
+    background: color-mix(in oklab, var(--app-accent) 16%, transparent);
+    color: var(--app-accent);
   }
 
   .brand-tile svg { display: block; }
@@ -245,7 +245,7 @@
   }
 
   .brand-word .muted { color: var(--text-muted); }
-  .brand-word .dot { color: var(--app-opensubs); }
+  .brand-word .dot { color: var(--app-accent); }
 
   /* Three zones: brand, tabs, actions. The tabs sat on the right with
      `margin-left: auto`, pressed against the app link and the account icon,
@@ -660,8 +660,8 @@
   footer .dl-chip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: var(--radius-sm, 6px);
-    background: color-mix(in oklab, var(--app-opensubs) 16%, transparent);
-    color: var(--app-opensubs);
+    background: color-mix(in oklab, var(--app-accent) 16%, transparent);
+    color: var(--app-accent);
   }
   footer .dl-chip svg { width: 14px; height: 14px; }
   /* Narrow screens: X / YouTube / Source start their own row instead of splitting across two */
@@ -726,7 +726,7 @@
 
     :root:root {
 
-      --app-opensubs: #00c896;
+      --app-accent: #00c896;
       --sub-accent: 0 200 150;
       --sub-ink: #007c5d;
       --sub-ink-deep: #087553;

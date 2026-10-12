@@ -11,17 +11,17 @@
 name = "subs-credits"
 version = "1.0.3"
 edition = "2021"
-# Deliberately NOT the workspace's AGPL-3.0.
+# Deliberately NOT the workspace's AGPL-3.0-or-later.
 #
 # `openapps-gateway` links this crate, and that gateway is one binary
-# serving OpenCapture, OpenNoteTaker, OpenPdfEdit and OpenSubs. Making this
-# AGPL would make the gateway a derivative work of it, and AGPL section 13
-# would then oblige an offer of the gateway's source to the users of all
-# four products -- which is a decision about three other products, taken by
-# editing a line in this one.
+# serving several products besides this one. Making this AGPL would make
+# the gateway a derivative work of it, and AGPL section 13 would then
+# oblige an offer of the gateway's source to the users of every product it
+# serves -- a decision about other products, taken by editing a line in
+# this one.
 #
 # So the application is AGPL and the pieces the shared backend links are
-# permissive. Same split OpenCapture uses for its vendored ui and sdk.
+# permissive: MIT OR Apache-2.0, at your option.
 license = "MIT OR Apache-2.0"
 
 [dependencies]

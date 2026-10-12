@@ -121,7 +121,7 @@ body {
 }
 
 .brand-dot {
-  color: var(--app-opensubs);
+  color: var(--app-accent);
   font-weight: var(--weight-medium);
 }
 
@@ -244,8 +244,8 @@ body {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--app-opensubs) 16%, white);
-  color: var(--app-opensubs);
+  background: color-mix(in oklab, var(--app-accent) 16%, white);
+  color: var(--app-accent);
   flex-shrink: 0;
 }
 

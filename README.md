@@ -13,14 +13,14 @@ subtitles over a video already playing in another tab, there are three more
 ways to run it — see **[docs/install.md](docs/install.md)**.
 
 [![ci](https://github.com/open-subs/opensubs/actions/workflows/ci.yml/badge.svg)](https://github.com/open-subs/opensubs/actions/workflows/ci.yml)
-[![licence: AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue)](LICENSE)
+[![licence: AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](LICENSE)
 
 ## Four places, one engine
 
 | | What it adds | Install |
 |---|---|---|
 | **Web app** | Nothing to install, nothing to trust — open the page | [opensubs.app](https://opensubs.app) |
-| **Browser extension** | Live subtitles over whatever is playing in a tab. Chrome, Edge, Firefox | [guide](docs/install.md#browser-extension) |
+| **Browser extension** | Live subtitles over whatever is playing in a tab. Chrome, Edge, Firefox | [Chrome](https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd) · [Edge](https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/opensubs/) |
 | **Desktop app** | Long files and batches, without a browser in the way. macOS, Windows, Linux | [guide](docs/install.md#desktop-app) |
 | **Command line** | Scripting and CI | [guide](docs/install.md#command-line) |
 
@@ -119,8 +119,14 @@ fail, so a green synthetic test is not evidence.
 
 ## Licence
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE). Everything in this repository
+is under it except the parts below, which say so in their own manifests.
 
-Two crates opt out deliberately, and say why in their own `Cargo.toml`:
-`subs-credits` and `subs-translate` are linked by a separate gateway
-binary.
+- **`crates/subs-credits` and `crates/subs-translate`** are
+  **MIT OR Apache-2.0**, at your option. They are linked by a separate
+  gateway binary, and each `Cargo.toml` says why they opt out.
+- **`apps/web/vendor/openapps/`** holds two prebuilt packages,
+  `@openapps/ui` and `@openapps/sdk`, which keep their own licence:
+  **MIT OR Apache-2.0** (their `package.json`).
+
+Both are permissive and combine with the AGPL in the rest of the app.

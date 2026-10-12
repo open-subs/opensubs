@@ -1,7 +1,9 @@
 # Installing OpenSubs
 
-Four ways to run it. The first needs nothing at all; the other three each
-have one prerequisite worth knowing before you download anything.
+Four ways to run it. The web app needs nothing at all, the extension
+installs from your browser's store, and the desktop app and the command
+line each have one prerequisite worth knowing before you download
+anything.
 
 - [Web app](#web-app) — nothing to install
 - [Browser extension](#browser-extension) — Chrome, Edge, Firefox
@@ -9,13 +11,14 @@ have one prerequisite worth knowing before you download anything.
 - [Command line](#command-line) — build from source
 - [Mobile](#mobile) — not released yet
 
-Builds live on the **[releases page](https://github.com/open-subs/opensubs/releases)**.
+The extension is in the **[Chrome Web Store](https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd)**,
+**[Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh)** and
+**[Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/opensubs/)**. Desktop builds live on the
+**[releases page](https://github.com/open-subs/opensubs/releases)**.
 
-> **These are release candidates.** They are complete and tested; the
-> version number says they have not been through a stable release yet.
-> The desktop builds are **unsigned**, and the extension is **not in any
-> store**, so both need a step that a signed build would not. Those steps
-> are below, in full, rather than left for you to discover.
+> The desktop builds are **unsigned**, so each operating system asks you
+> to confirm once, a step a signed build would not need. That step is
+> below, in full, rather than left for you to discover.
 
 ---
 
@@ -37,45 +40,16 @@ takes the audio from the video element itself, so it works the same in
 Chrome, Edge and Firefox — and it needs the site's permission, which it
 asks for when you press Start and for that site only.
 
-**It is not in any store yet.** There is no listing to click "Add to
-Chrome" on. What follows loads the build by hand, which is how every
-unlisted extension is installed.
+Install it from your browser's store:
 
-Download `opensubs-chrome-<version>.zip` or `opensubs-firefox-<version>.zip`
-from the [releases page](https://github.com/open-subs/opensubs/releases).
-The two are not interchangeable: Chromium and Firefox disagree about how a
-background script is declared, and each rejects the other's manifest.
+| Browser | Listing |
+|---|---|
+| Chrome | [Chrome Web Store](https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd) |
+| Edge | [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh) |
+| Firefox | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/opensubs/) |
 
-### Chrome and Edge
-
-1. Unzip it. You need the **folder**, not the `.zip`.
-2. Open `chrome://extensions` (or `edge://extensions`).
-3. Turn on **Developer mode** — top right.
-4. **Load unpacked**, and choose the unzipped folder.
-
-It stays installed. Chrome will remind you on each restart that a
-developer-mode extension is loaded; that is the browser being careful about
-unlisted extensions, and it stops once there is a store listing.
-
-### Firefox
-
-Firefox refuses to install unsigned extensions permanently on the release
-and beta channels, and this build is unsigned. Two options, and neither is
-a workaround for the other:
-
-**A temporary install** — works on every channel, lasts until you quit
-Firefox:
-
-1. Open `about:debugging#/runtime/this-firefox`.
-2. **Load Temporary Add-on**, and choose the `.zip` (or the `manifest.json`
-   inside the unzipped folder).
-
-**A permanent install** — needs Firefox Developer Edition, Nightly or ESR:
-
-1. Open `about:config` and set `xpinstall.signatures.required` to `false`.
-   This does nothing on release or beta; the setting is ignored there.
-2. Install the `.zip` from `about:addons` → gear → **Install Add-on From
-   File**.
+These three listings are the only official ones. The store installs it,
+keeps it updated, and needs no developer mode.
 
 ### Using it
 
@@ -90,6 +64,22 @@ Two things it cannot do, and it says so rather than producing empty
 subtitles: **DRM-protected video** (Netflix, Disney+ and so on) captures as
 silence, and a plain cross-origin video file served without CORS headers
 cannot be captured at all.
+
+### Loading a build by hand
+
+Only for testing a change before it reaches the stores. Build it (see the
+README), or take `opensubs-chrome-<version>.zip` or
+`opensubs-firefox-<version>.zip` from the
+[releases page](https://github.com/open-subs/opensubs/releases) — the two
+are not interchangeable, because Chromium and Firefox disagree about how a
+background script is declared.
+
+- **Chrome and Edge** — unzip it, open `chrome://extensions` (or
+  `edge://extensions`), turn on **Developer mode**, then **Load unpacked**
+  and choose the unzipped folder.
+- **Firefox** — open `about:debugging#/runtime/this-firefox`, **Load
+  Temporary Add-on**, and choose the `.zip`. A temporary add-on lasts until
+  you quit Firefox; the store listing is the permanent install.
 
 ---
 
@@ -225,7 +215,8 @@ The versions in between are untested. See [mobile.md](mobile.md).
 
 ## Uninstalling
 
-- **Extension** — remove it from `chrome://extensions` or `about:addons`.
+- **Extension** — remove it from `chrome://extensions`, `edge://extensions`
+  or `about:addons`.
 - **macOS** — drag OpenSubs to the Bin.
 - **Windows** — Add or Remove Programs.
 - **Linux** — `apt remove opensubs` / `dnf remove OpenSubs`, or delete the
