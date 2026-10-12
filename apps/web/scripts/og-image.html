@@ -1,0 +1,51 @@
+<!--
+  The link preview (apps/web/public/og-image.png), 1200x630. Regenerate with:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+      --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 \
+      --virtual-time-budget=8000 --screenshot=apps/web/public/og-image.png \
+      file://$PWD/apps/web/scripts/og-image.html
+  The logo is public/favicon.svg; the green is --green in src/styles/tokens/colors.css.
+-->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Geist+Mono:wght@500&display=block">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(900px 520px at 100% 0%, rgba(0, 200, 150, .20), rgba(0, 200, 150, 0) 70%),
+      radial-gradient(700px 420px at 0% 100%, rgba(0, 200, 150, .07), rgba(0, 200, 150, 0) 70%),
+      #0b0d0c;
+    color: #fff; font-family: "Geist", "Helvetica Neue", Arial, sans-serif;
+    position: relative;
+  }
+  .wrap { position: absolute; left: 88px; top: 92px; right: 88px; }
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 30px; font-weight: 500; letter-spacing: -0.01em; }
+  .brand svg { width: 52px; height: 52px; }
+  .brand b { font-weight: 700; }
+  .brand i { color: #00c896; font-style: normal; }
+  h1 { margin: 52px 0 0; font-size: 84px; line-height: 1.02; font-weight: 700; letter-spacing: -0.035em; }
+  p { margin: 28px 0 0; font-size: 31px; line-height: 1.35; color: rgba(255, 255, 255, .62); letter-spacing: -0.005em; }
+  .foot { position: absolute; left: 88px; right: 88px; bottom: 64px; display: flex; justify-content: space-between; align-items: center; }
+  .url { font-family: "Geist Mono", ui-monospace, Menlo, monospace; font-size: 26px; font-weight: 500; color: #00c896; }
+  .tags { display: flex; gap: 12px; }
+  .tags span { font-size: 20px; font-weight: 500; color: rgba(255, 255, 255, .78); border: 1.5px solid rgba(255, 255, 255, .16); border-radius: 999px; padding: 9px 18px; }
+</style></head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="5.5" fill="#111111"/>
+        <rect x="4" y="6.5" width="16" height="11" rx="2.4" fill="none" stroke="#00c896" stroke-width="1.7"/>
+        <rect x="6.8" y="12.6" width="6.4" height="2" rx="1" fill="#00c896"/>
+        <rect x="14.4" y="12.6" width="2.8" height="2" rx="1" fill="#00c896" opacity="0.5"/>
+      </svg>
+      <span>Open<b>Subs</b><i>.</i></span>
+    </div>
+    <h1>Subtitle any video,<br>without uploading it.</h1>
+    <p>Transcribe, translate, style and burn —<br>entirely in your browser.</p>
+  </div>
+  <div class="foot">
+    <span class="url">opensubs.app</span>
+  </div>
+</body></html>
