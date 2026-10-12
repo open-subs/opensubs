@@ -156,19 +156,26 @@ jobs:
           Import-Certificate -FilePath out\OpenSubs-test-certificate.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
 
       # The package installs, the app starts from its read-only install
-      # folder and stays up, and the ffmpeg inside it runs.
+      # folder and stays up, and the ffmpeg it carries runs.
       - name: Install and start
         run: |
           Add-AppxPackage "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix"
           $pkg = Get-AppxPackage -Name $env:IDENTITY_NAME
           $pkg | Format-List Name, Version, PackageFamilyName, InstallLocation
-          & "$($pkg.InstallLocation)\vendor\ffmpeg.exe" -hide_banner -version | Select-Object -First 1
-          if ($LASTEXITCODE) { throw 'the packaged ffmpeg did not run' }
           Start-Process "shell:AppsFolder\$($pkg.PackageFamilyName)!OpenSubs"
           Start-Sleep 20
           $running = Get-Process opensubs-desktop -ErrorAction SilentlyContinue
           if (-not $running) { throw 'OpenSubs was not running 20 seconds after starting it' }
           $running | Format-Table Id, Path, WorkingSet64
+
+          # Windows refuses a program under WindowsApps to anything outside
+          # the package, so ffmpeg is run from inside it, as the app runs it.
+          $log = 'C:\msix-ffmpeg.txt'
+          Invoke-CommandInDesktopPackage -PackageFamilyName $pkg.PackageFamilyName -AppId OpenSubs `
+            -Command cmd.exe -Args "/c `"`"$($pkg.InstallLocation)\vendor\ffmpeg.exe`" -hide_banner -version > $log 2>&1`""
+          Start-Sleep 10
+          Get-Content $log -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not (Select-String -Path $log -Pattern '^ffmpeg version' -Quiet)) { throw 'the packaged ffmpeg did not run inside the package' }
           $running | Stop-Process
           Remove-AppxPackage $pkg.PackageFullName
 
