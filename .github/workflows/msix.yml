@@ -28,7 +28,7 @@ on:
         default: OpenSubs.OpenSubs
       publisher:
         description: Package/Identity/Publisher
-        default: CN=OpenSubs
+        default: CN=7BD26B8D-251A-4E84-AA1A-56BC9B92FFBA
       publisher_display_name:
         description: Package/Properties/PublisherDisplayName
         default: OpenSubs
@@ -47,7 +47,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag || 'v1.0.3' }}
       IDENTITY_NAME: ${{ inputs.identity_name || 'OpenSubs.OpenSubs' }}
-      PUBLISHER: ${{ inputs.publisher || 'CN=OpenSubs' }}
+      PUBLISHER: ${{ inputs.publisher || 'CN=7BD26B8D-251A-4E84-AA1A-56BC9B92FFBA' }}
       PUBLISHER_DISPLAY_NAME: ${{ inputs.publisher_display_name || 'OpenSubs' }}
     steps:
       - uses: actions/checkout@v4
