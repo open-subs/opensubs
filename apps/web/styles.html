@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs</title>
-  <meta name="description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
+  <meta name="description" content="Twelve subtitle styles to burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Each rendered live, not a screenshot." />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta name="theme-color" content="#f2f2f2" />
   <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -12,17 +12,26 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <link rel="apple-touch-icon" href="/icon-180.png" />
   <link rel="canonical" href="https://opensubs.app/styles" />
+<link rel="alternate" hreflang="en" href="https://opensubs.app/styles" />
+<link rel="alternate" hreflang="zh-Hans" href="https://opensubs.app/zh-Hans/styles" />
+<link rel="alternate" hreflang="zh-Hant" href="https://opensubs.app/zh-Hant/styles" />
+<link rel="alternate" hreflang="ja" href="https://opensubs.app/ja/styles" />
+<link rel="alternate" hreflang="ko" href="https://opensubs.app/ko/styles" />
+<link rel="alternate" hreflang="de" href="https://opensubs.app/de/styles" />
+<link rel="alternate" hreflang="es" href="https://opensubs.app/es/styles" />
+<link rel="alternate" hreflang="pt" href="https://opensubs.app/pt/styles" />
+<link rel="alternate" hreflang="x-default" href="https://opensubs.app/styles" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="OpenSubs" />
   <meta property="og:title" content="Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs" />
-  <meta property="og:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
+  <meta property="og:description" content="Twelve subtitle styles to burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Each rendered live, not a screenshot." />
   <meta property="og:url" content="https://opensubs.app/styles" />
   <meta property="og:image" content="https://opensubs.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Subtitle Styles — 12 Free Presets, Rendered Live | OpenSubs" />
-  <meta name="twitter:description" content="Twelve subtitle styles you can burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Every one rendered live, not a screenshot." />
+  <meta name="twitter:description" content="Twelve subtitle styles to burn into a video free: bold fitness captions, neon gaming text, broadcast yellow and cinema. Each rendered live, not a screenshot." />
   <meta name="twitter:image" content="https://opensubs.app/og-image.png" />
   <script type="application/ld+json">
 {
@@ -70,7 +79,7 @@
       "name": "Are these styles free?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The six in the core pack are free. The advanced pack is free too at the moment — the badge in the app says what a thing costs you today."
+        "text": "Yes, all twelve: the six in the core pack and the six in the advanced pack. They run on your machine, and everything that runs on your machine is free."
       }
     }
   ],
@@ -144,12 +153,6 @@
     height: var(--header-height);
   }
 
-  /* The family wordmark. Every product in the suite uses this shape: a
-     tinted tile holding the product's own icon, then "Open" in muted grey,
-     the product name, and a period in the product's accent. OpenCapture is
-     blue, OpenSubs is orange (--app-opensubs). Brand green is reserved for
-     primary buttons on every product's page, which is why the tile and the
-     dot are the only things carrying the accent. */
   .site-brand {
     display: flex;
     align-items: center;
@@ -615,7 +618,6 @@
     * { animation: none !important; transition: none !important; }
   }
 
-
   /* --- the language switcher ---
      Two ways to the same eight pages, because they answer different
      questions. The footer row is what a crawler follows and what the
@@ -653,10 +655,106 @@
       position: fixed; right: 12px; left: auto; top: 56px; max-width: calc(100vw - 24px);
     }
   }
-</style>
+
+    :root:root {
+
+      --app-opensubs: #00c896;
+      --sub-accent: 0 200 150;
+      --sub-ink: #007c5d;
+      --sub-ink-deep: #087553;
+
+    }
+
+    .subhead .oss { color: var(--sub-ink); font-weight: 600; }
+
+    section + section { border-top-color: transparent; }
+
+    :root:root { --bg-page: #f7f4ec; --surface-card: #ffffff; }
+
+    .site-chrome { background: var(--bg-page); }
+    .site-chrome section:nth-of-type(even) { background: rgb(var(--sub-accent) / 0.045); }
+
+    .shot { margin: 0; }
+    .shot video {
+      display: block; width: 100%; height: auto; background: #000;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 2px 6px rgb(16 40 32 / 0.08), 0 18px 44px rgb(16 40 32 / 0.12);
+    }
+    .shot figcaption {
+      margin-top: var(--space-3);
+      font: var(--type-caption, var(--type-ui)); color: var(--text-faint);
+    }
+    .shot-lead { margin-bottom: var(--space-8); }
+    .shot-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+    @media (max-width: 860px) { .shot-row { grid-template-columns: 1fr; } }
+
+    .step-num {
+      display: inline-grid; place-items: center;
+      width: 26px; height: 26px; margin-bottom: var(--space-3);
+      border-radius: 999px;
+      background: rgb(var(--sub-accent) / 0.16); color: var(--sub-ink);
+      font: var(--type-caption, var(--type-ui)); font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .site-eyebrow {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      margin: 0 0 var(--space-5);
+      padding: 0.34rem var(--space-4);
+      border-radius: 999px;
+      border: 0;
+      background: rgb(var(--sub-accent) / 0.10);
+      color: var(--sub-ink);
+      font: var(--type-ui); font-weight: 500;
+    }
+    .site-eyebrow svg { flex: none; }
+
+    .hero h1 { font-size: clamp(2.1rem, 5.2vw, 3.9rem); }
+
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
+
+    .step-num {
+      width: 34px; height: 34px;
+      font-size: 1.05rem; font-weight: 700;
+    }
+
+    .card-icon {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+    .card-icon svg {
+      width: 44px; height: 44px; padding: 10px; box-sizing: border-box;
+      border-radius: 12px;
+      background: rgb(var(--sub-accent) / 0.13);
+      color: var(--sub-ink-deep);
+    }
+    .card-icon b {
+      font-size: 1.15rem; font-weight: 700; color: rgb(var(--sub-accent) / 0.55);
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+
+    .site-card, .featured {
+      border-color: transparent;
+      box-shadow: 0 1px 2px rgb(16 40 32 / 0.05),
+                  0 8px 24px rgb(16 40 32 / 0.06);
+    }
+
+    .restore-card,
+    .route.selected,
+    .style-tile.selected,
+    .drop-zone.active,
+    .screen.drag-over .dropzone {
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .section-head p, .hero .subhead { text-wrap: pretty; }
+
+    .section-head h2 { max-width: none; }
+    .section-head > p { max-width: 42rem; }
+    .section-head { max-width: none; }
+  </style>
   <script type="module" src="/src/styles-page.ts"></script>
-  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="stylesheet" crossorigin href="/assets/styles-i5_-DYtV.css">
 </head>
 <body>
 <!--
@@ -950,7 +1048,7 @@
         </details>
         <details>
           <summary>Are these styles free?</summary>
-          <p>The six in the core pack are free. The advanced pack is free too at the moment — the badge in the app says what a thing costs you today.</p>
+          <p>Yes, all twelve: the six in the core pack and the six in the advanced pack. They run on your machine, and everything that runs on your machine is free.</p>
         </details>
       </div>
     </div>
@@ -960,11 +1058,14 @@
 <footer>
   <div class="wrap">
     <span>&copy; 2026 OpenSubs</span>
-    <a href="/privacy.html">Privacy</a>
+    <a href="/privacy">Privacy</a>
     <a href="/styles">Styles</a>
     <a href="/burn-subtitles-into-video">Burn subtitles in</a>
     <a href="/translate-subtitles">Translate subtitles</a>
     <a href="/subtitle-sites">Subtitle sites</a>
+    <a href="/browser-extension">Browser extension</a>
+    <a href="/transcribe-video">Transcribe video</a>
+    <a href="/whisper-in-browser">Whisper in the browser</a>
     <a href="/blog">Blog</a>
     <a class="downloads" href="https://github.com/open-subs/opensubs/releases"><span class="dl-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></span>Downloads</a>
     <span class="spacer"></span>

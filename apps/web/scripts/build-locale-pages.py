@@ -531,7 +531,7 @@ def too_long(page, locale, raw):
 
 def page_source(page):
     """Where this page is written, which is not always in this repository."""
-    site = os.environ.get("SITE_SOURCE") or os.path.join(WEB, "..", "..", "..", "opensubs-website")
+    site = os.environ.get("SITE_SOURCE") or os.path.join(WEB, "..", "..", "website")
     at = {"index.html": ("template", "index.html"), "privacy.html": ("public", "privacy.html")}
     if page in at and os.path.isdir(site):
         return os.path.join(site, *at[page])

@@ -27,7 +27,7 @@ https://opensubs.app
   promise not to upload: there is no server to upload to, so a footage leak
   is not something that has to be prevented. It can be checked in the
   browser's Network tab — after the page and the model have loaded, working
-  on a video produces no requests.
+  on a video produces no requests on the default on-device route.
 - **No file-size limit, no queue, no watermark.** All three exist on hosted
   tools because the file has to reach a server and the server has to pay for
   the encode. Neither applies here.
@@ -71,9 +71,25 @@ https://opensubs.app
 - The first visit downloads a model. That is a real wait, and it is the
   price of not uploading the video.
 - Cloud translation, if chosen, sends the subtitle *text* — never the video
-  — to whichever provider was picked. The on-device option sends nothing and
-  is the default.
-- iOS 17 Safari cannot run the recogniser at all; iOS 26 and Android work.
+  — to whichever provider was picked. Cloud transcription, if chosen, sends
+  the audio span you trimmed to the service whose key you supplied — again,
+  never the video. The on-device options send nothing and are the defaults.
+- iOS 17 Safari cannot run the recogniser at all; iOS 26 works.
+- **The editor changes words, not timings.** Cue text is editable; the start
+  and end times are not, and cues cannot be added, deleted or merged. A file
+  that is out of sync with its video needs a different tool.
+
+## Where it runs
+
+- In the browser at https://opensubs.app/, with nothing installed.
+- As a browser extension that puts subtitles over whatever is playing in the tab:
+  - Chrome Web Store: https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd
+  - Firefox Add-ons: https://addons.mozilla.org/en-US/firefox/addon/opensubs/
+  - Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh
+- As a desktop app for macOS, Windows and Linux, for long files and batches.
+- As a command-line tool, built from source.
+
+Contact: hello@opensubs.app
 
 ## Pages
 
@@ -82,12 +98,22 @@ https://opensubs.app
   hardcoding captions into the picture.
 - [Subtitle styles](https://opensubs.app/styles): the twelve presets, each
   rendered live from the engine's own numbers rather than screenshotted.
-- [Privacy](https://opensubs.app/privacy.html): what is stored, and where.
+- [Translate subtitles](https://opensubs.app/translate-subtitles)
+- [Subtitle sites](https://opensubs.app/subtitle-sites): where to download subtitles, and making them yourself.
+- [Browser extension](https://opensubs.app/browser-extension): subtitles over whatever is playing in the tab; Chrome, Edge and Firefox.
+- [Transcribe video](https://opensubs.app/transcribe-video): transcribing a video to text in the browser, exported as .srt, .vtt or .ass.
+- [Whisper in the browser](https://opensubs.app/whisper-in-browser): how OpenSubs runs Whisper locally in the tab, and the three model sizes.
+- [Blog](https://opensubs.app/blog)
+- [Privacy](https://opensubs.app/privacy): what is stored, and where.
+- [Windows desktop privacy policy](https://opensubs.app/desktop-privacy): the
+  separate policy for the Windows desktop app.
 
 ## Languages
 
-Every page above exists as a real document in eight languages, translated
-at build time rather than by script, each with its own URL and canonical:
+Four pages exist as real documents in eight languages, translated at build
+time rather than by script, each with its own URL and canonical: the home
+page, Burn subtitles into video, Subtitle styles and Privacy. The home page
+in each language is:
 
 - English — https://opensubs.app/ (also the hreflang x-default)
 - 简体中文 — https://opensubs.app/zh-Hans
@@ -98,6 +124,13 @@ at build time rather than by script, each with its own URL and canonical:
 - Español — https://opensubs.app/es
 - Português — https://opensubs.app/pt
 
-The sub-pages sit under the same prefix: /ja/styles, /de/privacy.html, and
-so on. The tool itself follows the page it is embedded in, so the interface
-and the copy around it are always the same language.
+The other three sit under the same prefix: /ja/burn-subtitles-into-video,
+/ja/styles, /de/privacy, and so on. Where the tool is embedded in a page, it
+follows that page, so the interface and the copy around it are the same
+language.
+
+The remaining pages — Translate subtitles, Subtitle sites, Browser
+extension, Transcribe video, Whisper in the browser and the blog — are in
+English. One blog post, How to add captions
+to a video, also has a Portuguese version at
+https://opensubs.app/pt/blog/how-to-add-captions-to-a-video.
