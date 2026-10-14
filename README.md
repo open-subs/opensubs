@@ -96,7 +96,8 @@ platform.
 
 `apps/web/vendor/openapps/` holds two built packages the accounts and
 paid-translation UI depends on. They are checked in so a clone builds
-offline; `scripts/vendor-openapps.sh` regenerates them.
+offline. They are provided in compiled form; their source is not
+published, and `scripts/vendor-openapps.sh` regenerates them from it.
 
 ## Testing
 
@@ -117,6 +118,14 @@ video element in a real browser, runs the real model, and asserts a real
 transcript comes back. Fixtures pass in this repository while real files
 fail, so a green synthetic test is not evidence.
 
+## Maintainers
+
+OpenSubs is maintained by the OpenSubs team, who publish this repository
+from the [open-subs](https://github.com/open-subs) account. Report a
+problem or ask a question in
+[Issues](https://github.com/open-subs/opensubs/issues), or write to
+hello@opensubs.app.
+
 ## Licence
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE). Everything in this repository
@@ -125,8 +134,8 @@ is under it except the parts below, which say so in their own manifests.
 - **`crates/subs-credits` and `crates/subs-translate`** are
   **MIT OR Apache-2.0**, at your option. They are linked by a separate
   gateway binary, and each `Cargo.toml` says why they opt out.
-- **`apps/web/vendor/openapps/`** holds two prebuilt packages,
-  `@openapps/ui` and `@openapps/sdk`, which keep their own licence:
+- **`apps/web/vendor/openapps/`** holds two prebuilt packages for
+  accounts and credits, which keep their own licence:
   **MIT OR Apache-2.0** (their `package.json`).
 
 Both are permissive and combine with the AGPL in the rest of the app.

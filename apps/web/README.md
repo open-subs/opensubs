@@ -359,9 +359,6 @@ bundled Chromium has no proprietary codecs, so it would report a zero-width
 video forever and look exactly like an application bug. If ffmpeg is not
 installed the video checks skip and say so.
 
-Playwright is borrowed from `opendocscan/apps/web/node_modules` rather than
-added as a dependency here.
-
 ## Deploying
 
 `dist/` is static and uses relative URLs, so it works from a subdirectory,
@@ -379,7 +376,7 @@ big assets are fetched only when the feature that needs them is used.
 Serve it with compression: the ONNX runtime gzips to 5.8 MB and libass to
 836 KB.
 
-One server-side gotcha, already documented for `openpdfedit`: nginx did not
+One server-side gotcha: nginx did not
 learn the `application/wasm` MIME type until 1.21, and Ubuntu 22.04 ships
 1.18. Without an explicit `types { application/wasm wasm; }` block the
 browser refuses to stream-compile the module.
