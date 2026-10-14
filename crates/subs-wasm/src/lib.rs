@@ -30,7 +30,9 @@ use wasm_bindgen::prelude::*;
 use subs_asr::Transcript;
 use subs_media::{burn_args, BurnJob, ColorMeta, MediaInfo, OutputSize, Rational, TrimRange};
 use subs_style::StyleTemplate;
-use subs_subtitle::{parse_subtitles, segment, to_srt, to_vtt, Cue, SegmentConfig};
+use subs_subtitle::{
+    parse_subtitles, segment, to_srt, to_txt, to_txt_by_cue, to_vtt, Cue, SegmentConfig,
+};
 
 /// Route panics to `console.error` instead of an opaque `unreachable`
 /// trap. Idempotent, and safe to call from every entry point.
@@ -195,6 +197,21 @@ pub fn to_srt_js(cues_json: &str) -> Result<String, String> {
 pub fn to_vtt_js(cues_json: &str) -> Result<String, String> {
     let cues: Vec<Cue> = from_json(cues_json, "the cues")?;
     Ok(to_vtt(&cues))
+}
+
+/// Plain text, without cue numbers or timecodes: a transcript to read.
+///
+/// `by_cue` keeps one paragraph per cue with its lines apart, for
+/// bilingual subtitles, whose lines are two languages; otherwise the cues
+/// run on as prose, with a new paragraph at each pause.
+#[wasm_bindgen(js_name = toTxt)]
+pub fn to_txt_js(cues_json: &str, by_cue: bool) -> Result<String, String> {
+    let cues: Vec<Cue> = from_json(cues_json, "the cues")?;
+    Ok(if by_cue {
+        to_txt_by_cue(&cues)
+    } else {
+        to_txt(&cues)
+    })
 }
 
 /// Render cues to an ASS document at a given display size.
@@ -861,6 +878,24 @@ mod tests {
         let original: Vec<Cue> = serde_json::from_str(&cues_json()).unwrap();
         let parsed: Vec<Cue> = serde_json::from_str(&back).unwrap();
         assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn the_text_export_is_the_words_without_timings() {
+        let txt = to_txt_js(&cues_json(), false).unwrap();
+        assert!(!txt.is_empty());
+        assert!(!txt.contains("-->"), "{txt}");
+        let cues: Vec<Cue> = serde_json::from_str(&cues_json()).unwrap();
+        for cue in &cues {
+            for line in &cue.lines {
+                for word in line.split_whitespace() {
+                    assert!(txt.contains(word), "{word} missing from {txt}");
+                }
+            }
+        }
+        assert!(to_txt_js("not json", false).is_err());
+        let by_cue = to_txt_js(&cues_json(), true).unwrap();
+        assert_eq!(by_cue.matches("\n\n").count(), cues.len() - 1, "{by_cue}");
     }
 
     #[test]

@@ -18,7 +18,7 @@ use subs_whisper::WhisperTranscriber;
 use subs_media::{probe_args, MediaInfo, OutputSize, TrimRange, VideoEncoder};
 use subs_pipeline::{plan_job, write_ass, JobSpec, ProgressParser};
 use subs_style::{BorderStyle, Rgba, StyleTemplate};
-use subs_subtitle::{to_srt, to_vtt};
+use subs_subtitle::{to_srt, to_txt, to_vtt};
 use subs_asr::{AsrOptions, AudioRef, Transcriber};
 use subs_translate::{ClaudeTranslator, TranslateRequest, Translator};
 
@@ -116,6 +116,8 @@ pub struct BurnOptions {
     /// Write `<output>.srt` / `.vtt` alongside the video.
     pub write_srt: bool,
     pub write_vtt: bool,
+    /// Write `<output>.txt`: the words alone, without timings.
+    pub write_txt: bool,
     /// Translations already bought from OpenSubs' cloud translation, for a
     /// transcript `transcribe_for_cloud` made. See `cloud`.
     pub cloud: Option<CloudTranslation>,
@@ -462,6 +464,11 @@ fn run_burn_job_in(
     if options.write_vtt {
         let path = output.with_extension("vtt");
         std::fs::write(&path, to_vtt(&planned.cues))
+            .map_err(|e| format!("writing {}: {e}", path.display()))?;
+    }
+    if options.write_txt {
+        let path = output.with_extension("txt");
+        std::fs::write(&path, to_txt(&planned.cues))
             .map_err(|e| format!("writing {}: {e}", path.display()))?;
     }
 
@@ -1168,6 +1175,14 @@ mod tests {
         assert_eq!(from_empty, BurnOptions::default());
     }
 
+    #[test]
+    fn the_text_file_options_arrive_by_their_front_end_names() {
+        let options: BurnOptions =
+            serde_json::from_str(r#"{"writeSrt":true,"writeTxt":true}"#).unwrap();
+        assert!(options.write_srt && options.write_txt && !options.write_vtt);
+        assert!(!BurnOptions::default().write_txt);
+    }
+
     /// Real speech, real model: the lines priced for cloud translation are
     /// exactly the cues the export then asks translations for, so the paid
     /// translations land one-to-one. Needs ffmpeg on PATH, a whisper model
@@ -1225,6 +1240,7 @@ mod tests {
             style_file: None,
             write_srt: true,
             write_vtt: false,
+            write_txt: true,
             cloud: None,
         };
         let spec = spec_with(&options);

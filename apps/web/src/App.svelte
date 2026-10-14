@@ -97,6 +97,7 @@
     emphasisCap,
     glowCap,
     writeSrt,
+    writeTxt,
     writeVtt,
     clipError,
     clipLength,
@@ -568,6 +569,9 @@
     sourceCues !== null && sourceCues.length === cues.length && cues.length > 0,
   );
 
+  /** Whether the text exports carry both languages, one under the other. */
+  const exportsBoth = $derived(bilingual && canShowBoth && !!sourceCues && engineReady);
+
   /**
    * The cues the text exports and the glyph check work from.
    *
@@ -579,7 +583,7 @@
    * lines itself would then disagree with the burned picture.
    */
   const shownCues = $derived.by<Cue[]>(() => {
-    if (!bilingual || !canShowBoth || !sourceCues || !engineReady) return cues;
+    if (!exportsBoth || !sourceCues) return cues;
     const original = $state.snapshot(sourceCues);
     const translated = $state.snapshot(cues);
     try {
@@ -2873,7 +2877,7 @@
           <span class="tag">{t("text only")}</span>
         </div>
         <p class="oa-caption card-intro">
-          <Rich text={t("The subtitles on their own, to hand to a player, a platform or an editor — the video is not touched. **.ass** keeps the styling you chose here; **.srt** and **.vtt** are plain text that everything reads, with none of the styling.")} />
+          <Rich text={t("The subtitles on their own, to hand to a player, a platform or an editor — the video is not touched. **.ass** keeps the styling you chose here; **.srt** and **.vtt** are plain text that everything reads, with none of the styling. **.txt** is just the words, without timings: a transcript to read, quote or paste.")} />
         </p>
         <div class="checkbox-row">
           <button
@@ -2900,6 +2904,14 @@
           >
             <Icon name="download" size={14} />
             .vtt
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeTxt(shownCues, exportsBoth), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.txt`, "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .txt
           </button>
         </div>
 

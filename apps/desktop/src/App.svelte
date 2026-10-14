@@ -73,6 +73,7 @@
   let exportHeight = $state("");
   let writeSrt = $state(false);
   let writeVtt = $state(false);
+  let writeTxt = $state(false);
 
   let translateTo = $state("");
   /** "device": the offline model, free. "cloud": our servers, credits. */
@@ -361,6 +362,7 @@
       translateTo: translateTo === "" ? null : translateTo,
       writeSrt,
       writeVtt,
+      writeTxt,
     };
   }
 
@@ -809,6 +811,10 @@
         <label class="checkbox">
           <input type="checkbox" bind:checked={writeVtt} disabled={burning} />
           <span>Also write .vtt</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" bind:checked={writeTxt} disabled={burning} />
+          <span>Also write .txt (text only, no timings)</span>
         </label>
       </div>
     </section>

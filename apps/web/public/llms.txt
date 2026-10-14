@@ -103,6 +103,9 @@ Contact: hello@opensubs.app
 - [Browser extension](https://opensubs.app/browser-extension): subtitles over whatever is playing in the tab; Chrome, Edge and Firefox.
 - [Transcribe video](https://opensubs.app/transcribe-video): transcribing a video to text in the browser, exported as .srt, .vtt or .ass.
 - [Whisper in the browser](https://opensubs.app/whisper-in-browser): how OpenSubs runs Whisper locally in the tab, and the three model sizes.
+- [Subtitle editor](https://opensubs.app/subtitle-editor): correcting the text of an .srt or .vtt in the browser; timings are not editable.
+- [Caption generator](https://opensubs.app/caption-generator): generating captions from a video's speech in the browser, exported as a caption file or burned into an MP4.
+- [VTT to SRT](https://opensubs.app/vtt-to-srt): converting a .vtt to .srt in the browser, and what the conversion keeps and drops.
 - [Blog](https://opensubs.app/blog)
 - [Privacy](https://opensubs.app/privacy): what is stored, and where.
 - [Windows desktop privacy policy](https://opensubs.app/desktop-privacy): the

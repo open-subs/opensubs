@@ -21,6 +21,10 @@ WEB_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_DIR="$(dirname "$(dirname "$WEB_DIR")")"
 OUT_DIR="$WEB_DIR/src/wasm-gen"
 
+# The engine is served to every visitor, so no builder's home directory may
+# end up in it: rustc writes source paths into the binary for panic messages.
+source "$WORKSPACE_DIR/scripts/remap-paths.sh"
+
 if ! command -v wasm-bindgen >/dev/null 2>&1; then
   echo "error: wasm-bindgen not on PATH." >&2
   echo "  cargo install wasm-bindgen-cli --version 0.2.126" >&2

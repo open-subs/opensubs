@@ -23,6 +23,7 @@ export const toAssBilingualKaraoke: (a: number, b: number, c: number, d: number,
 export const toAssEmphasised: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const toAssKaraoke: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
 export const toSrt: (a: number, b: number, c: number) => void;
+export const toTxt: (a: number, b: number, c: number, d: number) => void;
 export const toVtt: (a: number, b: number, c: number) => void;
 export const transcriptFromSegments: (a: number, b: number, c: number, d: number, e: number) => void;
 export const translateRequestBody: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;

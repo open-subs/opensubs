@@ -56,6 +56,8 @@ export interface BurnOptions {
   styleFile?: string | null;
   writeSrt?: boolean;
   writeVtt?: boolean;
+  /** Also write the words alone, without timings, as `<output>.txt`. */
+  writeTxt?: boolean;
   /** Translations bought from cloud translation, for a priced transcript. */
   cloud?: { jobId: string; translations: string[] } | null;
 }

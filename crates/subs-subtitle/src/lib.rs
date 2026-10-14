@@ -15,7 +15,7 @@ pub use cue::{fmt_ass, fmt_srt, fmt_vtt, Cue};
 pub use linebreak::{wrap_lines, MAX_LINES};
 pub use parse::{parse_subtitles, ParseError};
 pub use segment::{segment, SegmentConfig};
-pub use serialize::{to_srt, to_vtt};
+pub use serialize::{to_srt, to_txt, to_txt_by_cue, to_vtt, TXT_PARAGRAPH_GAP};
 pub use snap::{enforce_gaps, snap_to_frame, MIN_GAP_FRAMES};
 pub use width::{
     is_cjk_char, is_cjk_dominant, join_tokens, joined_len, line_budget, needs_space_between,

@@ -203,6 +203,15 @@ export function toAssKaraoke(cues_json: string, style: string, play_w: number, p
 
 export function toSrt(cues_json: string): string;
 
+/**
+ * Plain text, without cue numbers or timecodes: a transcript to read.
+ *
+ * `by_cue` keeps one paragraph per cue with its lines apart, for
+ * bilingual subtitles, whose lines are two languages; otherwise the cues
+ * run on as prose, with a new paragraph at each pause.
+ */
+export function toTxt(cues_json: string, by_cue: boolean): string;
+
 export function toVtt(cues_json: string): string;
 
 /**
@@ -274,6 +283,7 @@ export interface InitOutput {
     readonly toAssEmphasised: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
     readonly toAssKaraoke: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
     readonly toSrt: (a: number, b: number, c: number) => void;
+    readonly toTxt: (a: number, b: number, c: number, d: number) => void;
     readonly toVtt: (a: number, b: number, c: number) => void;
     readonly transcriptFromSegments: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly translateRequestBody: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;

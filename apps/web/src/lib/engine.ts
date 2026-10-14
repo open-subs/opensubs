@@ -34,6 +34,7 @@ import init, {
   maxEmphasisStrength,
   toSrt,
   transcriptFromSegments,
+  toTxt,
   toVtt,
   translateRequestBody,
   translationBatchSize,
@@ -133,6 +134,15 @@ export function writeSrt(cues: Cue[]): string {
 
 export function writeVtt(cues: Cue[]): string {
   return toVtt(JSON.stringify(cues));
+}
+
+/**
+ * Plain text without timecodes: a transcript to read. `byCue` keeps one
+ * paragraph per cue with its lines apart, for bilingual cues, whose lines
+ * are two languages; otherwise the cues run on as prose.
+ */
+export function writeTxt(cues: Cue[], byCue = false): string {
+  return toTxt(JSON.stringify(cues), byCue);
 }
 
 /**

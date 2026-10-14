@@ -706,6 +706,18 @@ const secondCue = await page.$$eval(".cue-text", (els) => els[1].value);
 check("multi-line cue keeps its break", secondCue.includes("\n"), JSON.stringify(secondCue));
 
 {
+  // The plain-text transcript: the words only, with no cue numbers and no
+  // timecodes, the cues run on as prose and the second cue's line break
+  // undone. Half a second apart is no pause, so it is one paragraph.
+  const txt = await downloadText(page, 'button:has-text(".txt")');
+  check(
+    "the .txt is the words without timings",
+    txt === "The words, burned into the picture. A second cue, on two lines this time.\n",
+    JSON.stringify(txt),
+  );
+}
+
+{
   await panel("subtitles");
   const card = page.locator('.card:has(> h2:text-is("Subtitles"))');
   check(
@@ -1081,6 +1093,17 @@ if (FIXTURE) {
         "the .srt is reflowed the same way the picture is",
         srt.includes("A second cue, on two lines this time."),
         srt.slice(0, 400),
+      );
+      // Both languages in the transcript too, each on its own line under
+      // the other rather than interleaved into one paragraph.
+      const txt = await downloadText(page, 'button:has-text(".txt")');
+      const txtLines = txt.split("\n");
+      check(
+        "the .txt keeps the two languages on lines of their own",
+        !txt.includes("-->") &&
+          txtLines.includes("The words, burned into the picture.") &&
+          txtLines.some((l) => l.startsWith("Ligne 1")),
+        txt.slice(0, 300),
       );
 
       await both.locator("input").uncheck();

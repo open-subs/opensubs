@@ -563,6 +563,11 @@
 
   .site-card p { margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.55; }
 
+  /* /styles: the app stylesheet sizes .style-grid at minmax(340px, 1fr), wider
+     than a 360px phone leaves inside the gutters. That sheet is the app's build,
+     so the cap is set here; the id outranks it, since it loads after this. */
+  #gallery .style-grid { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); }
+
   .site-tag {
     display: inline-block;
     margin-bottom: var(--space-3);
@@ -779,7 +784,7 @@
 
     .hero h1 { font-size: clamp(2.1rem, 5.2vw, 3.9rem); }
 
-    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr)); }
 
     .step-num {
       width: 34px; height: 34px;

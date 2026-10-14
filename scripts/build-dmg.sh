@@ -39,6 +39,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+# No builder's home directory in what people download (see the script).
+source "$REPO_ROOT/scripts/remap-paths.sh"
 
 VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
 ARCH="$(uname -m)"
