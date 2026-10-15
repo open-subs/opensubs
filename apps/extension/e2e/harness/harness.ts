@@ -19,7 +19,7 @@ import { capture, findMedia, recordWindows } from "../../src/lib/capture";
 import { Input, BlobSource, ALL_FORMATS, AudioBufferSink } from "mediabunny";
 import { createEngine } from "../../src/engine/engine";
 import { stitch, toSrt } from "../../src/lib/seam";
-import type { Cue, Settings } from "../../src/lib/protocol";
+import { blobToWire, type Cue, type Settings } from "../../src/lib/protocol";
 
 declare global {
   interface Window {
@@ -127,7 +127,7 @@ window.runPipeline = async (settings, windows) => {
       if (sent === 1) window.__probe = await probeBlob(w.blob);
       engine.handle({
         kind: "transcribe",
-        audio: await w.blob.arrayBuffer(),
+        audio: await blobToWire(w.blob),
         mime: w.blob.type,
         offset: w.offset,
         settings,

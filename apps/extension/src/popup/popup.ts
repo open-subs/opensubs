@@ -184,8 +184,44 @@ goEl.addEventListener("click", async () => {
   await tell({ kind: "start", tabId: tab.id, settings: readSettings() });
 });
 
+/**
+ * Firefox for Android has no downloads API: `downloads.download` was removed
+ * there, and calling it never settled -- Save .srt did nothing and no file
+ * appeared. There the popup is a full page of its own rather than a panel, so
+ * it does not close under the save, and an ordinary download link works:
+ * Firefox asks "Download file?" and puts it in Downloads. Asked once, when the
+ * popup opens.
+ */
+const onAndroid: Promise<boolean> = api.runtime
+  .getPlatformInfo()
+  .then((info) => info.os === "android")
+  .catch(() => false);
+
+/**
+ * Save through a download link in this page, for browsers with no downloads API.
+ *
+ * SubRip's own type, not text/plain: Android names a download after its type,
+ * and as text/plain the file landed as "subtitles.srt.txt".
+ */
+function saveWithLink(srt: string) {
+  const url = URL.createObjectURL(new Blob([srt], { type: "application/x-subrip" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "subtitles.srt";
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 saveEl.addEventListener("click", async () => {
   const tabId = await activeTab();
+  if (await onAndroid) {
+    const got = (await tell({ kind: "cues", tabId })) as { srt: string; count: number } | undefined;
+    if (got?.count) saveWithLink(got.srt);
+    return;
+  }
   // Firefox closes the popup the moment the save dialog opens, and a blob URL
   // made here dies with the page that made it: the download appeared in the
   // panel with a "retry" arrow and no file. Where the background is

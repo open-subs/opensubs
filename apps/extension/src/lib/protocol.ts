@@ -165,9 +165,17 @@ export type FromEngine =
   | { kind: "segments"; cues: Cue[]; offset: number; take?: number }
   | { kind: "failed"; message: string };
 
-/** The one place that knows both browsers' name for the API. */
-export const api: typeof chrome =
-  (globalThis as unknown as { browser?: typeof chrome }).browser ?? chrome;
+/**
+ * The one place that knows both browsers' name for the API.
+ *
+ * Read off `globalThis` rather than named bare: a bare `chrome` throws a
+ * ReferenceError in an ordinary page, which is where e2e/pipeline.mjs runs
+ * the engine, and that stopped the harness before it could run anything.
+ */
+export const api: typeof chrome = (() => {
+  const g = globalThis as unknown as { browser?: typeof chrome; chrome?: typeof chrome };
+  return (g.browser ?? g.chrome) as typeof chrome;
+})();
 
 /**
  * Chromium resolves `chrome.runtime.sendMessage` with `undefined` and sets

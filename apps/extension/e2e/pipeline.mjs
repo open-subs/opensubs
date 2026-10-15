@@ -1,6 +1,10 @@
 // Run the extension's capture-and-transcribe pipeline against a real video.
 //
-//   node e2e/pipeline.mjs [video] [--engine chromium|firefox]
+//   node e2e/pipeline.mjs [video] [--engine chromium|firefox] [--no-audiodecoder]
+//
+// --no-audiodecoder removes WebCodecs' AudioDecoder from the page before
+// anything runs, as Firefox for Android ships without it, so the Web Audio
+// decoder that takes over there is the one exercised.
 //
 // A vite dev server serves the harness so the modules are the same ones the
 // extension bundles, imported the same way. The video is served from the
@@ -60,6 +64,9 @@ try {
       : { firefoxUserPrefs: { "media.autoplay.default": 0, "media.autoplay.blocking_policy": 0 } },
   );
   const page = await browser.newPage();
+  if (args.includes("--no-audiodecoder")) {
+    await page.addInitScript(() => { delete globalThis.AudioDecoder; });
+  }
   page.on("console", (m) => { if (m.type() === "error") console.log(`  console error: ${m.text().slice(0, 200)}`); });
   await page.goto("http://127.0.0.1:8794/e2e/harness/index.html");
   await page.evaluate((src) => {

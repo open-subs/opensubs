@@ -344,6 +344,7 @@ async function extractAudio(
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal,
 ): Promise<Float32Array> {
+  if (!hasAudioDecoder()) return await extractAudioWithWebAudio(file, start, end, onProgress, signal);
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     const track = await input.getPrimaryAudioTrack();
@@ -396,6 +397,71 @@ async function extractAudio(
   } finally {
     input.dispose();
   }
+}
+
+/**
+ * Whether WebCodecs can decode audio here.
+ *
+ * mediabunny decodes through WebCodecs' `AudioDecoder`, and Firefox for
+ * Android has none: every clip failed with "AudioDecoder is not available in
+ * this environment", so nothing could be transcribed there at all.
+ */
+function hasAudioDecoder(): boolean {
+  return typeof (globalThis as { AudioDecoder?: unknown }).AudioDecoder === "function";
+}
+
+/**
+ * The same result as `extractAudio`, decoded by Web Audio instead.
+ *
+ * Only for browsers without `AudioDecoder`; everywhere else the WebCodecs
+ * path above is kept, because it streams the trimmed range and this cannot.
+ * `decodeAudioData` takes the whole file into memory at once and decodes all
+ * of it before the trim is applied. That is fine for what reaches it in
+ * practice -- the browser extension's twenty-second recordings, and short
+ * clips on a phone -- and it is the only decoder those browsers have.
+ *
+ * It decodes straight to Whisper's rate: `decodeAudioData` resamples to the
+ * sample rate of the context it belongs to, so no second pass is needed.
+ */
+async function extractAudioWithWebAudio(
+  file: File,
+  start: number,
+  end: number | null,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<Float32Array> {
+  if (file.size === 0) throw new Error("That video has no audio track to transcribe.");
+  const bytes = await file.arrayBuffer();
+  if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+  let buffer: AudioBuffer;
+  try {
+    buffer = await new OfflineAudioContext(1, 1, TARGET_SAMPLE_RATE).decodeAudioData(bytes);
+  } catch {
+    throw new Error("No audio could be decoded from that clip.");
+  }
+  if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+
+  const rate = buffer.sampleRate;
+  const duration = buffer.length / rate;
+  const from = Math.max(0, start);
+  const to = end != null && end > from ? Math.min(end, duration) : duration;
+  if (to - from <= 0) throw new Error("The clip has no length.");
+  const first = Math.floor(from * rate);
+  const frames = Math.max(0, Math.min(buffer.length, Math.ceil(to * rate)) - first);
+  if (frames === 0) throw new Error("No audio could be decoded from that clip.");
+
+  // Downmixed by averaging, as above.
+  const mono = new Float32Array(frames);
+  for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < frames; i += 1) mono[i] += data[first + i];
+  }
+  if (buffer.numberOfChannels > 1) {
+    for (let i = 0; i < frames; i += 1) mono[i] /= buffer.numberOfChannels;
+  }
+  onProgress?.(1);
+  if (Math.abs(rate - TARGET_SAMPLE_RATE) < 1) return mono;
+  return await resample(mono, rate, TARGET_SAMPLE_RATE);
 }
 
 /** Resample via OfflineAudioContext, which does it properly. */
