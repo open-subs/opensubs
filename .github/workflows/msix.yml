@@ -1,0 +1,301 @@
+name: msix
+
+# The Windows app as an MSIX package, for the Microsoft Store.
+#
+# The Store signs MSIX packages itself, so this is how the Windows app gets
+# a trusted signature without a code-signing certificate of our own. (An
+# .exe or .msi listed in the Store has to arrive already signed.)
+#
+# By default the commit it is dispatched on is built exactly as the release
+# workflow builds the Windows installer (same toolchain, same bundled model
+# and ffmpeg, same ggml levels and instruction check) and the MSI that build
+# makes is used. Name a release in `tag` to package that release's MSI
+# instead. Either way the MSI is unpacked with an administrative install --
+# the files exactly as they would land on disk -- and packed again with a
+# manifest. The package is unsigned, as the Store wants it. A second copy is
+# signed with a throwaway certificate so it can be installed and tried on a
+# PC, and is installed and started here once.
+#
+# The package version is the app's own (tauri.conf.json, or the release
+# tag) with a fourth part of 0. The Store takes a package only when its
+# version is higher than the one it already has.
+#
+# The Store only takes a package whose identity matches what Partner Center
+# reserved for the app: copy Package/Identity/Name, Package/Identity/
+# Publisher and Package/Properties/PublisherDisplayName from the app's
+# Product identity page into the inputs.
+#
+# Nothing here publishes anything: the packages are the run's artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release whose MSI to package (empty builds this commit; no release candidates)
+        default: ""
+      identity_name:
+        description: Package/Identity/Name
+        default: OpenSubs.OpenSubs
+      publisher:
+        description: Package/Identity/Publisher
+        default: CN=7BD26B8D-251A-4E84-AA1A-56BC9B92FFBA
+      publisher_display_name:
+        description: Package/Properties/PublisherDisplayName
+        default: OpenSubs
+
+jobs:
+  msix:
+    name: MSIX
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+      IDENTITY_NAME: ${{ inputs.identity_name }}
+      PUBLISHER: ${{ inputs.publisher }}
+      PUBLISHER_DISPLAY_NAME: ${{ inputs.publisher_display_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The release workflow's Windows build, step for step. Keep the two
+      # in step: a package built differently from the installer is a
+      # different program under the same version.
+      - uses: actions/setup-node@v4
+        if: inputs.tag == ''
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+        if: inputs.tag == ''
+      - uses: Swatinem/rust-cache@v2
+        if: inputs.tag == ''
+        with: { key: "ggml-native-OFF-avx512-OFF" }
+      - run: npm install
+        if: inputs.tag == ''
+        working-directory: apps/desktop
+      - name: Bundled model and ffmpeg
+        if: inputs.tag == ''
+        shell: bash
+        run: bash apps/desktop/scripts/fetch-bundled.sh
+      - name: Build the Windows installer
+        if: inputs.tag == ''
+        working-directory: apps/desktop
+        run: npx tauri build --bundles msi
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          OPENSUBS_LINKER_MAP: ${{ format('{0}\target\opensubs-desktop.map', github.workspace) }}
+          GGML_NATIVE: "OFF"
+          GGML_SSE42: "ON"
+          GGML_AVX: "ON"
+          GGML_AVX2: "ON"
+          GGML_FMA: "ON"
+          GGML_F16C: "ON"
+          GGML_BMI2: "ON"
+          GGML_AVX_VNNI: "OFF"
+          GGML_AVX512: "OFF"
+          GGML_AVX512_VBMI: "OFF"
+          GGML_AVX512_VNNI: "OFF"
+          GGML_AVX512_BF16: "OFF"
+          GGML_AMX_TILE: "OFF"
+          GGML_AMX_INT8: "OFF"
+          GGML_AMX_BF16: "OFF"
+      - name: "instruction check: Windows exe"
+        if: inputs.tag == ''
+        shell: bash
+        run: |
+          python -m pip install --quiet iced-x86==1.21.0
+          python scripts/check-isa.py target/release/opensubs-desktop.exe --map target/opensubs-desktop.map --report isa-check-windows.md
+          cat isa-check-windows.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Unpack the MSI
+        run: |
+          if ($env:TAG) {
+            gh release download $env:TAG --pattern '*_x64_en-US.msi' --dir msi
+            $version = $env:TAG.TrimStart('v')
+          } else {
+            New-Item -ItemType Directory msi | Out-Null
+            Copy-Item target\release\bundle\msi\*_x64_en-US.msi msi
+            $version = (Get-Content apps\desktop\src-tauri\tauri.conf.json -Raw | ConvertFrom-Json).version
+          }
+          # MSIX versions have four parts, and the Store needs the last at 0.
+          $version = "$version.0"
+          if ($version -notmatch '^\d+\.\d+\.\d+\.0$') { throw "not a release version: $version" }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          $msi = (Get-ChildItem msi -Filter *.msi | Select-Object -First 1).FullName
+          "packaging $msi as $version"
+          $out = Join-Path $PWD 'msi-out'
+          $p = Start-Process msiexec -Wait -PassThru -ArgumentList '/a', "`"$msi`"", '/qn', "TARGETDIR=`"$out`""
+          if ($p.ExitCode -ne 0) { throw "msiexec /a exited $($p.ExitCode)" }
+          $exe = Get-ChildItem $out -Recurse -Filter opensubs-desktop.exe | Select-Object -First 1
+          if (-not $exe) { throw 'no opensubs-desktop.exe in the MSI' }
+          New-Item -ItemType Directory pkg | Out-Null
+          Copy-Item "$($exe.DirectoryName)\*" pkg -Recurse
+          Get-ChildItem pkg -Recurse -File | ForEach-Object { '{0,12:N0}  {1}' -f $_.Length, $_.FullName.Substring((Resolve-Path pkg).Path.Length + 1) }
+
+      # What the installers promise: nothing to download before the first
+      # subtitle. If the MSI stopped carrying these, so would the package.
+      - name: The models and ffmpeg came along
+        run: |
+          foreach ($f in 'opensubs-desktop.exe', 'models\ggml-base.bin', 'models\m2m100\model.bin',
+                         'vendor\ffmpeg.exe', 'vendor\ffprobe.exe') {
+            if (-not (Test-Path "pkg\$f")) { throw "missing from the package: $f" }
+          }
+
+      - name: Tiles and manifest
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $src = [System.Drawing.Image]::FromFile((Resolve-Path apps/desktop/src-tauri/icons/icon.png))
+          New-Item -ItemType Directory pkg\Assets | Out-Null
+          foreach ($a in @(@('Square44x44Logo', 44), @('StoreLogo', 50), @('Square150x150Logo', 150))) {
+            $bmp = New-Object System.Drawing.Bitmap $a[1], $a[1]
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.DrawImage($src, 0, 0, $a[1], $a[1])
+            $bmp.Save("pkg\Assets\$($a[0]).png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose()
+          }
+          $src.Dispose()
+
+          $version = $env:VERSION
+          $esc = { param($s) [System.Security.SecurityElement]::Escape($s) }
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package
+            xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+            xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+            xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+            IgnorableNamespaces="uap rescap">
+            <Identity Name="$(& $esc $env:IDENTITY_NAME)" Publisher="$(& $esc $env:PUBLISHER)"
+                      Version="$version" ProcessorArchitecture="x64" />
+            <Properties>
+              <DisplayName>OpenSubs</DisplayName>
+              <PublisherDisplayName>$(& $esc $env:PUBLISHER_DISPLAY_NAME)</PublisherDisplayName>
+              <Logo>Assets\StoreLogo.png</Logo>
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+            </Dependencies>
+            <Resources>
+              <Resource Language="en-us" />
+            </Resources>
+            <Applications>
+              <Application Id="OpenSubs" Executable="opensubs-desktop.exe" EntryPoint="Windows.FullTrustApplication">
+                <uap:VisualElements DisplayName="OpenSubs"
+                  Description="Subtitle any video without uploading it anywhere."
+                  BackgroundColor="transparent"
+                  Square150x150Logo="Assets\Square150x150Logo.png"
+                  Square44x44Logo="Assets\Square44x44Logo.png" />
+              </Application>
+            </Applications>
+            <Capabilities>
+              <rescap:Capability Name="runFullTrust" />
+            </Capabilities>
+          </Package>
+          "@ | Set-Content pkg\AppxManifest.xml -Encoding utf8
+          Get-Content pkg\AppxManifest.xml
+
+      - name: Pack
+        run: |
+          $sdk = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter makeappx.exe |
+            Where-Object { $_.DirectoryName -like '*\x64' } | Sort-Object FullName | Select-Object -Last 1).DirectoryName
+          "SDK=$sdk" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory out | Out-Null
+          & "$sdk\makeappx.exe" pack /d pkg /p "out\OpenSubs_$($env:VERSION)_x64.msix" /o
+          if ($LASTEXITCODE) { throw "makeappx exited $LASTEXITCODE" }
+
+      # Only for trying the package before the Store has it. Windows installs
+      # a sideloaded MSIX only when it trusts the signer, so the certificate
+      # goes alongside: import it into Local Machine > Trusted People first.
+      - name: Test-signed copy
+        run: |
+          $cert = New-SelfSignedCertificate -Type Custom -Subject $env:PUBLISHER -KeyUsage DigitalSignature `
+            -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(1) `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+          $test = "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix"
+          Copy-Item "out\OpenSubs_$($env:VERSION)_x64.msix" $test
+          & "$env:SDK\signtool.exe" sign /fd SHA256 /sha1 $cert.Thumbprint $test
+          if ($LASTEXITCODE) { throw "signtool exited $LASTEXITCODE" }
+          Export-Certificate -Cert $cert -FilePath out\OpenSubs-test-certificate.cer | Out-Null
+          Import-Certificate -FilePath out\OpenSubs-test-certificate.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+
+      # The package installs, the app starts from its read-only install
+      # folder and stays up, and the ffmpeg it carries runs.
+      - name: Install and start
+        run: |
+          Add-AppxPackage "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix"
+          $pkg = Get-AppxPackage -Name $env:IDENTITY_NAME
+          $pkg | Format-List Name, Version, PackageFamilyName, InstallLocation
+          Start-Process "shell:AppsFolder\$($pkg.PackageFamilyName)!OpenSubs"
+          Start-Sleep 20
+          $running = Get-Process opensubs-desktop -ErrorAction SilentlyContinue
+          if (-not $running) { throw 'OpenSubs was not running 20 seconds after starting it' }
+          $running | Format-Table Id, Path, WorkingSet64
+          # The window is a WebView2 page: its processes mean the UI loaded.
+          $web = Get-Process msedgewebview2 -ErrorAction SilentlyContinue
+          if (-not $web) { throw 'OpenSubs is running but no WebView2 process started for its window' }
+          "WebView2 processes: $(@($web).Count)"
+          # What the runner's screen shows, for the record.
+          New-Item -ItemType Directory -Force report | Out-Null
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("$PWD\report\running.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          } catch { "no screenshot: $_" }
+
+          # Windows refuses a program under WindowsApps to anything outside
+          # the package, so ffmpeg is run from inside it, as the app runs it.
+          $log = 'C:\msix-ffmpeg.txt'
+          Invoke-CommandInDesktopPackage -PackageFamilyName $pkg.PackageFamilyName -AppId OpenSubs `
+            -Command cmd.exe -Args "/c `"`"$($pkg.InstallLocation)\vendor\ffmpeg.exe`" -hide_banner -version > $log 2>&1`""
+          Start-Sleep 10
+          Get-Content $log -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not (Select-String -Path $log -Pattern '^ffmpeg version' -Quiet)) { throw 'the packaged ffmpeg did not run inside the package' }
+          $running | Stop-Process
+          Remove-AppxPackage $pkg.PackageFullName
+
+      # The checks Partner Center runs on a desktop package, on the
+      # test-signed copy (the kit installs what it tests). Evidence, not a
+      # gate: the report is uploaded either way.
+      - name: Windows App Certification Kit
+        continue-on-error: true
+        timeout-minutes: 45
+        run: |
+          New-Item -ItemType Directory -Force report | Out-Null
+          $appcert = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\App Certification Kit' -Filter appcert.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $appcert) { 'no Windows App Certification Kit on this runner image'; exit 0 }
+          & $appcert.FullName reset
+          $msix = (Resolve-Path "out\OpenSubs_$($env:VERSION)_x64-test-signed.msix").Path
+          & $appcert.FullName test -appxpackagepath $msix -reportoutputpath "$PWD\report\wack-report.xml"
+          "appcert exited $LASTEXITCODE"
+          if (Test-Path report\wack-report.xml) {
+            [xml]$r = Get-Content report\wack-report.xml
+            "OVERALL_RESULT: $($r.REPORT.OVERALL_RESULT)"
+            $r.SelectNodes('//TEST') | ForEach-Object { '{0,-10} {1}' -f $_.RESULT.InnerText, $_.NAME }
+          }
+
+      - name: Reports
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p report
+          [ -f isa-check-windows.md ] && cp isa-check-windows.md report/ || true
+          ls -la report
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report
+          path: report/*
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msix
+          path: out/*
+          if-no-files-found: error
+          # The package is the same 600 MB of models and ffmpeg as the
+          # installers; zipping it again only costs time.
+          compression-level: 0
