@@ -2,8 +2,7 @@
 
 The app is the web app in a native shell — see `docs/mobile.md` for why,
 and for what was measured on the simulator. This file is about the
-submission, and follows `openpdfedit/docs/STORES.md`, which is the one
-App Store submission this suite has already thought through.
+submission.
 
 Nothing here submits anything. `apps/mobile/ios/scripts/archive.sh`
 builds a signed `.ipa` and can upload it to App Store Connect, where it
@@ -90,17 +89,16 @@ that separates a configured rail from a compiled one.
 
 What that took, all three of which were missing:
 
-- **The image predated the Apple routes.** Rebuilt from the monorepo and
-  restarted with `deploy/run.sh prod`; the previous image is kept as
-  `openapps-server:rollback-apple-<timestamp>`.
-- **`[apple_iap]` in `config/prod-base.toml`**, not in `prod.env`:
-  `OPENAPPS_APPLE_IAP_ENVIRONMENT` can only override a section that already
-  exists. `environment = "production"`, and Apple's root certificate is
+- **The server image predated the Apple routes.** Rebuilt and restarted,
+  with the previous image kept for rollback.
+- **`[apple_iap]` in the server's base configuration file**, not in its
+  environment file: an environment variable can only override a section that
+  already exists. `environment = "production"`, and Apple's root certificate is
   **inline** as `root_certificates_pem` rather than
   `root_certificates_file`, because the container mounts that one file and
   nothing else from `config/` — a path there names a file the server cannot
   see, and the failure would arrive only when somebody first paid.
-- **`capacitor://localhost` in `OPENAPPS_SERVER_ALLOWED_ORIGINS`.** The app
+- **`capacitor://localhost` in the server's allowed origins.** The app
   is served from that scheme, so it is the `Origin` on every call it makes.
   Without it sign-in, balance and redeem all fail before any purchase code
   runs, as CORS, looking nothing like a purchase bug.
@@ -119,16 +117,16 @@ should say what the customer is actually charged, or the ledger and the
 receipt disagree by a cent for ever.
 
 The ids are prefixed on purpose. The server looks a product up by
-`(platform, product_id)` alone, so a bare `credits_1000` is already
-openpdfedit's row: the lookup would succeed, resolve to
-`com.openpdfedit.app`, and then fail verification against our bundle — a
-confusing failure a long way from its cause.
+`(platform, product_id)` alone, so a bare `credits_1000` could already be
+another app's row: the lookup would succeed, resolve to that app's bundle,
+and then fail verification against ours — a confusing failure a long way
+from its cause.
 
 **The client**
 
 - `apps/mobile/ios/scripts/archive.sh` — stage the web app, archive,
-  export, validate with Apple, upload. Modelled on openpdfedit's, with
-  two Capacitor differences: it builds the **workspace** (the Capacitor
+  export, validate with Apple, upload. Two steps are Capacitor's own:
+  it builds the **workspace** (the Capacitor
   runtime lives in `Pods.xcodeproj`, which `-project` cannot see), and it
   stages `www/` through `npm run sync` first, because that directory is a
   copy and archiving without it ships whatever was there last.
