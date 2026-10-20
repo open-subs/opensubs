@@ -29,7 +29,9 @@ import type { OpenApps } from "@openapps/sdk";
 // <openapps-signout> as custom elements. The import is a side effect, which
 // is why it has no bindings.
 import "@openapps/ui";
-import { configure, getClient, onChange } from "@openapps/ui";
+import { configure, getClient, notify, onChange } from "@openapps/ui";
+import { Say } from "./say";
+import { paidTranslation, rememberPaid } from "./paidjobs";
 
 /** The accounts server, behind our own hostname. */
 export const AUTH_URL = "https://auth.opensubs.app";
@@ -54,8 +56,20 @@ export const APP_ID = "opensubs";
  * the case where an element upgraded first.
  */
 export function account(): OpenApps {
-  return getClient() ?? configure({ baseUrl: AUTH_URL });
+  return getClient() ?? configure(CLIENT_OPTIONS);
 }
+
+/**
+ * The client's options, in one place so both calls to `configure` agree.
+ *
+ * `onAuthChange` is the part that matters. The SDK drops a session it finds
+ * dead -- a refresh token that was revoked or ran out -- and until this was
+ * wired, it did so silently: the page went on showing a balance and "Sign
+ * out" for an account it was no longer signed in to, and found out only
+ * when a paid translation came back 401. Telling every listener means the
+ * panel changes the moment the SDK knows.
+ */
+const CLIENT_OPTIONS = { baseUrl: AUTH_URL, onAuthChange: () => notify() };
 
 // Configured here, at module load, rather than in a component's onMount.
 //
@@ -65,11 +79,19 @@ export function account(): OpenApps {
 // and threw "no OpenApps client: call configure({ baseUrl })". Configuring
 // on import is ordered by the module graph instead of by rendering, so the
 // client exists before any element can ask for it.
-configure({ baseUrl: AUTH_URL });
+configure(CLIENT_OPTIONS);
 
-/** Kept for callers that want to be explicit; configuring twice is harmless. */
+/**
+ * Kept for callers that want to be explicit. Returns the client configured
+ * above rather than making another: `configure()` builds a new client every
+ * time it is called, and a second one is not harmless. Back from a Google
+ * sign-in, `<openapps-login>` starts exchanging the `#code=` on the first
+ * client; replacing it mid-exchange made the elements reload on the second,
+ * which read the same code from the address bar and spent it again. The
+ * server answered the second exchange with a 401 on every redirect sign-in.
+ */
 export function configureAccount(): OpenApps {
-  return configure({ baseUrl: AUTH_URL });
+  return account();
 }
 
 /**
@@ -90,24 +112,87 @@ function bearer(): string | null {
   return account().session?.accessToken ?? null;
 }
 
+/** The claims of an access token. Read, not verified: the server verifies. */
+function claims(token: string | null): { sub?: string; exp?: number } | null {
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(part));
+  } catch {
+    return null;
+  }
+}
+
+/** The signed-in account's id, or null. */
+export function userId(): string | null {
+  return claims(bearer())?.sub ?? null;
+}
+
+/**
+ * An access token the gateway will accept, refreshed first if it is about
+ * to run out.
+ *
+ * Access tokens last fifteen minutes and the session behind them a month.
+ * The SDK renews one when the accounts server turns it away, but a gateway
+ * call does not go through the SDK, so a page left open for a quarter of an
+ * hour sent a stale token, was refused, and told a signed-in user to sign
+ * in. Asking for the balance is the cheapest call that makes the SDK
+ * renew; if the session itself is dead it is dropped, and the page hears
+ * about it through `onAuthChange`.
+ */
+async function freshBearer(force: boolean, signal?: AbortSignal): Promise<string | null> {
+  const token = bearer();
+  if (!token) return null;
+  const exp = claims(token)?.exp ?? 0;
+  if (!force && exp * 1000 - Date.now() > 60_000) return token;
+  try {
+    await account().credits.balance(signal);
+  } catch {
+    // Dropped, or the network: either way the token below is the answer.
+  }
+  return bearer();
+}
+
 export async function balance(signal?: AbortSignal): Promise<number> {
   if (!signedIn()) return 0;
   return account().credits.balance(signal);
 }
 
-export class NotSignedIn extends Error {
+export class NotSignedIn extends Say {
   constructor() {
-    super("Sign in to use OpenSubs translation.");
+    super("Sign in to translate on our backend.");
     this.name = "NotSignedIn";
   }
 }
 
-export class InsufficientCredits extends Error {
+/** Was signed in, and the session behind it has ended. */
+export class SignInExpired extends Say {
+  constructor() {
+    super("Your sign-in has expired. Sign in again to use your credits.");
+    this.name = "SignInExpired";
+  }
+}
+
+/**
+ * The gateway has this job down as paid and no longer holds its answer --
+ * it keeps one for fifteen minutes -- and the answer is not held here
+ * either. Running it again is a new job.
+ */
+export class AlreadyPaid extends Say {
+  constructor() {
+    super(
+      "This was translated and paid for earlier, but the result is no longer held. Translating it again is charged as a new job, at the price shown.",
+    );
+    this.name = "AlreadyPaid";
+  }
+}
+
+export class InsufficientCredits extends Say {
   constructor(
     readonly need: number,
     readonly have: number,
   ) {
-    super(`This needs ${need} credits and you have ${have}.`);
+    super("This needs {need} credits and you have {have}. Add credits below.", { need, have });
     this.name = "InsufficientCredits";
   }
 }
@@ -136,23 +221,48 @@ export async function translateOnBackend(
   idempotencyKey: string,
   signal?: AbortSignal,
 ): Promise<TranslateResult> {
-  const token = bearer();
+  const user = userId();
+  // Already paid for by this account and still held here: the same text,
+  // with no request, no charge and no wait.
+  const held = paidTranslation(user, idempotencyKey);
+  if (held && held.length === lines.length) {
+    return { translations: held, charged: 0, newBalance: -1 };
+  }
+
+  const token = await freshBearer(false, signal);
   if (!token) throw new NotSignedIn();
 
-  const response = await fetch(`${API_URL}/${APP_ID}/translate`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      lines,
-      target,
-      source: source ?? "auto",
-      idempotency_key: idempotencyKey,
-    }),
-    signal,
-  });
+  const send = (bearerToken: string) =>
+    fetch(`${API_URL}/${APP_ID}/translate`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify({
+        lines,
+        target,
+        source: source ?? "auto",
+        idempotency_key: idempotencyKey,
+      }),
+      signal,
+    });
+
+  let response = await send(token);
+  if (response.status === 401) {
+    // Refused although the clock said the token was good: renew it once
+    // and ask again. A session that cannot be renewed has ended, and the
+    // user is told that rather than to sign in as if they never had.
+    const renewed = await freshBearer(true, signal);
+    if (!renewed) throw new SignInExpired();
+    response = await send(renewed);
+    if (response.status === 401) {
+      if (!signedIn()) throw new SignInExpired();
+      // The accounts server still accepts this session and the gateway
+      // does not: not something signing in again would fix.
+      throw new Say("The translation service could not confirm your sign-in. You were not charged — try again.");
+    }
+  }
 
   const raw = await response.text();
   let body: Record<string, unknown> = {};
@@ -164,8 +274,10 @@ export async function translateOnBackend(
 
   if (!response.ok) throw translationError(response.status, body);
 
+  const translations = (body.translations as string[]) ?? [];
+  rememberPaid(user, idempotencyKey, translations);
   return {
-    translations: (body.translations as string[]) ?? [],
+    translations,
     charged: Number(body.charged ?? 0),
     newBalance: Number(body.new_balance ?? 0),
   };
@@ -183,23 +295,24 @@ function translationError(status: number, body: Record<string, unknown>): Error 
   if (status === 402) {
     return new InsufficientCredits(Number(body.need ?? 0), Number(body.have ?? 0));
   }
+  if (status === 409 && body.error === "already_charged") return new AlreadyPaid();
+  if (status === 409 && body.error === "in_progress") {
+    return new Say("This translation is still running from an earlier attempt. Try again in a minute.");
+  }
   if (status === 503 && body.error === "not_configured") {
-    return new Error(
-      "OpenSubs translation is not available right now. Use “On this device”, " +
-        "which is free, or bring your own API key.",
+    return new Say(
+      "OpenSubs translation is not available right now. Use “On this device”, which is free, or bring your own API key.",
     );
   }
   if (body.error === "vendor_miscount") {
-    return new Error(
-      "The translation came back with the wrong number of lines, so it was " +
-        "rejected rather than risk desynchronising your subtitles. " +
-        "You were not charged — try again.",
+    return new Say(
+      "The translation came back with the wrong number of lines, so it was rejected rather than risk desynchronising your subtitles. You were not charged — try again.",
     );
   }
   if (status === 502) {
-    return new Error("The translation service could not be reached. You were not charged.");
+    return new Say("The translation service could not be reached. You were not charged.");
   }
-  return new Error(`The translation service returned ${status}.`);
+  return new Say("The translation service returned {status}.", { status });
 }
 
 /**
@@ -210,9 +323,11 @@ function translationError(status: number, body: Record<string, unknown>): Error 
  * the charge instead of billing twice. A random UUID per attempt would
  * defeat the idempotency it looks like it provides.
  */
-export function jobKey(lines: string[], target: string): string {
+export function jobKey(lines: string[], target: string, source = "auto"): string {
+  // The source language is part of the job: the gateway fingerprints it
+  // with the lines and refuses a key reused for a different request.
   let hash = 0x811c9dc5;
-  const material = `${target}\u0000${lines.join("\u0000")}`;
+  const material = `${source}\u0000${target}\u0000${lines.join("\u0000")}`;
   for (let i = 0; i < material.length; i += 1) {
     hash ^= material.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193) >>> 0;

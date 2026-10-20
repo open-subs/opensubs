@@ -311,6 +311,22 @@ mod tests {
     }
 
     #[test]
+    fn a_korean_translation_keeps_its_spaces_and_breaks_between_words() {
+        // The words arrived spaced and were written into the cue with every
+        // space gone, broken inside 라이스 at the line end.
+        let korean = "안녕하세요 여러분, 오늘은 라이스 대학교가 텍사스와 경기를 합니다";
+        let out = apply_translations(&[cue(0.0, 4.0, "x")], &[korean.to_string()]).unwrap();
+        assert_eq!(out[0].lines.len(), 2, "{:?}", out[0].lines);
+        assert_eq!(out[0].lines.join(" "), korean, "{:?}", out[0].lines);
+        let words: Vec<&str> = korean.split(' ').collect();
+        for line in &out[0].lines {
+            for word in line.split(' ') {
+                assert!(words.contains(&word), "{word:?} is not a whole word: {:?}", out[0].lines);
+            }
+        }
+    }
+
+    #[test]
     fn a_translation_that_outgrows_one_line_is_broken_across_two() {
         // Comfortably over 42 characters, comfortably under 84: this is the
         // case the line budget exists for.

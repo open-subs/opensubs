@@ -18,6 +18,6 @@ pub use segment::{segment, SegmentConfig};
 pub use serialize::{to_srt, to_txt, to_txt_by_cue, to_vtt, TXT_PARAGRAPH_GAP};
 pub use snap::{enforce_gaps, snap_to_frame, MIN_GAP_FRAMES};
 pub use width::{
-    is_cjk_char, is_cjk_dominant, join_tokens, joined_len, line_budget, needs_space_between,
+    is_cjk_char, is_cjk_dominant, is_hangul, join_tokens, joined_len, line_budget, needs_space_between,
     MAX_CHARS_CJK, MAX_CHARS_LATIN,
 };

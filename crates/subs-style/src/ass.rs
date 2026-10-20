@@ -1,6 +1,6 @@
 use crate::{BorderStyle, Rgba, StyleTemplate};
 use std::fmt::Write as _;
-use subs_subtitle::width::is_cjk_spacing;
+use subs_subtitle::width::{is_cjk_spacing, is_hangul};
 use subs_subtitle::{fmt_ass, join_tokens, Cue};
 
 /// U+2060 WORD JOINER: invisible, zero-width, carries no joining or
@@ -66,11 +66,6 @@ const NO_LINE_START: &str = "，。、！？：；）」』】〉》〕］｝”
 
 /// Characters a line may not end with: the opening half of a pair.
 const NO_LINE_END: &str = "（「『【〈《〔［｛“‘([{";
-
-/// Hangul, which is written with spaces between words.
-fn is_hangul(c: char) -> bool {
-    matches!(c as u32, 0x1100..=0x11FF | 0x3130..=0x318F | 0xAC00..=0xD7AF)
-}
 
 /// Whether libass could never break between `a` and `b` on its own.
 ///

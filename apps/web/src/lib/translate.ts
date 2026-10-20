@@ -22,9 +22,11 @@
 
 import { applyTranslations, batchSize, translateRequestBody, parseTranslateResponse } from "./engine";
 import type { Cue } from "./engine";
-import { translateOnBackend, jobKey } from "./account";
+import { translateOnBackend, jobKey, userId, AlreadyPaid } from "./account";
+import { keyFor, retireKey } from "./paidjobs";
 import { contextGroups, joinGroup, spread } from "./context";
 import { translateChunk } from "./shortfall";
+import { Say } from "./say";
 
 export type ProviderId = "device" | "opensubs" | "claude" | "openai" | "deepl";
 
@@ -152,9 +154,7 @@ export async function deviceAvailability(
   if (!api) {
     return {
       ok: false,
-      reason:
-        "This browser has no built-in translator. Chrome 138+ does; " +
-        "otherwise pick a provider below.",
+      reason: "This browser has no built-in translator. Chrome 138+ does; otherwise pick a provider below.",
     };
   }
   try {
@@ -163,7 +163,7 @@ export async function deviceAvailability(
       targetLanguage: target,
     });
     if (state === "unavailable") {
-      return { ok: false, reason: `Your browser cannot translate ${source} to ${target}.` };
+      return { ok: false, reason: "Your browser cannot translate between these two languages." };
     }
     return { ok: true, needsDownload: state === "downloadable" };
   } catch (e) {
@@ -303,7 +303,7 @@ async function deviceBatcher(
   allTexts: string[],
 ): Promise<Batch> {
   const api = translatorApi();
-  if (!api) throw new Error("This browser has no built-in translator.");
+  if (!api) throw new Say("This browser has no built-in translator.");
 
   // The device translator needs an explicit source language: unlike an
   // LLM it cannot infer one. Detection is tried first, but it is genuinely
@@ -314,9 +314,8 @@ async function deviceBatcher(
   let source = options.source && options.source !== "auto" ? options.source : null;
   source ??= await detectLanguage(allTexts.join(" "));
   if (!source) {
-    throw new Error(
-      "This browser could not detect the spoken language. Choose it explicitly " +
-        "under “Spoken language”.",
+    throw new Say(
+      "This browser could not detect the spoken language. Choose it explicitly under “Translate from”.",
     );
   }
 
@@ -329,7 +328,7 @@ async function deviceBatcher(
     monitor: (m) => {
       m.addEventListener("downloadprogress", (event) => {
         const loaded = (event as Event & { loaded?: number }).loaded ?? 0;
-        options.onProgress?.(0, 1, `Downloading the language model (${Math.round(loaded * 100)}%)`);
+        options.onProgress?.(Math.round(loaded * 100), 100, "Downloading the language model");
       });
     },
   });
@@ -394,11 +393,15 @@ const OPENAI_SYSTEM =
   "timestamp of entry N, so a count mismatch desynchronises the whole clip. Keep each " +
   "translation roughly as long as the original — a subtitle too long to read in its slot " +
   "is a worse translation than a plainer one that fits. Use natural spoken register, " +
-  "preserve proper nouns and numbers, and add no notes or explanations.";
+  "preserve proper nouns and numbers, and add no notes or explanations. The lines often " +
+  "come from speech recognition, which drops the capitals on names (\"rice play texas\" " +
+  "is Rice University's team, not grain): use the surrounding lines to tell a name from " +
+  "an ordinary word, and keep names as names.";
 
 function openAiBatcher(options: TranslateOptions): Batch {
-  const key = requireKey(options, "this provider");
   const base = (options.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const host = hostOf(base);
+  const key = requireKey(options, host);
   const model = options.model || "gpt-4o-mini";
 
   return async (texts) => {
@@ -425,13 +428,13 @@ function openAiBatcher(options: TranslateOptions): Batch {
     });
 
     const raw = await response.text();
-    if (!response.ok) throw authAwareError(response.status, new Error(raw.slice(0, 200)), "the server");
+    if (!response.ok) throw authAwareError(response.status, new Error(raw.slice(0, 200)), host);
 
     let content: string;
     try {
       content = JSON.parse(raw).choices?.[0]?.message?.content ?? "";
     } catch {
-      throw new Error("The server did not return a chat completion.");
+      throw new Say("The server did not return a chat completion.");
     }
     return readTranslationsArray(content);
   };
@@ -454,10 +457,10 @@ function readTranslationsArray(content: string): string[] {
   try {
     parsed = JSON.parse(candidate);
   } catch {
-    throw new Error("The model's reply was not valid JSON.");
+    throw new Say("The model's reply was not valid JSON.");
   }
   const list = (parsed as { translations?: unknown }).translations;
-  if (!Array.isArray(list)) throw new Error('The model returned no "translations" array.');
+  if (!Array.isArray(list)) throw new Say("The model returned no translations.");
   // The count is the caller's business: a short reply is retried and then
   // split, rather than throwing the batch away.
   return list.map((v) => String(v ?? ""));
@@ -489,7 +492,7 @@ function deeplBatcher(options: TranslateOptions): Batch {
     const raw = await response.text();
     if (!response.ok) throw authAwareError(response.status, new Error(raw.slice(0, 200)), "DeepL");
     const list = JSON.parse(raw).translations;
-    if (!Array.isArray(list)) throw new Error("DeepL returned no translations.");
+    if (!Array.isArray(list)) throw new Say("{who} returned no translations.", { who: "DeepL" });
     return list.map((t: { text?: string }) => t.text ?? "");
   };
 }
@@ -507,19 +510,53 @@ function deeplTarget(code: string): string {
 
 // --- OpenSubs-hosted ----------------------------------------------------
 
+/**
+ * The requests a paid translation of these cues makes, in order, with the
+ * key each one is charged under.
+ *
+ * The same split `translateCues` makes for this provider -- one string per
+ * cue, `batchSize()` to a request -- so the page can price each request the
+ * way the gateway does, and know which of them this account has already
+ * paid for.
+ */
+export function opensubsRequests(
+  cues: Cue[],
+  target: string,
+  source = "auto",
+): { lines: string[]; key: string }[] {
+  const user = userId();
+  const texts = cues.map((c) => c.lines.join(" "));
+  const size = batchSize();
+  const out: { lines: string[]; key: string }[] = [];
+  for (let i = 0; i < texts.length; i += size) {
+    const lines = texts.slice(i, i + size);
+    out.push({ lines, key: keyFor(user, jobKey(lines, target, source)) });
+  }
+  return out;
+}
+
 function opensubsBatcher(options: TranslateOptions): Batch {
   return async (texts) => {
     // The job key is derived from the text, not from the attempt, so a
     // retry after a dropped response replays the same charge rather than
     // billing twice. See `account.jobKey`.
-    const result = await translateOnBackend(
-      texts,
-      options.target,
-      options.source,
-      jobKey(texts, options.target),
-      options.signal,
-    );
-    return result.translations;
+    const source = options.source ?? "auto";
+    const base = jobKey(texts, options.target, source);
+    try {
+      const result = await translateOnBackend(
+        texts,
+        options.target,
+        source,
+        keyFor(userId(), base),
+        options.signal,
+      );
+      return result.translations;
+    } catch (e) {
+      // Paid for, and the answer is gone from both ends: the next run of
+      // this text is a new job under a new key, priced as one.
+      if (e instanceof AlreadyPaid) retireKey(userId(), base);
+      throw e;
+    }
   };
 }
 
@@ -537,14 +574,23 @@ export function opensubsConfigured(): boolean {
 
 // --- shared helpers -----------------------------------------------------
 
+/** "api.openai.com", for naming a server in a sentence. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
 function requireKey(options: TranslateOptions, who: string): string {
   const key = options.apiKey?.trim();
-  if (!key) throw new Error(`${who} needs an API key.`);
+  if (!key) throw new Say("{who} needs an API key.", { who });
   return key;
 }
 
 function authAwareError(status: number, cause: unknown, who: string): Error {
-  if (status === 401 || status === 403) return new Error(`${who} rejected that key.`);
-  if (status === 429) return new Error(`${who} is rate-limiting; try again shortly.`);
+  if (status === 401 || status === 403) return new Say("{who} rejected that key.", { who });
+  if (status === 429) return new Say("{who} is rate-limiting; try again shortly.", { who });
   return cause instanceof Error ? cause : new Error(String(cause));
 }

@@ -51,6 +51,29 @@ pub fn is_cjk_spacing(c: char) -> bool {
         )
 }
 
+/// Hangul: dense like Chinese and Japanese, but written with spaces
+/// between words.
+///
+/// Counted as CJK for the line budget and for width, where it behaves like
+/// them, and never for spacing, where it does not. Treating it as spaceless
+/// closed up every gap in a Korean translation -- `오늘은 라이스 대학교가`
+/// came out `오늘은라이스대학교가` -- and, because each syllable was then a
+/// break point, split words in two at the line break.
+pub fn is_hangul(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x1100..=0x11FF |   // Hangul Jamo
+        0x3130..=0x318F |   // Hangul compatibility Jamo
+        0xAC00..=0xD7AF     // Hangul syllables
+    )
+}
+
+/// Whether the boundary between two characters takes no space: both sides
+/// belong to a script written without spaces between words.
+fn closes_up(a: char, b: char) -> bool {
+    is_cjk_spacing(a) && is_cjk_spacing(b) && !is_hangul(a) && !is_hangul(b)
+}
+
 /// Whether a cue should use the dense-script line budget.
 ///
 /// Decided by a majority of *alphabetic* characters, so digits, spaces and
@@ -86,10 +109,11 @@ pub fn line_budget(text: &str) -> usize {
 ///
 /// The rule is per-boundary, not per-cue, so mixed script does the sensible
 /// thing: a space is still correct between a CJK token and a Latin one
-/// (`工具 CapCut 视频`), and only a CJK/CJK boundary is closed up.
+/// (`工具 CapCut 视频`), and only a CJK/CJK boundary is closed up. Korean
+/// keeps its spaces: see [`is_hangul`].
 pub fn needs_space_between(left: &str, right: &str) -> bool {
     match (left.chars().next_back(), right.chars().next()) {
-        (Some(a), Some(b)) => !(is_cjk_spacing(a) && is_cjk_spacing(b)),
+        (Some(a), Some(b)) => !closes_up(a, b),
         // An empty token has no boundary to speak of; never invent a space
         // next to one, or it shows up as a double space.
         _ => false,
@@ -123,7 +147,7 @@ pub fn joined_len(tokens: &[&str]) -> usize {
     for (i, t) in tokens.iter().enumerate() {
         let space = i > 0
             && match (last, t.chars().next()) {
-                (Some(a), Some(b)) => !(is_cjk_spacing(a) && is_cjk_spacing(b)),
+                (Some(a), Some(b)) => !closes_up(a, b),
                 _ => false,
             };
         if space {
@@ -254,20 +278,35 @@ mod tests {
     }
 
     #[test]
-    fn japanese_and_korean_join_like_chinese() {
+    fn japanese_joins_like_chinese() {
         assert_eq!(join_tokens(&["こんにちは", "世界"]), "こんにちは世界");
-        assert_eq!(join_tokens(&["안녕", "하세요"]), "안녕하세요");
+    }
+
+    #[test]
+    fn korean_words_keep_the_space_between_them() {
+        // Every token reaching the joiner is a whitespace-delimited word --
+        // the recogniser's words are split on spaces, and so is a
+        // translation -- so a Korean boundary is a word boundary.
+        assert_eq!(join_tokens(&["안녕하세요", "여러분"]), "안녕하세요 여러분");
+        assert_eq!(
+            join_tokens(&["오늘은", "라이스", "대학교가"]),
+            "오늘은 라이스 대학교가"
+        );
+        assert!(needs_space_between("오늘은", "라이스"));
+        // Chinese is unchanged.
+        assert!(!needs_space_between("你好", "世界"));
     }
 
     #[test]
     fn joined_len_always_agrees_with_join_tokens() {
         // These two must not drift: one decides line budgets and reading
         // speed, the other decides what is actually rendered.
-        let cases: [&[&str]; 8] = [
+        let cases: [&[&str]; 9] = [
             &[],
             &["solo"],
             &["Hello", "world"],
             &["字幕", "工具"],
+            &["안녕하세요", "여러분", "字幕"],
             &["这个", "CapCut", "工具"],
             &["yy字幕", "工具", "x"],
             &["", "字幕", ""],

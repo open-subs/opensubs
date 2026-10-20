@@ -7,8 +7,6 @@
   import {
     quoteForTranslation,
     quoteForTranscription,
-    priceLabel,
-    creditWord,
     usd,
     PRICING_OF,
     type Quote,
@@ -19,9 +17,14 @@
     signedIn,
     configureAccount,
     onAccountChange,
+    userId,
     InsufficientCredits,
     NotSignedIn,
+    SignInExpired,
   } from "./lib/account";
+  import { paidTranslation } from "./lib/paidjobs";
+  import { Say } from "./lib/say";
+  import { languageFromScript, sameLanguage } from "./lib/sourcelang";
   import AppleCredits from "./lib/AppleCredits.svelte";
   import { appleStore, inNativeShell, mustUseInAppPurchase } from "./lib/native";
   import {
@@ -75,6 +78,7 @@
     deviceAvailability,
     detectionAvailable,
     opensubsConfigured,
+    opensubsRequests,
     provider as providerById,
     translateCues,
     type ProviderId,
@@ -212,6 +216,14 @@
    */
   let sourceLanguage = $state("auto");
   /**
+   * The language the subtitles are in, when something actually said so:
+   * the recogniser heard one language, or the person picked it under
+   * "Translate from". `sourceLanguage` cannot stand in for this -- it falls
+   * back to English wherever the browser cannot detect, which is a default
+   * for the device translator's picker, not a fact about the text.
+   */
+  let knownSource = $state<string | null>(null);
+  /**
    * Chrome exposes `LanguageDetector` even where its model is absent, so
    * this is resolved once at startup. When detection is not real, the
    * "detect automatically" option is not offered at all -- an option that
@@ -265,6 +277,17 @@
    */
   let translateShortfall = $state<string | null>(null);
   let deviceStatus = $state<string | null>(null);
+  /**
+   * The session ended without anyone signing out: the panel says so,
+   * rather than silently turning into a sign-in prompt.
+   */
+  let signInExpired = $state(false);
+  /** When the person last pressed a sign-out button, to tell the two apart. */
+  let signedOutAt = 0;
+  /** Bumped when a paid translation lands, so prices re-read what is held. */
+  let paidVersion = $state(0);
+  /** The top-up packs, opened on request when there is a balance. */
+  let topUpOpen = $state(false);
 
   let asr = $state<AsrSupport | null>(null);
   /**
@@ -641,9 +664,22 @@
     PROVIDERS.filter((p) => p.id !== "opensubs" || opensubsConfigured()),
   );
 
+  /**
+   * The language the original subtitles are in, as far as anything knows:
+   * what was heard or chosen, else what the script alone settles.
+   */
+  const subtitleLanguage = $derived(
+    knownSource ??
+      languageFromScript((sourceCues ?? cues).map((c) => c.lines.join(" "))),
+  );
+
+  /** Translating into the language the text is already in changes nothing. */
+  const sameAsSource = $derived(sameLanguage(subtitleLanguage, translateTo));
+
   const canTranslateNow = $derived(
     hasCues &&
       translateTo !== "" &&
+      !sameAsSource &&
       !translating &&
       (!activeProvider.needsKey || apiKey.trim() !== ""),
   );
@@ -815,7 +851,13 @@
       // module share a session rather than each holding their own.
       configureAccount();
       onAccountChange(() => {
-        session.signedIn = signedIn();
+        const now = signedIn();
+        // Signed in a moment ago, not now, and nobody pressed sign out:
+        // the session ended under the page.
+        if (session.signedIn && !now && Date.now() - signedOutAt > 5000) signInExpired = true;
+        if (now) signInExpired = false;
+        session.signedIn = now;
+        paidVersion += 1;
         void refreshBalance();
       });
       session.signedIn = signedIn();
@@ -1253,6 +1295,7 @@
       selectedCue = null;
       sourceCues = null;
       bilingual = false;
+      knownSource = null;
     } catch (e) {
       cues = [];
       cuesVideo = null;
@@ -1431,9 +1474,13 @@
       // A single spoken language is also the language to translate *from*,
       // and the user should not have to tell us twice. Mixed audio leaves
       // it on "auto", which is the honest answer.
+      knownSource = null;
       if (spokenFound.length === 1) {
         const match = languages.find((l) => l.code.split("-")[0] === spokenFound[0]);
-        if (match) sourceLanguage = match.code;
+        if (match) {
+          sourceLanguage = match.code;
+          knownSource = match.code;
+        }
       }
       cues = segment(transcript);
       // Made from this video's own audio, so there is no doubt whose they
@@ -1536,13 +1583,37 @@
    * anyone having to press an "estimate" button -- the price is simply on
    * screen, next to the thing it is the price of.
    */
-  const translationQuote = $derived.by<Quote | null>(() => {
+  /**
+   * The source language the paid route is told, and keys its jobs by.
+   * Only a language something actually established -- never the device
+   * picker's fallback, which would tell the model a Korean file is English.
+   */
+  const paidSource = $derived(knownSource ?? "auto");
+
+  /**
+   * What this translation would cost, priced before anything is committed.
+   *
+   * Priced request by request, as the gateway charges it: each request is
+   * rounded up on its own, so pricing the whole file at once under-quoted
+   * anything over sixty lines. A request this account has already paid
+   * for, and whose answer is still held here, costs nothing -- applying
+   * it again sends nothing at all. Priced on the original text, which is
+   * what is sent, not on a translation that may be on screen.
+   */
+  const translationQuote = $derived.by<{ credits: number; paid: boolean } | null>(() => {
     if (providerId !== "opensubs" || !translateTo || cues.length === 0) return null;
+    void paidVersion;
+    void session.signedIn;
     try {
-      return quoteForTranslation(
-        cues.map((c) => c.lines.join(" ")),
-        translateTo,
-      );
+      const user = session.signedIn ? userId() : null;
+      let credits = 0;
+      let paid = true;
+      for (const request of opensubsRequests(sourceCues ?? cues, translateTo, paidSource)) {
+        if (paidTranslation(user, request.key)?.length === request.lines.length) continue;
+        paid = false;
+        credits += quoteForTranslation(request.lines, translateTo).credits;
+      }
+      return { credits, paid };
     } catch {
       return null;
     }
@@ -1571,35 +1642,50 @@
   /** Remembered so switching away from the key route and back returns here. */
   let lastKeyProvider = $state<ProviderId>("claude");
 
+  // Each card says what the result is like, not how it is produced: the
+  // choice a person is making is between a literal line-by-line rendering,
+  // a translation written for the whole clip, and a model of their own.
   const translateRoutes = $derived<Route[]>([
     {
       id: "device",
       label: "On this device",
       cost: "free",
-      note: "Chrome's built-in translation. Nothing is uploaded and nothing is charged.",
+      note: "Literal, one sentence at a time · Nothing is uploaded",
     },
     {
       id: "key",
       label: "Your own API key",
       cost: "own-key",
-      costLabel: "You pay them",
-      note: "Claude, an OpenAI-compatible server, or DeepL.",
+      costLabel: "You pay the provider",
+      note: "Choose your model · The provider bills you",
     },
     {
       id: "opensubs",
       label: "OpenSubs",
       cost: "paid",
-      note: "Our backend. No key, no account elsewhere.",
+      note: "Ready to publish · Reads the whole clip for context · Natural wording",
       unavailable: opensubsConfigured()
         ? undefined
         : t("Not in this build"),
       price: translationQuote
-        ? priceLabel(translationQuote.credits)
+        ? translationQuote.paid
+          ? t("Already paid for · free to apply again")
+          : priceText(translationQuote.credits)
         : translateTo
           ? undefined
           : t("Pick a language"),
     },
   ]);
+
+  /** "1 credit", "8 credits", in the interface's language. */
+  function creditsText(n: number): string {
+    return t(n === 1 ? "{n} credit" : "{n} credits", { n });
+  }
+
+  /** A credit count with its dollar value: `8 credits · $0.04`. */
+  function priceText(n: number): string {
+    return `${creditsText(n)} · ${usd(n * PRICING_OF().credit_usd)}`;
+  }
 
   /**
    * What our backend would charge to transcribe the current clip.
@@ -1652,7 +1738,7 @@
       // is worse than an absent one.
       unavailable: opensubsAsrConfigured() ? undefined : t("Not yet available"),
       price: transcriptionQuote
-        ? priceLabel(transcriptionQuote.credits)
+        ? priceText(transcriptionQuote.credits)
         : t("Load a video"),
     },
   ]);
@@ -1663,8 +1749,12 @@
 
   function pickTranslateRoute(id: string) {
     if (id === "device") providerId = "device";
-    else if (id === "opensubs") providerId = "opensubs";
-    else providerId = lastKeyProvider;
+    else if (id === "opensubs") {
+      providerId = "opensubs";
+      // About to spend: make sure the balance and the sign-in on screen
+      // are the server's, not whatever they were an hour ago.
+      if (session.signedIn) void refreshBalance();
+    } else providerId = lastKeyProvider;
   }
 
   /**
@@ -1698,13 +1788,15 @@
       const translated = await translateCues({
         cues: from,
         target: translateTo,
-        source: sourceLanguage,
+        // The device translator needs its picker's answer; everyone else is
+        // told only what is known, so a guess never reaches a model.
+        source: providerId === "device" ? sourceLanguage : paidSource,
         providerId,
         apiKey: apiKey.trim(),
         baseUrl: baseUrl.trim() || activeProvider.defaultBaseUrl,
         model: providerModel.trim() || activeProvider.defaultModel,
         onProgress: (done, total, note) => {
-          translateProgress = `${done}/${total} ${note}`;
+          translateProgress = `${done}/${total} ${t(note)}`;
         },
         onShortfall: (missed, total) => {
           translateShortfall = t(
@@ -1727,17 +1819,18 @@
           : translated;
       translateProgress = "";
     } catch (e) {
-      if (e instanceof NotSignedIn) {
-        translateError = t("Sign in to translate on our backend.");
-      } else if (e instanceof InsufficientCredits) {
-        translateError = `This needs ${creditWord(e.need)} and you have ${e.have}. Add credits below.`;
-      } else {
-        const message = e instanceof Error ? e.message : String(e);
-        translateError = message.includes("Cancelled") ? null : message;
+      if (e instanceof SignInExpired) {
+        signInExpired = true;
+        // The SDK may not have noticed yet; the panel must not keep
+        // showing a balance for a session that has ended.
+        session.signedIn = signedIn();
       }
+      if (e instanceof InsufficientCredits) topUpOpen = true;
+      translateError = sayError(e);
     } finally {
       translating = false;
       translateProgress = "";
+      paidVersion += 1;
       // The gateway charged (or did not), so the authoritative balance is
       // the server's. Re-read rather than adjusting a local copy, which
       // would drift the moment anything else spent from this account --
@@ -1759,6 +1852,44 @@
     } catch {
       // A failed read leaves the last known figure rather than showing
       // zero, which would read as "you have no credits" for a network blip.
+      // A session the server has ended is dropped by the SDK, and the
+      // account listener hears about that on its own.
+    }
+  }
+
+  /**
+   * A failure, in the interface's language.
+   *
+   * Errors this app raises carry their English text as a catalogue key; a
+   * failure from somewhere else -- a vendor's own message -- is shown as
+   * the reason inside a sentence that is translated.
+   */
+  function sayError(e: unknown): string | null {
+    if (e instanceof Say) return t(e.key, e.params);
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("Cancelled") || (e instanceof Error && e.name === "AbortError")) return null;
+    return t("Translation failed: {reason}", { reason: message });
+  }
+
+  /**
+   * Re-read the account whenever the page comes back into view, at most
+   * once a minute. A session that ended while the tab sat in the
+   * background -- signed out elsewhere, or past its month -- shows as
+   * ended when the person returns, not when they next try to pay.
+   */
+  let lastAccountCheck = 0;
+  function checkAccountOnReturn() {
+    if (document.visibilityState !== "visible" || !session.signedIn) return;
+    if (Date.now() - lastAccountCheck < 60_000) return;
+    lastAccountCheck = Date.now();
+    void refreshBalance();
+  }
+
+  /** A press on a sign-out button, so that ending is not taken for expiry. */
+  function noteSignOut(event: Event) {
+    const tags = ["OPENAPPS-SIGNOUT", "OPENAPPS-ACCOUNT"];
+    if (event.composedPath().some((el) => tags.includes((el as Element).tagName))) {
+      signedOutAt = Date.now();
     }
   }
 
@@ -1836,8 +1967,8 @@
     >
       {#if asrEngine === "opensubs" && transcriptionQuote}
         {again
-          ? t("Re-generate for {price}", { price: creditWord(transcriptionQuote.credits) })
-          : t("Generate for {price}", { price: creditWord(transcriptionQuote.credits) })}
+          ? t("Re-generate for {price}", { price: creditsText(transcriptionQuote.credits) })
+          : t("Generate for {price}", { price: creditsText(transcriptionQuote.credits) })}
       {:else if again}
         {t("Re-generate")}
       {:else}
@@ -2006,7 +2137,7 @@
   </details>
 {/snippet}
 
-{#snippet creditBar(quote: Quote | null, ok: boolean, empty: string)}
+{#snippet creditBar(quote: { credits: number; paid?: boolean } | null, ok: boolean, empty: string)}
   <!--
     Balance, price and the way to fix a shortfall, on one line. The only
     question here is "can I do this", and answering it should not need a
@@ -2014,55 +2145,91 @@
     always: credits are a currency nobody has an instinct for, and a reader
     should not have to go and find the conversion to know whether 26 of them
     is pennies or a month's subscription.
+
+    The credit packs open only when they are the next step: with no balance,
+    or not enough for this job. Shown to everyone, they read as a second
+    payment to a person who had already bought credits.
   -->
+  {@const needsCredits = session.balance <= 0 || !ok}
   <div class="credit-bar">
     {#if session.signedIn}
       <span class="credit-balance">
-        <Rich text={t(session.balance === 1 ? "**{n}** credit left" : "**{n}** credits left", { n: session.balance })} />
+        <span class="credit-balance-label">{t("Balance")}</span>
+        <strong class="credit-balance-count">{creditsText(session.balance)}</strong>
         <span class="credit-worth">{usd(session.balance * PRICING_OF().credit_usd)}</span>
       </span>
       {#if quote}
         <span class="credit-price" class:credit-short={!ok}>
-          {t("Costs")} <strong>{priceLabel(quote.credits)}</strong>
+          {#if quote.paid}
+            {t("Already paid for · free to apply again")}
+          {:else}
+            {t("Costs")} <strong>{priceText(quote.credits)}</strong>
+          {/if}
         </span>
       {:else}
-        <span class="oa-caption">{empty}</span>
+        <span class="oa-caption">{t(empty)}</span>
       {/if}
       <span class="credit-actions">
-        <!--
-          Inside the iOS shell credits are Apple's to sell. Guideline 3.1.1
-          requires in-app purchase for digital content used in the app, so
-          the card checkout is not merely redundant here -- it is the thing
-          that must not be rendered. `mustUseInAppPurchase()` is true for
-          the whole shell, including a build whose StoreKit plugin is
-          missing: then neither way to buy is offered, which is correct.
-          Offering the card one would be a removable app.
-        -->
-        {#if !mustUseInAppPurchase()}
-          <openapps-buy return-to="none"></openapps-buy>
-        {:else if appleStore()}
-          <AppleCredits store={appleStore()!} oncredited={() => void refreshBalance()} />
+        {#if !needsCredits && (!mustUseInAppPurchase() || appleStore())}
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            aria-expanded={topUpOpen}
+            onclick={() => (topUpOpen = !topUpOpen)}
+          >
+            {topUpOpen ? t("Hide top-up") : t("Top up")}
+          </button>
         {/if}
         <openapps-signout></openapps-signout>
       </span>
     {:else}
       <span class="credit-balance">
-        {#if quote}
-          {t("Costs")} <strong>{priceLabel(quote.credits)}</strong> &mdash;
+        {#if signInExpired}
+          {t("Your sign-in has expired. Sign in again to use your credits.")}
+        {:else}
+          {#if quote}
+            {t("Costs")} <strong>{priceText(quote.credits)}</strong> &mdash;
+          {/if}
+          {t("sign in to use it")}
         {/if}
-        {t("sign in to use it")}
       </span>
       <span class="credit-actions">
         <openapps-login></openapps-login>
       </span>
     {/if}
   </div>
+  {#if session.signedIn && (needsCredits || topUpOpen)}
+    <div class="credit-topup">
+      <p class="oa-caption">
+        {session.balance <= 0
+          ? t("You have no credits yet. Pick a pack to start.")
+          : !ok
+            ? t("Not enough credits for this job. Pick a pack to top up.")
+            : t("Pick a pack to top up.")}
+      </p>
+      <!--
+        Inside the iOS shell credits are Apple's to sell: guideline 3.1.1
+        requires in-app purchase, so the card checkout must not be rendered
+        there, even for a build whose StoreKit plugin is missing. `return-to`
+        "none" is for a page that cannot be returned to.
+      -->
+      {#if !mustUseInAppPurchase()}
+        <openapps-buy return-to={inNativeShell() ? "none" : ""}></openapps-buy>
+      {:else if appleStore()}
+        <AppleCredits store={appleStore()!} oncredited={() => void refreshBalance()} />
+      {/if}
+    </div>
+  {/if}
   <p class="oa-caption">
     {t("You are charged the price shown, never more, and only for work that succeeds — a failed job costs nothing. {credits} credits cost {price}, and they do not expire.", { credits: PRICING_OF().pack_credits, price: usd(PRICING_OF().pack_usd) })}
   </p>
 {/snippet}
 
+<svelte:document onvisibilitychange={checkAccountOnReturn} />
+
 <svelte:window
+  onfocus={checkAccountOnReturn}
+  onclickcapture={noteSignOut}
   ondragover={(e) => {
     e.preventDefault();
     isDragOver = true;
@@ -2697,14 +2864,22 @@
             <select class="input" bind:value={translateTo} disabled={translating}>
               <option value="">{t("Don't translate")}</option>
               {#each languages as l (l.code)}
-                <option value={l.code}>{l.endonym} &middot; {l.name}</option>
+                {@const same = sameLanguage(subtitleLanguage, l.code)}
+                <option value={l.code} disabled={same}>
+                  {l.endonym} &middot; {l.name}{same ? ` — ${t("the subtitles' language")}` : ""}
+                </option>
               {/each}
             </select>
           </label>
           {#if activeProvider.local}
             <label class="field field-wide">
               <span class="field-label">{t("Translate from")}</span>
-              <select class="input" bind:value={sourceLanguage} disabled={translating}>
+              <select
+                class="input"
+                bind:value={sourceLanguage}
+                disabled={translating}
+                onchange={() => (knownSource = sourceLanguage === "auto" ? null : sourceLanguage)}
+              >
                 {#if canDetect}
                   <option value="auto">{t("Detect automatically")}</option>
                 {/if}
@@ -2784,8 +2959,14 @@
           </p>
         {/if}
 
+        {#if sameAsSource}
+          <p class="field-error">
+            {t("The subtitles are already in this language, so there is nothing to translate. Pick another language.")}
+          </p>
+        {/if}
+
         {#if providerId === "device" && deviceStatus}
-          <p class="oa-caption">{deviceStatus}</p>
+          <p class="oa-caption">{t(deviceStatus)}</p>
         {/if}
 
         {#if providerId === "opensubs"}
@@ -2805,8 +2986,10 @@
           >
             {#if translating}
               {translateProgress || t("Translating")}
+            {:else if translationQuote?.paid}
+              {t("Already translated · apply again free")}
             {:else if translationQuote}
-              {t("Translate for {price}", { price: creditWord(translationQuote.credits) })}
+              {t("Translate for {price}", { price: creditsText(translationQuote.credits) })}
             {:else}
               {t("Translate cues")}
             {/if}

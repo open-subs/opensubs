@@ -1057,6 +1057,36 @@ html {
 
 .credit-balance {
   color: var(--text-muted);
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* The balance is the first thing a buyer looks for: as large and as dark
+   as the price beside it, not a grey aside. */
+.credit-balance-count {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Top up and Sign out, side by side at the end of the bar. */
+.credit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* The packs, below the bar, when buying is the next step. */
+.credit-topup {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+}
+
+.credit-topup > .oa-caption {
+  margin: 0 0 var(--space-2);
 }
 
 /* The dollar value of what is left, in the same breath as the count. A

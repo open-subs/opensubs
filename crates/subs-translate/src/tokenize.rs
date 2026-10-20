@@ -4,10 +4,10 @@
 //! arrives pre-tokenised. A translation arrives as one finished string, so
 //! before it can be line-broken it has to be cut back into units a line
 //! break may fall between -- and where those units are is script-dependent.
-//! Latin text breaks at spaces; Chinese, Japanese and Korean have no spaces
-//! and break between characters.
+//! Latin text breaks at spaces, and so does Korean, which is written with
+//! them; Chinese and Japanese have none and break between characters.
 
-use subs_subtitle::is_cjk_char;
+use subs_subtitle::{is_cjk_char, is_hangul};
 
 /// Characters that must never begin a line: closing punctuation, and the
 /// CJK full-width forms of the same. A break before one of these is the
@@ -45,7 +45,9 @@ pub fn tokenize(text: &str) -> Vec<String> {
             continue;
         }
 
-        if is_cjk_char(c) {
+        // Hangul is a letter of a spaced script: it builds a word like
+        // Latin does, and the break falls at the space after it.
+        if is_cjk_char(c) && !is_hangul(c) {
             flush(&mut latin, &mut tokens, &mut pending_open);
             let mut t = std::mem::take(&mut pending_open);
             t.push(c);
@@ -118,6 +120,15 @@ mod tests {
     #[test]
     fn mixed_script_keeps_latin_runs_whole_between_cjk_characters() {
         assert_eq!(toks("用 OpenSubs 剪辑"), ["用", "OpenSubs", "剪", "辑"]);
+    }
+
+    #[test]
+    fn korean_splits_on_whitespace_and_keeps_words_whole() {
+        assert_eq!(
+            toks("오늘은 라이스 대학교가 텍사스와"),
+            ["오늘은", "라이스", "대학교가", "텍사스와"]
+        );
+        assert_eq!(toks("네, 맞아요."), ["네,", "맞아요."]);
     }
 
     #[test]

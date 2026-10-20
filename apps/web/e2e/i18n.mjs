@@ -130,7 +130,35 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
       asked.add(JSON.parse(`"${m[1]}"`));
       asked.add(JSON.parse(`"${m[2]}"`));
     }
+    // An error raised as `new Say("…")` (or a Say subclass's super("…")) is
+    // shown through t() at the one place errors are displayed, so its text
+    // is a key too. It must be one literal: a key glued together with `+`
+    // cannot be checked here, and would reach the screen in English.
+    if (/\bSay\b/.test(src)) {
+      for (const m of src.matchAll(/\b(?:new Say|super)\(\s*"((?:[^"\\]|\\.)*)"(\s*\+)?/g)) {
+        if (m[2]) fails.push(`a Say key is built with + in ${path.basename(f)}: ${m[1].slice(0, 40)}`);
+        asked.add(JSON.parse(`"${m[1]}"`));
+      }
+    }
   }
+  // Text that reaches t() through a variable rather than a literal: progress
+  // notes, the device translator's status, and the panel's empty states.
+  for (const k of [
+    "Translating",
+    "Translating on this device",
+    "Downloading the language model",
+    "Chrome will download a small language model the first time.",
+    "This browser has no built-in translator. Chrome 138+ does; otherwise pick a provider below.",
+    "Your browser cannot translate between these two languages.",
+    "Add subtitles to see the price",
+    "Pick a language to see the price",
+    "Load a video to see the price",
+    // The translate route cards (RoutePicker renders t(route.note)).
+    "Literal, one sentence at a time · Nothing is uploaded",
+    "Choose your model · The provider bills you",
+    "Ready to publish · Reads the whole clip for context · Natural wording",
+    "You pay the provider",
+  ]) asked.add(k);
   const absent = [...asked].filter((k) => !(k in zhHans));
   ok("every t() string in the source is catalogued", absent.length === 0,
     `${absent.length}: ${absent.slice(0, 3).join(" | ")}`);

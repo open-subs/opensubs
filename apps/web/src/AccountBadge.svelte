@@ -27,7 +27,7 @@
   {#if session.signedIn}
     <span class="nav-balance" title={t("Credits, shared across your account")}>
       <strong>{session.balance}</strong>
-      {session.balance === 1 ? "credit" : "credits"}
+      {t(session.balance === 1 ? "credit" : "credits")}
     </span>
     <!--
       The same button opens the panel signed in as signed out, because the

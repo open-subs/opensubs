@@ -49,6 +49,10 @@ longer. A subtitle that is too long to read in its slot is a worse \
 translation than a slightly plainer one that fits.
 - Use natural spoken register, not literal word-for-word rendering.
 - Preserve proper nouns, numbers, and technical terms.
+- The lines often come from speech recognition, which drops the capitals \
+on names (\"rice play texas\" is Rice University's team, not grain). Use \
+the surrounding entries to tell a name from an ordinary word, and keep \
+names as names.
 - Keep sentence-final punctuation; do not add narration, notes, brackets, \
 or explanations.
 - The lines are consecutive speech from one clip, so use the surrounding \
@@ -315,6 +319,16 @@ mod tests {
 
     fn texts() -> Vec<String> {
         vec!["Hello there".into(), "How are you".into()]
+    }
+
+    #[test]
+    fn the_prompt_warns_that_names_may_have_lost_their_capitals() {
+        // A recogniser's "rice play texas" was translated as grain. The
+        // model is told why a name can look like an ordinary word.
+        let body = build_request(&texts(), &req(), "m");
+        let system = body["system"].as_str().unwrap();
+        assert!(system.contains("drops the capitals"), "{system}");
+        assert!(system.contains("names as names"), "{system}");
     }
 
     #[test]
