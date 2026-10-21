@@ -70,6 +70,8 @@ export declare function formatUsd(cents: number): string;
  * so a realistic range stays readable without implying false precision.
  */
 export declare function perCreditCost(pkg: CreditPackage): string;
+/** A CAIP-2 chain id as a person would recognise it; the id itself if unknown. */
+export declare function networkName(chain: string): string;
 /** Token minor units → a decimal string, trailing zeros trimmed. */
 export declare function formatUnits(amount: number, decimals: number): string;
 declare global {

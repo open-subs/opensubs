@@ -41,7 +41,8 @@ https://opensubs.app
   switches between two languages is transcribed in both. Whisper's own
   pipeline has no language detection at all; this is implemented on top of
   it.
-- **Exports:** .srt, .vtt and .ass, or an MP4 with the subtitles burned in.
+- **Exports:** .srt, .vtt and .ass; .txt, the words alone with no timings;
+  or an MP4 with the subtitles burned in.
 - **Licence:** AGPL-3.0-or-later.
 
 ## Honest limitations
@@ -86,7 +87,7 @@ https://opensubs.app
   - Chrome Web Store: https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd
   - Firefox Add-ons: https://addons.mozilla.org/en-US/firefox/addon/opensubs/
   - Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh
-- As a desktop app for macOS, Windows and Linux, for long files and batches.
+- As a desktop app for macOS, Windows and Linux, for long files (one video at a time).
 - As a command-line tool, built from source.
 
 Contact: hello@opensubs.app
@@ -101,7 +102,7 @@ Contact: hello@opensubs.app
 - [Translate subtitles](https://opensubs.app/translate-subtitles)
 - [Subtitle sites](https://opensubs.app/subtitle-sites): where to download subtitles, and making them yourself.
 - [Browser extension](https://opensubs.app/browser-extension): subtitles over whatever is playing in the tab; Chrome, Edge and Firefox.
-- [Transcribe video](https://opensubs.app/transcribe-video): transcribing a video to text in the browser, exported as .srt, .vtt or .ass.
+- [Transcribe video](https://opensubs.app/transcribe-video): transcribing a video to text in the browser, exported as .txt (the words alone) or as .srt, .vtt or .ass.
 - [Whisper in the browser](https://opensubs.app/whisper-in-browser): how OpenSubs runs Whisper locally in the tab, and the three model sizes.
 - [Subtitle editor](https://opensubs.app/subtitle-editor): correcting the text of an .srt or .vtt in the browser; timings are not editable.
 - [Caption generator](https://opensubs.app/caption-generator): generating captions from a video's speech in the browser, exported as a caption file or burned into an MP4.

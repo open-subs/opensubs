@@ -21,7 +21,7 @@ ways to run it — see **[docs/install.md](docs/install.md)**.
 |---|---|---|
 | **Web app** | Nothing to install, nothing to trust — open the page | [opensubs.app](https://opensubs.app) |
 | **Browser extension** | Live subtitles over whatever is playing in a tab. Chrome, Edge, Firefox | [Chrome](https://chromewebstore.google.com/detail/live-subtitles-in-your-br/ebiggkbolhfmhhiclmhkjkjofnflbepd) · [Edge](https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/opensubs/) |
-| **Desktop app** | Long files and batches, without a browser in the way. macOS, Windows, Linux | [guide](docs/install.md#desktop-app) |
+| **Desktop app** | Long files, without a browser in the way. One video at a time. macOS, Windows, Linux | [guide](docs/install.md#desktop-app) |
 | **Command line** | Scripting and CI | [guide](docs/install.md#command-line) |
 
 Line breaking, reading-speed limits, the style presets and the ASS writer

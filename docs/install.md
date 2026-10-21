@@ -85,7 +85,7 @@ background script is declared.
 
 ## Desktop app
 
-For long files and batches, without a browser in the way.
+For long files, without a browser in the way. It works on one video at a time.
 
 ### First: ffmpeg
 

@@ -88,8 +88,12 @@ await context.route("https://auth.opensubs.app/**", async (route) => {
     case "/v1/payments/packages":
       return json(route, 200, {
         packages: [{ id: "starter", credits: 1000, usd_price: 500 }, { id: "pro", credits: 5000, usd_price: 2000 }],
-        rails: { stripe: true },
+        rails: { stripe: true, ethereum: true },
       });
+    case "/v1/payments/eth/deposit-address":
+      return json(route, 200, { topup_id: "t-eth", chain: "eip155:1", address: "0x00000000000000000000000000000000000000e7", expected_amount: 5_000_537 });
+    case "/v1/payments/topups/t-eth":
+      return json(route, 200, { id: "t-eth", rail: "ethereum", status: "pending", credits: 1000 });
     default:
       return json(route, 200, {});
   }
@@ -151,10 +155,8 @@ async function reload() {
   await page.reload();
 }
 async function cueTexts() {
-  await page.click("#tab-subtitles");
-  const values = await page.locator("textarea.cue-text").evaluateAll((els) => els.map((e) => e.value));
-  await page.click("#tab-translate");
-  return values;
+  // The cue list sits beside the panels, not inside one of them.
+  return page.locator("textarea.cue-text").evaluateAll((els) => els.map((e) => e.value));
 }
 async function translateNow() {
   await button.click();
@@ -227,6 +229,25 @@ await section("signed in, no balance: the packs open by themselves", async () =>
   state.balance = 40;
 });
 
+// --- paying in stablecoins: the network is named, not only its id ----------
+await section("paying in stablecoins: the network is named, not only its id", async () => {
+
+  state.balance = 0;
+  await reload();
+  await open(ENGLISH);
+  await paidRoute();
+  const buy = panel.locator("openapps-buy");
+  await buy.locator("button.package").first().click();
+  await buy.getByRole("button", { name: "Pay with USDC / USDT" }).click();
+  await buy.locator("code.payload").waitFor({ timeout: 10000 });
+  const said = (await buy.evaluate((el) => el.shadowRoot?.textContent ?? "")).replace(/\s+/g, " ");
+  check(said.includes("USDC or USDT on Ethereum Mainnet (eip155:1) to:"), "the deposit page names the network the way a wallet does", said);
+  check(said.includes("On any other network it is not credited."), "and says what happens on any other", said);
+  await shot("4b-stablecoin-network");
+  await buy.getByRole("button", { name: "Cancel" }).click();
+  state.balance = 40;
+});
+
 // --- translating, and translating the same thing again --------------------
 await section("translating, and translating the same thing again", async () => {
 
@@ -235,7 +256,7 @@ await section("translating, and translating the same thing again", async () => {
   await paidRoute();
   await into.selectOption("zh-Hans");
   await page.waitForTimeout(300);
-  check((await button.innerText()) === "翻译，1 点数", "a new job is priced, in the interface's language", await button.innerText());
+  check((await button.innerText()) === "翻译 · 1 点数", "a new job is priced, in the interface's language", await button.innerText());
   await translateNow();
   check(gatewayCalls.length === 1, "the first run goes to the gateway", `${gatewayCalls.length} calls`);
   check(gatewayCalls[0]?.source === "auto", "an unestablished source is sent as auto, not as a guess", gatewayCalls[0]?.source);
@@ -243,22 +264,22 @@ await section("translating, and translating the same thing again", async () => {
   await translateNow();
   check(gatewayCalls.length === 2, "another language is another job", `${gatewayCalls.length} calls`);
   await into.selectOption("zh-Hans");
-  await page.waitForTimeout(300);
-  check((await button.innerText()) === "已翻译，免费重新应用", "a language already paid for says so on the button", await button.innerText());
+  await page.waitForTimeout(800);
+  check((await button.innerText()) === "已翻译，不计费", "a language already paid for says so on the button", await button.innerText());
+  check(await button.isDisabled(), "and the button cannot be pressed, since there is nothing left to do");
   const priceOnCard = await panel.locator(".routes .route").nth(2).locator(".route-price").innerText();
-  check(priceOnCard === "已付费 · 再次应用免费", "and on the card", priceOnCard);
+  check(priceOnCard === "已翻译，不计费", "and on the card", priceOnCard);
   await shot("5-already-translated");
-  await translateNow();
-  check(gatewayCalls.length === 2, "applying it again sends nothing", `${gatewayCalls.length} calls`);
+  check(gatewayCalls.length === 2, "picking it again sends nothing", `${gatewayCalls.length} calls`);
   const again = await cueTexts();
-  check(again[0].replace(/\n/g, " ") === `[zh-Hans] ${ENGLISH[0]}`, "and puts back the text that was paid for", again[0]);
+  check(again[0].replace(/\n/g, " ") === `[zh-Hans] ${ENGLISH[0]}`, "and puts the text that was paid for straight back on screen", again[0]);
 
   await reload();
   await open(ENGLISH);
   await paidRoute();
   await into.selectOption("zh-Hans");
-  await page.waitForTimeout(300);
-  check((await button.innerText()) === "已翻译，免费重新应用", "what was paid for is still known after a reload", await button.innerText());
+  await page.waitForTimeout(800);
+  check((await button.innerText()) === "已翻译，不计费", "what was paid for is still known after a reload", await button.innerText());
 });
 
 // --- Korean keeps its spaces ----------------------------------------------

@@ -600,6 +600,46 @@ html {
   pointer-events: none;
 }
 
+/* Subtitles with no video under them. A dashed surface rather than the
+   black player: an empty player looks like footage still loading, and
+   this is waiting for the person, not for the network. */
+/* `display: block` above outranks the `hidden` attribute. */
+.stage video[hidden] {
+  display: none;
+}
+
+.stage.stage-empty {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+}
+
+.no-video {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.no-video-title {
+  margin: 0;
+  font: var(--type-ui);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.no-video .oa-caption {
+  margin: 0;
+  max-width: 44ch;
+}
+
+.no-video-actions {
+  justify-content: center;
+  margin-top: var(--space-1);
+}
+
 .dropzone {
   display: flex;
   flex-direction: column;

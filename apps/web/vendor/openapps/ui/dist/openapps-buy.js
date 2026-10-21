@@ -259,8 +259,10 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
       ${instruction.kind === "address"
             ? html `
             <p>Send exactly <strong>${formatUnits(instruction.amount, 6)}</strong> USDC or
-            USDT on <code>${instruction.chain}</code> to:</p>
+            USDT on <strong class="network">${networkName(instruction.chain)}</strong>
+            (<code>${instruction.chain}</code>) to:</p>
             <code class="payload">${instruction.address}</code>
+            <p class="caption">On any other network it is not credited.</p>
           `
             : nothing}
       ${instruction.kind === "invoice"
@@ -480,6 +482,28 @@ export function perCreditCost(pkg) {
         return "";
     const cents = pkg.usd_price / pkg.credits;
     return `${cents < 1 ? cents.toFixed(2) : cents.toFixed(1)}¢ each`;
+}
+/**
+ * The networks a deposit can be asked for on, by CAIP-2 id, named the way a
+ * wallet's network picker names them.
+ *
+ * The server says which chain an address is on as a CAIP-2 id, and that is
+ * what this showed: "eip155:1". It is exact and it is not something a payer
+ * can check against their wallet, and sending on the wrong chain is the one
+ * mistake here that loses money. So the name leads and the id follows it.
+ */
+const NETWORK_NAMES = {
+    "eip155:1": "Ethereum Mainnet",
+    "eip155:10": "OP Mainnet",
+    "eip155:56": "BNB Smart Chain",
+    "eip155:137": "Polygon PoS",
+    "eip155:8453": "Base",
+    "eip155:42161": "Arbitrum One",
+    "eip155:11155111": "Sepolia testnet",
+};
+/** A CAIP-2 chain id as a person would recognise it; the id itself if unknown. */
+export function networkName(chain) {
+    return NETWORK_NAMES[chain.trim().toLowerCase()] ?? chain;
 }
 /** Token minor units → a decimal string, trailing zeros trimmed. */
 export function formatUnits(amount, decimals) {

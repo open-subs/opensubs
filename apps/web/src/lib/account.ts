@@ -296,6 +296,14 @@ function translationError(status: number, body: Record<string, unknown>): Error 
     return new InsufficientCredits(Number(body.need ?? 0), Number(body.have ?? 0));
   }
   if (status === 409 && body.error === "already_charged") return new AlreadyPaid();
+  // The gateway refuses a source and target that name the same language,
+  // before anything is held. The page refuses it first wherever it knows the
+  // language; this is the answer when only the gateway did.
+  if (status === 400 && body.error === "same_language") {
+    return new Say(
+      "The subtitles are already in this language, so there is nothing to translate. Pick another language.",
+    );
+  }
   if (status === 409 && body.error === "in_progress") {
     return new Say("This translation is still running from an earlier attempt. Try again in a minute.");
   }

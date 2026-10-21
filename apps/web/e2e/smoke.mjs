@@ -1660,10 +1660,10 @@ if (FIXTURE) {
       "the page does not say what a pack costs",
     );
 
-    const button = await page.textContent('button:has-text("Translate for")');
+    const button = await page.textContent('button:has-text("Translate ·")');
     check(
       "the button names the price it will charge",
-      /Translate for \d+ credits?$/.test((button ?? "").trim()),
+      /Translate · \d+ credits?$/.test((button ?? "").trim()),
       `button read ${JSON.stringify(button)}`,
     );
   }

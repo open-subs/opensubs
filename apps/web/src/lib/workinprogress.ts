@@ -63,6 +63,21 @@ export interface SavedWork {
   bilingualOrder?: "original-first" | "translation-first";
   /** How large the original is set relative to the translation. */
   originalScale?: number;
+  /**
+   * The language the original subtitles are in, when something established
+   * it: the recogniser heard one language, or the person chose it.
+   *
+   * Not optional in spirit, only in old records. A paid translation is
+   * keyed by its source language, so a restore that came back without it
+   * sent the same text under a different key: the gateway charged it as a
+   * new job, the page priced a language already paid for as new, and
+   * nothing stopped a translation into the language the text is already in.
+   */
+  knownSource?: string | null;
+  /** The "Translate from" picker's choice, which can differ from the above. */
+  sourceLanguage?: string;
+  /** Which language the subtitles on screen were translated into, if any. */
+  translatedTo?: string | null;
 }
 
 export function saveWork(work: Omit<SavedWork, "at">): void {

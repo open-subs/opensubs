@@ -33,7 +33,8 @@
     "test:refill": "node --experimental-strip-types e2e/refill.mjs",
     "test:device": "node --experimental-strip-types e2e/device.mjs",
     "test:windows": "node --experimental-strip-types e2e/windows.mjs",
-    "test:shortfall": "node --experimental-strip-types e2e/shortfall.mjs"
+    "test:shortfall": "node --experimental-strip-types e2e/shortfall.mjs",
+    "test:restore": "node e2e/restore.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

@@ -257,6 +257,12 @@
   let subtitleEncodingCertain = $state(true);
 
   let sourceCues = $state<Cue[] | null>(null);
+  /**
+   * The language the subtitles on screen were translated into, or null
+   * while they are the original. What tells "this translation is already
+   * showing" apart from "this translation is paid for and could be shown".
+   */
+  let translatedTo = $state<string | null>(null);
   /** Burn the original alongside the translation. */
   let bilingual = $state(false);
   let bilingualOrder = $state<"original-first" | "translation-first">("original-first");
@@ -554,6 +560,18 @@
    */
   type Panel = "subtitles" | "style" | "clip" | "translate" | "export";
   let panel = $state<Panel>("style");
+  /**
+   * Whether the Subtitles card has anything in it once there are cues.
+   *
+   * Generating again needs the video's audio. Without a video -- subtitles
+   * restored after a reload, or a file opened on its own -- the card used
+   * to hold a heading and a sentence telling you to load a video, with
+   * nothing to press. Loading one is the button under the player, so the
+   * tab is left out until there is something it can do.
+   */
+  const subtitlesPanelHasContent = $derived(
+    hasVideo || transcribing || !!asrError || !!subtitleError || noSpeechOffer,
+  );
   const panelTabs = $derived(
     (
       [
@@ -563,7 +581,7 @@
         { id: "translate", label: "Translate" },
         { id: "export", label: "Export" },
       ] as { id: Panel; label: string }[]
-    ).filter((tab) => tab.id !== "clip" || hasDimensions),
+    ).filter((tab) => (tab.id !== "clip" || hasDimensions) && (tab.id !== "subtitles" || subtitlesPanelHasContent)),
   );
   $effect(() => {
     if (!panelTabs.some((tab) => tab.id === panel)) panel = "style";
@@ -1147,6 +1165,19 @@
     bilingual = restored.bilingual ?? false;
     bilingualOrder = restored.bilingualOrder ?? "original-first";
     originalScale = restored.originalScale ?? 0.8;
+    // The language the text is in comes back with the text. Without it a
+    // restored English transcription was "auto" again: a paid translation
+    // was keyed differently and charged a second time, the price did not
+    // say it was already paid, and English into English was let through.
+    knownSource = restored.knownSource ?? null;
+    sourceLanguage = restored.sourceLanguage ?? restored.knownSource ?? sourceLanguage;
+    if (sourceLanguage === "auto" && !canDetect) sourceLanguage = knownSource ?? "en";
+    translatedTo =
+      restored.translatedTo !== undefined
+        ? restored.translatedTo
+        : restored.sourceCues
+          ? restored.translateTo || null
+          : null;
     restored = null;
   }
 
@@ -1294,6 +1325,7 @@
       wordEffect = "none";
       selectedCue = null;
       sourceCues = null;
+      translatedTo = null;
       bilingual = false;
       knownSource = null;
     } catch (e) {
@@ -1312,6 +1344,7 @@
     try {
       cues = readSubtitles(decodeAs(subtitleBytes, encoding));
       sourceCues = null;
+      translatedTo = null;
       bilingual = false;
     } catch (e) {
       subtitleError = String(e);
@@ -1511,6 +1544,7 @@
       // A fresh transcription is a fresh original; anything held from a
       // previous translation belongs to text that is no longer here.
       sourceCues = null;
+      translatedTo = null;
       bilingual = false;
       // Nothing was decoded, so there is no encoding to second-guess.
       subtitleBytes = null;
@@ -1560,6 +1594,9 @@
       bilingual,
       bilingualOrder,
       originalScale,
+      knownSource,
+      sourceLanguage,
+      translatedTo,
     });
   });
 
@@ -1621,6 +1658,31 @@
 
   const affordable = $derived(!translationQuote || session.balance >= translationQuote.credits);
 
+  /** The paid translation into the picked language is the one on screen. */
+  const paidAndShown = $derived(!!translationQuote?.paid && translatedTo === translateTo);
+
+  /**
+   * A language this account has already paid for, picked again: that
+   * translation goes straight back on screen. It is held here, so this
+   * sends nothing and charges nothing. Pressing a button labelled "free"
+   * to get it was a step that looked like a purchase, and pressing it
+   * while that translation was already showing did nothing visible.
+   *
+   * One attempt per pick, so a failure is shown rather than retried in a
+   * loop; picking the language again tries again.
+   */
+  let autoAppliedFor = "";
+  $effect(() => {
+    if (providerId !== "opensubs" || translating || !translationQuote?.paid) return;
+    if (!translateTo || translatedTo === translateTo || sameAsSource) return;
+    if (autoAppliedFor === translateTo) return;
+    autoAppliedFor = translateTo;
+    untrack(() => void doTranslate());
+  });
+  $effect(() => {
+    if (translatedTo === translateTo) autoAppliedFor = "";
+  });
+
   /**
    * Which of the three ways to translate is selected.
    *
@@ -1669,7 +1731,7 @@
         : t("Not in this build"),
       price: translationQuote
         ? translationQuote.paid
-          ? t("Already paid for · free to apply again")
+          ? t("Already translated · not charged")
           : priceText(translationQuote.credits)
         : translateTo
           ? undefined
@@ -1784,10 +1846,13 @@
     // in, compounding its mistakes; this makes the second attempt as good
     // as the first.
     const from = sourceCues ?? $state.snapshot(cues);
+    // Read once: the picker can change while the request is out, and the
+    // result is in the language that was asked for, not the one shown now.
+    const target = translateTo;
     try {
       const translated = await translateCues({
         cues: from,
-        target: translateTo,
+        target,
         // The device translator needs its picker's answer; everyone else is
         // told only what is known, so a guess never reaches a model.
         source: providerId === "device" ? sourceLanguage : paidSource,
@@ -1808,13 +1873,14 @@
       // Only once the translation is in hand: a failed or cancelled run
       // must leave the subtitles exactly as they were.
       sourceCues = from;
+      translatedTo = target;
       // A translation into Chinese arrives in whichever script the
       // provider chose, and they are no more consistent than the
       // recogniser. Same rule, same reason -- and the same trap, so this
       // asks whether the target is Chinese rather than whether it is not
       // Traditional.
       cues =
-        isChinese(translateTo) && !wantsTraditional(translateTo)
+        isChinese(target) && !wantsTraditional(target)
           ? await simplify(translated)
           : translated;
       translateProgress = "";
@@ -2161,7 +2227,7 @@
       {#if quote}
         <span class="credit-price" class:credit-short={!ok}>
           {#if quote.paid}
-            {t("Already paid for · free to apply again")}
+            {t("Already translated · not charged")}
           {:else}
             {t("Costs")} <strong>{priceText(quote.credits)}</strong>
           {/if}
@@ -2430,7 +2496,7 @@
     -->
     <div class="workspace">
       <div class="workspace-output">
-            <div class="stage">
+            <div class="stage" class:stage-empty={!hasVideo}>
               <!-- svelte-ignore a11y_media_has_caption -->
               <video
                 bind:this={videoEl}
@@ -2438,10 +2504,57 @@
                 onloadedmetadata={onVideoLoaded}
                 controls
                 playsinline
+                hidden={!hasVideo}
               ></video>
+              {#if !hasVideo}
+                <!--
+                  Subtitles with no video under them: restored after a reload
+                  or a sign-in, or a subtitle file opened on its own. The
+                  player used to sit here empty, captioned "reading…" for ever,
+                  which reads as a page still loading rather than one waiting
+                  for you. It says what is missing and offers the way back.
+                -->
+                <div class="no-video" data-no-video>
+                  <Icon name="film" size={22} />
+                  <p class="no-video-title">
+                    {cuesVideo
+                      ? t("Subtitles restored. To burn them in, load the video again.")
+                      : t("To preview these subtitles and burn them in, load their video.")}
+                  </p>
+                  {#if cuesVideo}
+                    <p class="oa-caption">
+                      <Rich text={t("They were made for **{name}**. The video never left your device, so it cannot come back on its own.", { name: cuesVideo })} />
+                    </p>
+                  {/if}
+                  <div class="field-row no-video-actions">
+                    {#if rememberedVideoHandle}
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        disabled={reopening}
+                        onclick={reopenRememberedVideo}
+                      >
+                        {reopening ? t("Opening…") : t("Open {name} again", { name: rememberedVideoHandle.name })}
+                      </button>
+                    {/if}
+                    <label class="btn btn-sm" class:btn-primary={!rememberedVideoHandle} class:btn-secondary={!!rememberedVideoHandle}>
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onclick={chooseVideo}
+                        onchange={onVideoInput}
+                        hidden
+                      />
+                      {cuesVideo ? t("Load the video again") : t("Load video")}
+                    </label>
+                  </div>
+                </div>
+              {/if}
             </div>
             <div class="file-row">
-              {#if hasDimensions}
+              {#if !hasVideo}
+                <p class="oa-caption file-meta">{t("No video loaded")}</p>
+              {:else if hasDimensions}
                 <p class="oa-caption file-meta">
                   <span class="oa-mono">{videoName}</span>
                   &middot; {videoWidth}&times;{videoHeight}
@@ -2461,7 +2574,7 @@
                   disabled={burning || transcribing}
                   hidden
                 />
-                {t("Replace video")}
+                {hasVideo ? t("Replace video") : t("Load video")}
               </label>
             </div>
         {#if videoError}
@@ -2568,9 +2681,11 @@
             someone back to a screen they can only reach by discarding what
             they have would be a strange way to offer a second attempt.
           -->
-          <div class="subsection-head">
-            <h3 class="subsection-title">{t("Generate again")}</h3>
-          </div>
+          {#if transcribing || hasVideo}
+            <div class="subsection-head">
+              <h3 class="subsection-title">{t("Generate again")}</h3>
+            </div>
+          {/if}
           {#if transcribing}
             {@render transcribeProgress()}
           {:else if hasVideo}
@@ -2578,10 +2693,6 @@
               {t("Change anything below and run it again. This replaces the subtitles above, including any edits and any translation, so save what you want to keep from Export first.")}
             </p>
             {@render transcribeControls(true)}
-          {:else}
-            <p class="oa-caption card-intro">
-              {t("Load a video to generate subtitles from its audio.")}
-            </p>
           {/if}
           {#if noSpeechOffer}
             {@render noSpeechNotice()}
@@ -2981,15 +3092,15 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            disabled={!canTranslateNow || !affordable}
+            disabled={!canTranslateNow || !affordable || paidAndShown}
             onclick={doTranslate}
           >
             {#if translating}
               {translateProgress || t("Translating")}
             {:else if translationQuote?.paid}
-              {t("Already translated · apply again free")}
+              {t("Already translated · not charged")}
             {:else if translationQuote}
-              {t("Translate for {price}", { price: creditsText(translationQuote.credits) })}
+              {t("Translate · {price}", { price: creditsText(translationQuote.credits) })}
             {:else}
               {t("Translate cues")}
             {/if}
@@ -3055,58 +3166,35 @@
           <h2 class="section-title">{t("Export")}</h2>
           <CostBadge cost="free" />
         </div>
+        <!--
+          Burning comes first and is always here. It used to appear only once
+          a video had loaded, so with subtitles alone -- restored after a
+          reload, or opened from a file -- the export offered text files and
+          nothing else, and the one place the word "burn" appeared was a
+          caption about bilingual subtitles.
+        -->
         <div class="subsection-head">
-          <h3 class="subsection-title">{t("A subtitle file")}</h3>
-          <span class="tag">{t("text only")}</span>
+          <h3 class="subsection-title">{t("A video, with the subtitles burned in")}</h3>
+          {#if hasDimensions && support?.ok}
+            <span class="tag tag-unlocked">
+              {support.container === "mp4" ? "MP4 · H.264" : "WebM · VP9"}
+            </span>
+          {/if}
         </div>
-        <p class="oa-caption card-intro">
-          <Rich text={t("The subtitles on their own, to hand to a player, a platform or an editor — the video is not touched. **.ass** keeps the styling you chose here; **.srt** and **.vtt** are plain text that everything reads, with none of the styling. **.txt** is just the words, without timings: a transcript to read, quote or paste.")} />
-        </p>
-        <div class="checkbox-row">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            disabled={!assDocument}
-            onclick={() => download(assDocument, assName(videoName), "text/plain")}
-          >
-            <Icon name="download" size={14} />
-            .ass
-          </button>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            onclick={() => download(writeSrt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain")}
-          >
-            <Icon name="download" size={14} />
-            .srt
-          </button>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            onclick={() => download(writeVtt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt")}
-          >
-            <Icon name="download" size={14} />
-            .vtt
-          </button>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            onclick={() => download(writeTxt(shownCues, exportsBoth), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.txt`, "text/plain")}
-          >
-            <Icon name="download" size={14} />
-            .txt
-          </button>
-        </div>
-
-        {#if hasDimensions}
-          <div class="subsection-head">
-            <h3 class="subsection-title">{t("A video, with the subtitles burned in")}</h3>
-            {#if support?.ok}
-              <span class="tag tag-unlocked">
-                {support.container === "mp4" ? "MP4 · H.264" : "WebM · VP9"}
-              </span>
-            {/if}
+        {#if !hasVideo}
+          <p class="oa-caption card-intro">
+            {t("The picture with the subtitles drawn into it, so they show up anywhere without a subtitle file beside them. It needs the video they belong to.")}
+          </p>
+          <div class="checkbox-row">
+            <label class="btn btn-primary btn-sm" data-load-for-burn>
+              <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
+              {t("Load the video first")}
+            </label>
           </div>
+        {:else if !hasDimensions}
+          <p class="oa-caption card-intro">{t("reading…")}</p>
+        {/if}
+        {#if hasDimensions}
 
           {#if support && !support.ok}
             <div class="banner banner-danger">
@@ -3171,6 +3259,49 @@
             <p class="field-error">{burnError}</p>
           {/if}
         {/if}
+
+        <div class="subsection-head">
+          <h3 class="subsection-title">{t("A subtitle file")}</h3>
+          <span class="tag">{t("text only")}</span>
+        </div>
+        <p class="oa-caption card-intro">
+          <Rich text={t("The subtitles on their own, to hand to a player, a platform or an editor — the video is not touched. **.ass** keeps the styling you chose here; **.srt** and **.vtt** are plain text that everything reads, with none of the styling. **.txt** is just the words, without timings: a transcript to read, quote or paste.")} />
+        </p>
+        <div class="checkbox-row">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            disabled={!assDocument}
+            onclick={() => download(assDocument, assName(videoName), "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .ass
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeSrt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .srt
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeVtt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt")}
+          >
+            <Icon name="download" size={14} />
+            .vtt
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={() => download(writeTxt(shownCues, exportsBoth), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.txt`, "text/plain")}
+          >
+            <Icon name="download" size={14} />
+            .txt
+          </button>
+        </div>
 
         {#if cliLine}
           <details class="raw-command">
