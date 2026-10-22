@@ -666,7 +666,7 @@ fn missing_message(ffmpeg_bin: &Path, missing: &[&str]) -> String {
         .collect();
     let fix = match subs_pipeline::install_method() {
         Some(m) => format!(" Install one that has them: `{}`.", m.command),
-        None => " Install an ffmpeg 8 or later built with whisper and libass.".to_string(),
+        None => " Install an ffmpeg built with libass (the `ass` filter).".to_string(),
     };
     format!(
         "{} has no {}.{fix}",

@@ -548,15 +548,15 @@
           <p class="oa-caption">{ffmpegCheckError}</p>
         {:else if ffmpeg}
           <p class="oa-caption">
-            OpenSubs uses two of ffmpeg's filters: <code>whisper</code>, which transcribes the
-            audio, and <code>ass</code> (libass), which burns the subtitles in.
+            OpenSubs uses ffmpeg's <code>ass</code> filter (libass) to burn the subtitles in.
+            Transcription is built into the app.
             {#if ffmpeg.found}
               The ffmpeg found here has no {ffmpeg.missing.join(" and no ")}.
             {/if}
             {#if ffmpeg.install}
               {ffmpeg.install.note}
             {:else}
-              Install an ffmpeg 8 or later built with whisper and libass.
+              Install an ffmpeg built with libass (the <code>ass</code> filter).
             {/if}
           </p>
         {/if}
@@ -1033,7 +1033,7 @@
         {#if videoPath && !modelPath}
           <span class="oa-caption">Pick a whisper model to enable burning.</span>
         {:else if ffmpegOk === false}
-          <span class="oa-caption">ffmpeg needs {ffmpeg && !ffmpeg.found ? "installing" : "whisper and libass"} before this can run.</span>
+          <span class="oa-caption">ffmpeg needs {ffmpeg && !ffmpeg.found ? "installing" : "libass"} before this can run.</span>
         {:else if trimError}
           <span class="oa-caption">{trimError}</span>
         {/if}
