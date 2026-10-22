@@ -45,8 +45,8 @@
     --muted: #5f6672;
     --rule: #e3e5e9;
     --rule-soft: #eef0f3;
-    --accent: #ff8c42;
-    --accent-soft: #fff1e6;
+    --accent: #00c896;
+    --accent-soft: #d1f0e3;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -56,8 +56,8 @@
       --muted: #9aa1ac;
       --rule: #292b30;
       --rule-soft: #202226;
-      --accent: #ff9c5c;
-      --accent-soft: #2a1d14;
+      --accent: #00c896;
+      --accent-soft: #10302a;
     }
   }
   * { box-sizing: border-box; }

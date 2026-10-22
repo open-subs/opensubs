@@ -49,8 +49,30 @@ if (!viewBox || viewBox[1] !== viewBox[2]) {
 }
 const UNITS = Number(viewBox[1]);
 
+/**
+ * The groups that wrap part of the mark. Only the one shape the logo uses is
+ * understood: `transform="translate(x y) scale(s)"`, plus a `fill` the rects
+ * inside inherit. Anything else is refused rather than drawn wrong.
+ */
+const groups = [...svg.matchAll(/<g\b([^>]*)>([\s\S]*?)<\/g>/g)].map((m) => {
+  const t = /\btransform="([^"]*)"/.exec(m[1]);
+  const fill = /\bfill="([^"]*)"/.exec(m[1]);
+  const tm = t ? /^\s*translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)\s*(?:scale\(\s*([-\d.]+)\s*\))?\s*$/.exec(t[1]) : null;
+  if (t && !tm) {
+    console.error(`app-icon: cannot draw transform="${t[1]}"; only translate(x y) scale(s)`);
+    process.exit(1);
+  }
+  return {
+    start: m.index, end: m.index + m[0].length,
+    tx: tm ? Number(tm[1]) : 0, ty: tm ? Number(tm[2]) : 0, s: tm && tm[3] ? Number(tm[3]) : 1,
+    fill: fill ? fill[1] : null,
+  };
+});
+
 /** Every <rect> in the mark, with the attributes that decide how it is drawn. */
-const rects = [...svg.matchAll(/<rect\b([^>]*)\/>/g)].map(([, attrs]) => {
+const rects = [...svg.matchAll(/<rect\b([^>]*)\/>/g)].map((match) => {
+  const [, attrs] = match;
+  const group = groups.find((g) => match.index > g.start && match.index < g.end);
   const attr = (name) => {
     const m = new RegExp(`\\b${name}="([^"]*)"`).exec(attrs);
     return m ? m[1] : null;
@@ -59,10 +81,11 @@ const rects = [...svg.matchAll(/<rect\b([^>]*)\/>/g)].map(([, attrs]) => {
     const v = attr(name);
     return v === null ? fallback : Number(v);
   };
+  const { tx = 0, ty = 0, s = 1, fill = null } = group ?? {};
   return {
-    x: num("x"), y: num("y"), w: num("width"), h: num("height"), r: num("rx"),
-    fill: attr("fill"), stroke: attr("stroke"), strokeWidth: num("stroke-width"),
-    opacity: num("opacity", 1),
+    x: tx + s * num("x"), y: ty + s * num("y"), w: s * num("width"), h: s * num("height"),
+    r: s * num("rx"), fill: attr("fill") ?? fill, stroke: attr("stroke"),
+    strokeWidth: s * num("stroke-width"), opacity: num("opacity", 1),
   };
 });
 if (rects.length === 0) {
