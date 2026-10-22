@@ -89,38 +89,22 @@ For long files, without a browser in the way. It works on one video at a time.
 
 ### First: ffmpeg
 
-The desktop app shells out to `ffmpeg` both to burn subtitles into the
-picture and to run speech recognition, and it needs one built with the
-**`ass`** and **`whisper`** filters. Homebrew's plain `ffmpeg` formula has
-neither, and most distribution packages have `ass` but not `whisper` — the
-whisper filter is recent. The failure looks like a bug in this app rather
-than a missing dependency, which is why it is the first thing on this page.
+The desktop app uses `ffmpeg` to burn subtitles into the picture, so it
+needs one built with the **`ass`** filter (libass). Speech recognition is
+built into the app, so ffmpeg's `whisper` filter is not needed.
 
-Check what you have, on any platform:
+**macOS and Windows.** The installers include an ffmpeg that has it.
+There is nothing to install.
 
-```bash
-ffmpeg -filters | grep -E ' (ass|whisper) '
-```
-
-Two lines back and you are set. **`whisper` missing** means you can still
-burn subtitles you already have, and style and translate them — you just
-cannot generate them from audio. **`ass` missing** means burning fails
-outright.
-
-**macOS.** The app can do this for you. When it starts without a usable
-ffmpeg it shows **Install ffmpeg-full via Homebrew**, and streams the
-install output so you can see what it is doing. It needs
-[Homebrew](https://brew.sh) already installed and says so if it is missing.
-By hand:
+**Linux.** The `.deb`, `.rpm` and AppImage do not include ffmpeg. Install
+one built with libass (most distribution packages are), then check:
 
 ```bash
-brew install ffmpeg-full          # not `ffmpeg` -- that build has neither filter
+ffmpeg -filters | grep -E ' ass '
 ```
 
-**Windows and Linux.** The in-app installer is Homebrew-only, so install
-ffmpeg yourself. Take a *full* build rather than a minimal one, then run
-the filter check above — if `whisper` is absent, the app still burns and
-styles, and you generate subtitles in the web app or the extension instead.
+One line back and you are set. Nothing back means burning fails, and the
+app says which filter is missing.
 
 The app searches its own folder first, then the usual Homebrew prefixes,
 then `PATH` — there is no setting for an explicit path, so an ffmpeg
@@ -168,8 +152,10 @@ They land in `~/.cache/opensubs-models` and are shared with the CLI.
 
 ## Command line
 
-There is no prebuilt binary yet — build it from source. Same `ffmpeg`
-requirement as the desktop app, above.
+There is no prebuilt binary yet — build it from source. It needs an
+`ffmpeg` built with the **`ass`** filter (libass); the check is above. On
+macOS that is `brew install ffmpeg-full`, because Homebrew's plain `ffmpeg`
+has no libass.
 
 ```bash
 git clone https://github.com/open-subs/opensubs
