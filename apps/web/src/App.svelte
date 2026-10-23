@@ -1377,15 +1377,32 @@
    */
   let loadingSample = $state(false);
 
+  /**
+   * A file shipped beside the page, as a blob.
+   *
+   * Status 0 is accepted when the body arrived. Inside the iOS shell the
+   * page is served by Capacitor's scheme handler, which answers a media
+   * file -- `.mp4`, `.mov`, `.m4a` and the rest -- with a bare URLResponse
+   * rather than an HTTP one whenever the request has no Range header. The
+   * bytes are all there, but fetch reports status 0, so `r.ok` is false
+   * and the sample was refused on every iPhone with "could not be loaded:
+   * 0". A browser never produces status 0 for a same-origin file it
+   * actually delivered, so an empty body is still the failure check.
+   */
+  async function bundled(path: string): Promise<Blob> {
+    const r = await fetch(path);
+    if (!r.ok && r.status !== 0) throw new Error(String(r.status));
+    const blob = await r.blob();
+    if (blob.size === 0) throw new Error(String(r.status || "empty"));
+    return blob;
+  }
+
   async function trySample() {
     if (loadingSample) return;
     loadingSample = true;
     videoError = null;
     try {
-      const [clip, cues] = await Promise.all([
-        fetch("sample.mp4").then((r) => r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))),
-        fetch("sample.srt").then((r) => r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))),
-      ]);
+      const [clip, cues] = await Promise.all([bundled("sample.mp4"), bundled("sample.srt")]);
       await loadVideo(new File([clip], "sample.mp4", { type: "video/mp4" }));
       await useSubtitleFile(new File([cues], "sample.srt", { type: "text/plain" }));
     } catch (e) {

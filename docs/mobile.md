@@ -26,7 +26,8 @@ xcrun simctl boot <udid> && xcrun simctl openurl <udid> http://localhost:5180/
 | iOS (Safari `Version/`) | Engine | Notes |
 |---|---|---|
 | 17.0 | **fails** | `Can't create a session. ERROR_CODE: 1` |
-| 26.0 | works | the floor this app ships with |
+| 18.5 | works | a real iPhone 16, not a simulator -- see below; the floor this app ships with |
+| 26.0 | works | |
 | 26.5 | works | |
 | 27.0 | works | |
 
@@ -55,35 +56,38 @@ Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE:
   Could not find OrtValue with name '/layers.0/self_attn/Transpose_1_output_0'
 ```
 
-### The floor is 26.0, and it is a measurement
+### The floor is 18.5, and it is a measurement
 
-`IPHONEOS_DEPLOYMENT_TARGET` and the Podfile's `IOS_MIN` both say 26.0.
+`IPHONEOS_DEPLOYMENT_TARGET` and the Podfile's `IOS_MIN` both say 18.5.
 
-Not because iOS 18 was tested and failed — because **it cannot be tested
-here**. Xcode 27 offers no iOS 18 simulator runtime at all:
+It was 26.0 until an iPhone 16 on iOS 18.5 turned the app away in
+TestFlight. 26.0 was never a finding about iOS 18: Xcode 27 offers no
+iOS 18 simulator runtime at all, so 18 could not be tested here.
 
 ```
 $ xcodebuild -downloadPlatform iOS -buildVersion 18.5
-iOS 18.5 is not available for download.        # and 18, 18.0, 18.1, 18.3, 18.6
-$ xcodebuild -downloadPlatform iOS -buildVersion 26.0
-Downloading iOS 26.0 Simulator (23A343) (arm64): Done.
+iOS 18.5 is not available for download.        # and 18, 18.0, 18.1, 18.3, 18.4, 18.6
 ```
 
-So 26.0 is the lowest version this toolchain can run the engine on, and
-therefore the lowest floor anyone here can stand behind. There is no
-version of iOS between 18 and 26: Apple renumbered, so the untested band is
-26 minus 18 in name only — it is iOS 18.x and nothing else.
+That phone was the missing test device. In Safari on opensubs.app, with
+the engine set to "On this device" and the Base model -- the model the app
+carries -- it transcribed the sample clip, and a marker typed into the
+subtitles beforehand was replaced by the real transcript, so the text came
+from the recogniser. Safari there is a fair stand-in for the app: the same
+WebKit, the same full-precision Base on the CPU (Safari 18 has no WebGPU),
+and single-threaded in both, because neither the site nor the shell sends
+the COOP/COEP headers that would allow threads. iOS 17's failure happened
+in Safari as well, while the session was being built, so this is the
+check that would have caught it.
 
-The cost is real and it is a deliberate trade. An app that refuses to
-install on iOS 18 reaches fewer phones; an app that installs and cannot
-transcribe is a guideline 2.1 rejection and a one-star review, and the
-reviewer will not catch it because Apple reviews on the current OS. Given a
-choice between "fewer users" and "an unknown number of users with a broken
-app", this picks the one that is not a surprise.
+The floor is 18.5 rather than 18.0 because 18.0 to 18.4 are still
+untested, and every phone on one of them is a free update away from 18.5.
+Before this ships to the App Store, transcribe once in the TestFlight
+build on an 18.5 phone: the app is the one thing that check did not run.
 
-**Lowering it is one run away.** Point `e2e/enginecheck` at an iOS 18
-device or at a machine with an Xcode that still ships the runtime. If it
-passes, move both numbers down and re-run `pod install`.
+To lower it further, run `e2e/enginecheck` -- or the same steps on the
+site -- on an older device, then move both numbers down and re-run
+`pod install`.
 
 ### The app runs single-threaded, and that is the shell's doing
 
@@ -99,6 +103,29 @@ handler, not a change to any of this app's own code.
 
 Both numbers are from a simulator with **no GPU adapter**, so both are the
 CPU path. A real device has a GPU and should do better than either.
+
+### Two things the shell does that a browser does not
+
+**It sends foreign navigations to the default browser.** Capacitor allows a
+top-level navigation only to the app's own origin and passes anything else
+to `UIApplication.open`. Google sign-in is a whole-page redirect to
+`auth.opensubs.app`, so it used to leave the app. The sign-in itself worked
+there, and then the server redirected that browser to `return_to`, which is
+`capacitor://localhost/#code=…`. No app registers that scheme, so Safari
+said the address was invalid, Edge said the application couldn't be
+opened, and the code never came back. `OpenSubsAuth.swift` now catches
+`/v1/auth/oidc/<provider>/start` and `/go` before Capacitor does and opens
+them in `ASWebAuthenticationSession`. That sheet intercepts the redirect to
+`capacitor://` itself, and Google accepts it where it refuses an embedded
+web view. The server needed no change: `capacitor://localhost` was already
+an allowed `return_to` origin.
+
+**It answers media files without an HTTP status.** Capacitor's scheme
+handler replies to a `.mp4` (or `.mov`, `.m4a`…) request that has no
+`Range` header with a plain `URLResponse`. The bytes arrive, but `fetch`
+reports status 0, so `response.ok` is false. "Try a sample" checked `ok` and
+refused its own bundled clip on every iPhone. It now accepts status 0 when
+the body is not empty.
 
 ## Building it
 

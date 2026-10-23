@@ -4,12 +4,12 @@ require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 # IPHONEOS_DEPLOYMENT_TARGET in App.xcodeproj -- Xcode refuses a build
 # where the app targets an older iOS than the pods it links.
 #
-# 26.0 is a measurement, not a preference: see docs/mobile.md. The engine
-# does not run on iOS 17 at all, it runs on 26.0, and every version in
-# between is untestable on this toolchain because Xcode 27 offers no iOS 18
-# simulator runtime to download. Lowering it is one `simctl` run away the
-# day a runtime or a device exists to run e2e/enginecheck on.
-IOS_MIN = '26.0'
+# 18.5 is a measurement, not a preference: see docs/mobile.md. The engine
+# does not run on iOS 17 at all; it runs on an iPhone on 18.5 and on every
+# 26 and 27 simulator. 18.0 to 18.4 are untested -- no simulator runtime
+# for them is downloadable on Xcode 27 -- and a phone on one of them is a
+# free update away from 18.5.
+IOS_MIN = '18.5'
 
 platform :ios, IOS_MIN
 use_frameworks!
