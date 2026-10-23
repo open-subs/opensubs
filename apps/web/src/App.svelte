@@ -52,6 +52,14 @@
     type Decoded,
   } from "./lib/decode";
   import { burnInBrowser, burnSupport, type BurnSupport } from "./lib/burn";
+  import {
+    exportGateOn,
+    primeExportGate,
+    markPendingExport,
+    pendingExport,
+    clearPendingExport,
+  } from "./lib/exportgate";
+  import ExportGate from "./lib/ExportGate.svelte";
   import { isChinese, toSimplified, wantsTraditional } from "./lib/script";
   import { initLocale, t } from "./lib/i18n/index.svelte";
   import LanguagePicker from "./lib/LanguagePicker.svelte";
@@ -504,6 +512,13 @@
   let burnedName = $state("");
   let burnedNote = $state<string | null>(null);
   let burnAbort: AbortController | null = null;
+  /** The sign-in sheet in front of exporting a video is open. */
+  let exportGateOpen = $state(false);
+  /**
+   * Back from a sign-in that left the page while an export was waiting:
+   * the export starts by itself once the video is open again.
+   */
+  let exportWaiting = $state(false);
 
   let preview: Preview | null = null;
 
@@ -891,6 +906,7 @@
     // catalogues are also imported by the extension's engine host, which
     // has no `window` to read a preference from.
     initLocale();
+    primeExportGate();
     stopLanguageLinks = keepWorkAcrossLanguageLinks(() => !starting);
     try {
       await load();
@@ -921,6 +937,17 @@
       // cues over an empty player would look broken. The user is told what
       // is waiting and for which file.
       restored = loadWork();
+      // An export was pressed before a sign-in took the page away. The
+      // work comes back without asking -- the person already chose to
+      // carry on -- and the export waits for the video.
+      if (pendingExport()) {
+        if (restored) {
+          resumeWork();
+          exportWaiting = true;
+        } else {
+          clearPendingExport();
+        }
+      }
       // The handle is looked up alongside the cues, so the restore card
       // can offer the video back in the same breath rather than as a
       // second surprise once the subtitles are already on screen.
@@ -1272,6 +1299,47 @@
       burnRemaining = "";
     }
   }
+
+  /**
+   * The export button. Asks for an account first when the switch is on and
+   * nobody is signed in; otherwise exactly `doBurn`.
+   */
+  async function requestBurn() {
+    if (!videoFile || !assDocument || burning || exportGateOpen) return;
+    if (!signedIn() && (await exportGateOn())) {
+      markPendingExport(videoName);
+      exportGateOpen = true;
+      return;
+    }
+    void doBurn();
+  }
+
+  function closeExportGate() {
+    exportGateOpen = false;
+    clearPendingExport();
+  }
+
+  // Signed in with the sheet open, without leaving the page: carry on.
+  $effect(() => {
+    if (!exportGateOpen || !session.signedIn) return;
+    untrack(() => {
+      exportGateOpen = false;
+      clearPendingExport();
+      void doBurn();
+    });
+  });
+
+  // Back from a provider, signed in, and the video is open again.
+  $effect(() => {
+    if (!exportWaiting || !session.signedIn) return;
+    if (!videoFile || !assDocument || !hasDimensions || !support?.ok) return;
+    untrack(() => {
+      if (burning || burnedUrl) return;
+      exportWaiting = false;
+      clearPendingExport();
+      void doBurn();
+    });
+  });
 
   function cancelBurn() {
     burnAbort?.abort();
@@ -2363,6 +2431,17 @@
 
 <main class="screen" class:drag-over={isDragOver}>
 
+  {#if exportGateOpen}
+    <ExportGate onclose={closeExportGate} />
+  {/if}
+
+  {#if exportWaiting && session.signedIn && !videoFile}
+    <div class="banner" data-export-waiting>
+      <Icon name="check-circle" />
+      <p>{t("Signed in. Open the video again and the export starts by itself.")}</p>
+    </div>
+  {/if}
+
   {#if restored}
     <!--
       Signing in navigates away and back, which destroys the tab. This is
@@ -3283,7 +3362,7 @@
                 type="button"
                 class="btn btn-primary btn-sm"
                 disabled={!assDocument}
-                onclick={doBurn}
+                onclick={requestBurn}
               >
                 {t("Burn subtitles into the video")}
               </button>
