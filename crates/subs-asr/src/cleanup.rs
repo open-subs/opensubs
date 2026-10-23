@@ -469,6 +469,8 @@ const SWALLOW_REACH: usize = 4;
 
 /// Three consecutive segments saying the same thing are a loop.
 const LOOP_RUN: usize = 3;
+/// A repeated line this short or shorter is a loop however loud it is.
+const SHORT_LOOP_CHARS: usize = 12;
 /// How quiet, against the clip's own median segment level, is nothing.
 const QUIET_RATIO: f64 = 0.35;
 /// Two identical lines further apart than this are two identical lines.
@@ -585,7 +587,17 @@ pub fn clean_up(segments: &[Segment], level: impl Fn(f64, f64) -> f64, language:
             out.removed.push(drop(Reason::Repeat));
             continue;
         }
-        if run_length[run_start[i]] >= LOOP_RUN && (is_sign_off_word(&bare(&text)) || i != run_start[i]) {
+        // A loop is a short thing said again and again -- "you", "you",
+        // "you" over closing music -- and goes whatever the audio. A whole
+        // sentence repeated over a voice as loud as the rest is somebody
+        // saying it again (a chant, a chorus, a looped recording), and only
+        // goes when there was nothing to hear. The web app drops every
+        // repeat after the first; on the desktop a two-minute loop of one
+        // sentence came out as one subtitle.
+        let short = bare(&text).chars().count() <= SHORT_LOOP_CHARS;
+        if run_length[run_start[i]] >= LOOP_RUN
+            && (is_sign_off_word(&bare(&text)) || (i != run_start[i] && (short || quiet(i))))
+        {
             out.removed.push(drop(Reason::Repeat));
             continue;
         }
@@ -690,6 +702,18 @@ mod tests {
             "en",
         );
         assert_eq!(texts(&c), ["if not many, pairs of jeans."]);
+    }
+
+    /// The same sentence looped for two minutes, all of it loud: every
+    /// repetition is speech and stays.
+    #[test]
+    fn a_sentence_said_again_and_again_over_a_voice_stays() {
+        let line = "And so my fellow Americans ask not what your country can do for you.";
+        let segs: Vec<Segment> = (0..11).map(|k| seg(k as f64 * 11.0, k as f64 * 11.0 + 10.0, line)).collect();
+        assert_eq!(clean_up(&segs, LOUD, "en").kept.len(), 11);
+        // The copies that run on over silence go.
+        let level = |from: f64, _to: f64| if from >= 88.0 { 0.001 } else { 0.1 };
+        assert_eq!(clean_up(&segs, level, "en").kept.len(), 8);
     }
 
     #[test]

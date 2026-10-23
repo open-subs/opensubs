@@ -267,6 +267,31 @@ pub fn aligned_words(seg: &TimedSegment, speech: Option<&[Span]>) -> Option<Vec<
     Some(words)
 }
 
+/// Whether an alignment can be believed for this segment.
+///
+/// The alignment is usually right where the segment times are wrong, but it
+/// can fail too, and when it does it fails loudly. On speech that repeats --
+/// the same eleven-second sentence looped for two minutes -- every loop
+/// sounds alike, and the alignment spread the first segment's words over
+/// nineteen seconds and crammed the second's 105 characters into 2.3. Two
+/// tests catch that without second-guessing a good alignment: nobody speaks
+/// faster than 25 characters a second, and a segment's words do not take
+/// half as long again as the segment itself (with six seconds of grace,
+/// for the zero-length segments whisper.cpp sometimes writes).
+/// A segment that fails either is placed by its own times instead.
+pub fn plausible_alignment(seg: &TimedSegment, words: &[Word]) -> bool {
+    let (Some(first), Some(last)) = (words.first(), words.last()) else {
+        return false;
+    };
+    let span = (last.end - first.start).max(1e-3);
+    let chars = seg.text.chars().filter(|c| c.is_alphanumeric()).count() as f64;
+    let own = (seg.end - seg.start).max(0.0);
+    chars / span <= MAX_CHARS_PER_SECOND && span <= (own * 1.5).max(own + 6.0)
+}
+
+/// Faster than this is not speech; see `cleanup` for the same number.
+const MAX_CHARS_PER_SECOND: f64 = 25.0;
+
 /// Whether the detector heard a voice within `reach` seconds of a span.
 ///
 /// The test for dropping an aligned segment is deliberately this loose.
@@ -524,6 +549,27 @@ mod tests {
         for pair in words.windows(2) {
             assert!(pair[1].start >= pair[0].end - 1e-9, "{pair:?}");
         }
+    }
+
+    /// The looped sentence: its first segment spread over 19 s, its second
+    /// crammed into 2.3 s. Both are refused; Tears of Steel's moved but
+    /// compact alignment is kept.
+    #[test]
+    fn an_alignment_that_stretches_or_crams_is_refused() {
+        let text = "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.";
+        let seg = |start: f64, end: f64| TimedSegment { start, end, text: text.into(), char_times: None };
+        let words = |a: f64, b: f64| vec![
+            Word { start: a, end: a + 0.3, text: "And".into(), confidence: 1.0 },
+            Word { start: b - 0.3, end: b, text: "country.".into(), confidence: 1.0 },
+        ];
+        assert!(!plausible_alignment(&seg(0.0, 11.0), &words(0.52, 19.54)));
+        assert!(!plausible_alignment(&seg(11.0, 22.0), &words(19.44, 21.78)));
+        assert!(plausible_alignment(&seg(0.0, 11.0), &words(0.52, 10.4)));
+        let jerk = TimedSegment { start: 7.0, end: 16.0, text: "You're a jerk, Tom!".into(), char_times: None };
+        assert!(plausible_alignment(&jerk, &[
+            Word { start: 23.30, end: 23.48, text: "You're".into(), confidence: 1.0 },
+            Word { start: 24.34, end: 24.6, text: "Tom!".into(), confidence: 1.0 },
+        ]));
     }
 
     #[test]

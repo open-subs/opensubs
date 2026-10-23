@@ -18,7 +18,7 @@
 use std::path::{Path, PathBuf};
 use subs_asr::cleanup::clean_up;
 use subs_asr::{
-    aligned_words, fit_to_speech, has_speech, near_speech, retime, transcript_from_speech, AsrError, AsrOptions, AudioRef,
+    aligned_words, fit_to_speech, has_speech, near_speech, plausible_alignment, retime, transcript_from_speech, AsrError, AsrOptions, AudioRef,
     Segment, Span, TimedSegment, Transcriber, Transcript, Word, NEAR_SPEECH_S,
 };
 use whisper_rs::{
@@ -300,7 +300,7 @@ fn dtw_preset(model: &Path) -> Option<DtwModelPreset> {
 fn finish(segments: Vec<TimedSegment>, speech: Option<&[Span]>, samples: &[f32], language: &str) -> Transcript {
     let mut placed: Vec<(Segment, Option<Vec<Word>>)> = Vec::new();
     for seg in segments {
-        match aligned_words(&seg, speech).filter(|w| !w.is_empty()) {
+        match aligned_words(&seg, speech).filter(|w| plausible_alignment(&seg, w)) {
             Some(words) => {
                 let (start, end) = (words[0].start, words[words.len() - 1].end);
                 if speech.is_none_or(|sp| near_speech(sp, start, end, NEAR_SPEECH_S)) {
