@@ -195,7 +195,7 @@
  "Local data: clear site data for <code>app.opensubs.app</code> in your browser.": "ローカルのデータ：ブラウザーで <code>app.opensubs.app</code> のサイトデータを消してください。",
  "Local data: clear site data for <code>opensubs.app</code> in your browser.": "ローカルのデータ：ブラウザで <code>opensubs.app</code> のサイトデータを消してください。",
  "Looking for an existing subtitle file to download? <a href=\"/subtitle-sites\">See where to find subtitles</a>.": "既存の字幕ファイルを探していますか？<a href=\"/subtitle-sites\">字幕がどこにあるかを見る</a>。",
- "MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.": "MP4、MOV、WebM、MKV に対応。無料、アカウント不要。音声モデルは、生成するときに一度だけ取得されます。",
+ "MP4, MOV, WebM and MKV. Free, no account to try. The speech model downloads once, when you generate.": "MP4、MOV、WebM、MKV に対応。無料、試すならアカウント不要。音声モデルは、生成するときに一度だけ取得されます。",
  "Minimal Dark on Light": "ミニマル 明るい背景に黒",
  "Most subtitle tools upload your video, process it, and promise to delete it. OpenSubs is built the other way round.": "たいていの字幕ツールは動画をアップロードし、処理し、削除すると約束します。OpenSubs はその逆の作りです。",
  "Most subtitle tools upload your video, process it, and promise to delete it. OpenSubs is built the other way round. Free, and open source &mdash; the code that touches your video is <a href=\"https://github.com/open-subs/opensubs\">on GitHub</a> under the AGPL-3.0-or-later, so the sentence before this one is something you can check rather than something you have to believe.": "たいていの字幕ツールは動画をアップロードし、処理し、消すと約束します。OpenSubs は逆向きに作られています。無料で、オープンソース &mdash; あなたの動画に触れるコードは AGPL-3.0-or-later のもとで <a href=\"https://github.com/open-subs/opensubs\">GitHub にあります</a>。だから前の一文は、信じるしかないものではなく、確かめられるものです。",

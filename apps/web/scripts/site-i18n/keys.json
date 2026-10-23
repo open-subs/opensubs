@@ -164,7 +164,7 @@
  "Load the MP4 in OpenSubs, open the .srt, and burn. The result is a new MP4 with the subtitles in the picture; your original file stays as it was.",
  "Local data: clear site data for <code>opensubs.app</code> in your browser.",
  "Looking for an existing subtitle file to download? <a href=\"/subtitle-sites\">See where to find subtitles</a>.",
- "MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.",
+ "MP4, MOV, WebM and MKV. Free, no account to try. The speech model downloads once, when you generate.",
  "Minimal Dark on Light",
  "Most subtitle tools upload your video, process it, and promise to delete it. OpenSubs is built the other way round. Free, and open source &mdash; the code that touches your video is <a href=\"https://github.com/open-subs/opensubs\">on GitHub</a> under the AGPL-3.0-or-later, so the sentence before this one is something you can check rather than something you have to believe.",
  "Neither takes a subtitle file, so the text has to be in the picture. How to generate, style and burn it in.",

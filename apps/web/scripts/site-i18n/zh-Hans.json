@@ -195,7 +195,7 @@
  "Local data: clear site data for <code>app.opensubs.app</code> in your browser.": "本地数据：在浏览器中清除 <code>app.opensubs.app</code> 的站点数据。",
  "Local data: clear site data for <code>opensubs.app</code> in your browser.": "本地数据：在浏览器里清除 <code>opensubs.app</code> 的站点数据。",
  "Looking for an existing subtitle file to download? <a href=\"/subtitle-sites\">See where to find subtitles</a>.": "想找现成的字幕文件下载？<a href=\"/subtitle-sites\">看看去哪里找字幕</a>。",
- "MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.": "支持 MP4、MOV、WebM 和 MKV。免费，不用账号。语音模型在你生成时下载一次。",
+ "MP4, MOV, WebM and MKV. Free, no account to try. The speech model downloads once, when you generate.": "支持 MP4、MOV、WebM 和 MKV。免费，试用无需账号。语音模型在你生成时下载一次。",
  "Minimal Dark on Light": "极简 浅底深字",
  "Most subtitle tools upload your video, process it, and promise to delete it. OpenSubs is built the other way round.": "大多数字幕工具会上传你的视频、处理它，然后承诺删除它。OpenSubs 的做法正好相反。",
  "Most subtitle tools upload your video, process it, and promise to delete it. OpenSubs is built the other way round. Free, and open source &mdash; the code that touches your video is <a href=\"https://github.com/open-subs/opensubs\">on GitHub</a> under the AGPL-3.0-or-later, so the sentence before this one is something you can check rather than something you have to believe.": "大多数字幕工具会上传你的视频、处理它，然后承诺删掉。OpenSubs 是反着造的。免费，而且开源 &mdash; 碰到你视频的那部分代码按 AGPL-3.0-or-later 放<a href=\"https://github.com/open-subs/opensubs\">在 GitHub 上</a>，所以上一句话是你可以自己核对的，而不是只能相信的。",

@@ -72,8 +72,34 @@ function readSwitch(): Promise<boolean> {
   switchState ??= fetch(`${SWITCH_URL}?t=${Date.now()}`, { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null))
     .then((body) => body?.exportGate === true)
-    .catch(() => false);
+    .catch(() => false)
+    .then((on) => {
+      try {
+        localStorage.setItem(LAST_KEY, on ? "1" : "0");
+      } catch {
+        // Only the first frame of the copy depends on it.
+      }
+      return on;
+    });
   return switchState;
+}
+
+const LAST_KEY = "opensubs.exportGate.last";
+
+/**
+ * Whether the copy should say that burning takes a sign-in, before the
+ * switch has answered: the answer this browser got last time, so the page
+ * does not open on one sentence and change to the other. Never true off
+ * the website.
+ */
+export function exportGateLastKnown(): boolean {
+  if (!onWeb()) return false;
+  if (forcedOn()) return true;
+  try {
+    return localStorage.getItem(LAST_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 /** Start reading the switch, so a press does not wait for it. */

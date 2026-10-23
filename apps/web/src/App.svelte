@@ -55,6 +55,7 @@
   import {
     exportGateOn,
     primeExportGate,
+    exportGateLastKnown,
     markPendingExport,
     pendingExport,
     clearPendingExport,
@@ -515,6 +516,11 @@
   /** The sign-in sheet in front of exporting a video is open. */
   let exportGateOpen = $state(false);
   /**
+   * Whether the copy says burning takes a free sign-in. Only where the
+   * switch is on: the phone apps run this same page and are not gated.
+   */
+  let exportGateCopy = $state(exportGateLastKnown());
+  /**
    * Back from a sign-in that left the page while an export was waiting:
    * the export starts by itself once the video is open again.
    */
@@ -907,6 +913,7 @@
     // has no `window` to read a preference from.
     initLocale();
     primeExportGate();
+    void exportGateOn().then((on) => (exportGateCopy = on));
     stopLanguageLinks = keepWorkAcrossLanguageLinks(() => !starting);
     try {
       await load();
@@ -2587,7 +2594,9 @@
           </label>
         </div>
         <p class="start-fine">
-          {t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
+          {exportGateCopy
+            ? t("MP4, MOV, WebM and MKV. Free, no account to try. The speech model downloads once, when you generate.")
+            : t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
         </p>
       </div>
       {#if videoError}
@@ -3465,7 +3474,9 @@
       </button>
       {#if showFeatures}
         <p class="oa-caption card-intro">
-          <Rich text={t("No account, no watermark and no export limit.")} />
+          <Rich text={exportGateCopy
+            ? t("No account to try, no watermark and no export limit; burning a video takes a free sign-in.")
+            : t("No account, no watermark and no export limit.")} />
         </p>
         <ul class="feature-list">
           {#each features as f (f.id)}
