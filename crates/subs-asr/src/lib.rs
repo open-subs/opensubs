@@ -1,13 +1,19 @@
 //! Speech recognition behind a trait, plus the canonical `Transcript`.
 
+pub mod cleanup;
 pub mod ffmpeg_whisper;
 pub mod mock;
+pub mod speech;
 pub mod transcript;
 
 pub use ffmpeg_whisper::{
     parse_whisper_jsonl, synthesize_words, transcript_from_segments, FfmpegWhisperTranscriber,
 };
 pub use mock::MockTranscriber;
+pub use speech::{
+    aligned_words, fit_to_speech, has_speech, near_speech, retime, speech_seconds, transcript_from_speech, Span,
+    TimedSegment, NEAR_SPEECH_S,
+};
 pub use transcript::{Segment, Transcript, Word};
 
 use std::path::{Path, PathBuf};
