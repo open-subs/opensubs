@@ -293,9 +293,11 @@ for (const fixture of FIXTURES) {
     continue;
   }
 
+  // The download buttons are on the Export tab.
+  if (await page.locator("#tab-export").count()) await page.click("#tab-export");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.locator('button:has-text(".srt")').click(),
+    page.click('button:has-text(".srt")'),
   ]);
   const srt = join(dir, `${fixture.name.replace(/\W+/g, "-")}.srt`);
   await download.saveAs(srt);

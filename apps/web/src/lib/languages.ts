@@ -51,3 +51,35 @@ export function smoothLabels(labels: string[]): string[] {
   }
   return labels;
 }
+
+/**
+ * Give a cell nobody spoke in the language of the nearest cell somebody did.
+ *
+ * Whisper names a language for every cell, silence and music included, and
+ * names it as firmly: over a stalled video or a music bed it says English,
+ * and over a long enough pause two cells agree and survive `smoothLabels`.
+ * The same decoder step says how likely it is that nobody is speaking, and
+ * a cell above that bar has no vote of its own -- it belongs to whatever
+ * speech is beside it. The earlier neighbour is preferred, so a pause takes
+ * the language of the sentence it follows.
+ *
+ * Measured on a Korean drama clip, Whisper Tiny: four-second cells of a
+ * stalled player read English at p = 0.38 with a no-speech probability of
+ * 0.94; the cells of Korean speech read Korean at 0.9-1.0 with 0.0-0.4.
+ *
+ * Runs before `smoothLabels`, in place. If no cell holds speech, nothing is
+ * changed: there is then nothing better to say.
+ */
+export function inheritQuiet(labels: string[], quiet: boolean[]): string[] {
+  let last: string | null = null;
+  const firstSpoken = quiet.findIndex((q) => !q);
+  if (firstSpoken < 0) return labels;
+  for (let i = 0; i < labels.length; i += 1) {
+    if (!quiet[i]) {
+      last = labels[i];
+      continue;
+    }
+    labels[i] = last ?? labels[firstSpoken];
+  }
+  return labels;
+}

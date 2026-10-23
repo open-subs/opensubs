@@ -26,6 +26,7 @@
 import { transcribeLocally, asrSupport, loadLocalModel, type AsrSupport } from "../../../web/src/lib/asr";
 import { isSignOff } from "../../../web/src/lib/cleanup";
 import { isChinese, toSimplified, wantsTraditional } from "../../../web/src/lib/script";
+import { addEvidence, chooseLanguages, settledLanguage, type Evidence } from "../lib/autolang";
 import { AUTO_BEHIND, AUTO_FAST, behindNote, enqueue, maxWaiting, pickModel, startsOnCpu } from "../lib/pace";
 import { fromWire, type Cue, type FromEngine, type Settings, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
 
@@ -137,37 +138,31 @@ export function createEngine(emit: Emit): Engine {
   const waiting: Extract<ToEngine, { kind: "transcribe" }>[] = [];
   let dropped = 0;
   /**
-   * The language this capture turned out to be in, once a window has said so.
+   * What this capture has said about its language so far, and the language
+   * it settled on once it had said enough. See ../lib/autolang.ts.
    *
-   * On "auto", `transcribeLocally` works out the language before it
-   * transcribes -- it reads the audio every few seconds so that a file which
-   * switches language comes out in both. For a file that is the right call and
-   * it is paid once. A live capture calls it once per *window*, so every
-   * twenty seconds of audio paid for detection again: about fifteen seconds of
-   * "Listening for the language" on top of the transcription, which put each
-   * window at 35-45 seconds against 20 of audio. The engine could never catch
-   * up, and dropped every other window to stay near the film -- half of a
-   * two-minute lecture came out with no subtitles at all.
+   * On "auto", `transcribeLocally` would detect the language in every
+   * window on its own. A window is twenty seconds, which is too little to
+   * trust a language on: a stall or a bar of music inside it votes as
+   * firmly as speech, and windows that disagreed with themselves were cut
+   * into per-cell passes in whatever each cell was heard as. The windows
+   * instead add up their evidence here, and each is transcribed in the
+   * language the whole capture so far points to.
    *
-   * So the first window that holds real speech in exactly one language names
-   * it, and every window after is transcribed as that language, which skips
-   * detection entirely. Two things keep this from being wrong more often than
-   * it is fast:
+   * Once the capture has plainly been one language for long enough, it is
+   * settled: later windows are transcribed in it without detecting again.
+   * That is also what keeps up on a slow machine -- detection is an
+   * encoder pass per four seconds of audio, and paying it on every window
+   * put each twenty seconds of audio at 35-45 seconds of work.
    *
-   *   - it is only taken from a window with words in it. An opening of music,
-   *     silence or applause detects as *something*, and locking a lecture
-   *     into whatever Whisper guessed over the title music would be worse
-   *     than the problem this solves;
-   *   - a window that heard two languages locks nothing, so a bilingual
-   *     capture keeps paying for detection and keeps being right.
-   *
-   * What it gives up: a video in one language that switches to another later
-   * on will be transcribed in the first. Naming the languages in the popup
-   * is the way out of that, as it is for a file.
+   * What it gives up: a video in one language that switches to another
+   * after it has settled is transcribed in the first. Naming the languages
+   * in the popup is the way out of that, as it is for a file.
    *
    * Reset by `warm`, which every Start sends: a new capture is a new video.
    */
-  let heard: string | null = null;
+  let evidence: Evidence = {};
+  let settled: string | null = null;
   /**
    * The model this engine has already run, so it is not announced again.
    *
@@ -216,7 +211,10 @@ export function createEngine(emit: Emit): Engine {
         wasmProxy: true,
         start: 0,
         end: null,
-        language: auto ? heard ?? undefined : settings.language,
+        language: auto ? settled ?? undefined : settings.language,
+        // Only consulted while nothing is settled: this window's evidence
+        // joins the capture's, and the window is read in what that says.
+        chooseLanguage: auto && !settled ? (heard) => chooseLanguages(addEvidence(evidence, heard)) : undefined,
         // One window of many. A window that is all music or all silence
         // must be allowed to come back with nothing in it.
         allowEmpty: true,
@@ -243,9 +241,7 @@ export function createEngine(emit: Emit): Engine {
         result.transcript.language ?? settings.language,
         settings.language,
       );
-      if (auto && !heard && cues.length > 0 && result.languages?.length === 1) {
-        heard = result.languages[0];
-      }
+      if (auto && !settled) settled = settledLanguage(evidence);
       emit({ kind: "segments", cues, offset, take });
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e);
@@ -335,7 +331,8 @@ export function createEngine(emit: Emit): Engine {
         // A Start. Whatever the last capture learned belongs to that video,
         // and its count of dropped windows belongs to that run -- carried
         // over, the second video would open "(5 windows skipped)".
-        heard = null;
+        evidence = {};
+        settled = null;
         dropped = 0;
         behind = false;
         said = null;

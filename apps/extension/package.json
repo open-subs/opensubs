@@ -16,7 +16,8 @@
     "check": "tsc --noEmit",
     "icons": "node scripts/generate-icons.mjs",
     "test:pipeline": "node e2e/pipeline.mjs",
-    "test:installed": "node e2e/installed.mjs"
+    "test:installed": "node e2e/installed.mjs",
+    "test:autolang": "node e2e/autolang.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

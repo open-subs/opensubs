@@ -15,7 +15,7 @@
 //
 //   node --experimental-strip-types e2e/labels.mjs
 import assert from "node:assert/strict";
-import { smoothLabels } from "../src/lib/languages.ts";
+import { inheritQuiet, smoothLabels } from "../src/lib/languages.ts";
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -81,6 +81,34 @@ test("a run of three is never collapsed, wherever it sits", () => {
     smoothLabels([...run("ja", 4), ...run("ko", 3), ...run("ja", 4)]),
     [...run("ja", 4), ...run("ko", 3), ...run("ja", 4)],
   );
+});
+
+// --- cells with nobody speaking ----------------------------------------
+//
+// Real readings off a Korean drama clip with a stall in it, Whisper Tiny:
+// the stalled player reads English at p = 0.38, no-speech 0.94, for three
+// cells in a row -- a run of three, which smoothing rightly keeps.
+
+test("a stall inside speech takes the language of the speech before it", () => {
+  const labels = ["ko", "ko", "ko", "en", "en", "en", "ko", "ko"];
+  const quiet = [false, false, false, true, true, true, false, false];
+  assert.deepEqual(smoothLabels(inheritQuiet(labels, quiet)), run("ko", 8));
+});
+
+test("an opening of music takes the language of the first speech", () => {
+  const labels = ["en", "en", "ja", "ja", "ja"];
+  const quiet = [true, true, false, false, false];
+  assert.deepEqual(inheritQuiet(labels, quiet), run("ja", 5));
+});
+
+test("a real change of language between spoken cells is kept", () => {
+  const labels = ["en", "en", "en", "zh", "zh", "zh"];
+  const quiet = run(false, 6);
+  assert.deepEqual(smoothLabels(inheritQuiet(labels, quiet)), labels);
+});
+
+test("a clip nobody speaks in is left as it was", () => {
+  assert.deepEqual(inheritQuiet(["en", "cy", "en"], run(true, 3)), ["en", "cy", "en"]);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

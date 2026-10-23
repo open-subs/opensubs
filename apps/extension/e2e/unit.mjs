@@ -2,6 +2,7 @@
 //
 // Run with:  node --experimental-strip-types e2e/unit.mjs
 import { sameness, stitch, cueAt, toSrt, toVtt, OVERLAP_S } from "../src/lib/seam.ts";
+import { addEvidence, chooseLanguages, settledLanguage, LOCK_S } from "../src/lib/autolang.ts";
 
 let pass = 0;
 const fails = [];
@@ -537,6 +538,70 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   ok("the Firefox overlay is only copied over the Firefox build",
     existsSync(join(root, "scripts", "copy-static.mjs"))
     && /_locales\.firefox/.test(readFileSync(join(root, "scripts", "copy-static.mjs"), "utf8")));
+}
+
+
+// --- automatic language, across a capture ---------------------------------
+//
+// One Korean video came out with English and Japanese lines in it, and
+// everything after a minute and a half in English: each window decided its
+// own language, and the first window that agreed with itself -- a stall
+// and a short line, read as English -- fixed the language for the rest.
+// The rule now decides on everything heard so far; these are its numbers.
+
+{
+  eq("nothing heard is no language", chooseLanguages({}), null);
+  eq("a breath of evidence is still nothing", chooseLanguages({ en: 0.4 }), null);
+  eq("and nothing settles on it", settledLanguage({ en: 0.4 }), null);
+}
+
+{
+  // The opening of the video: two windows of Korean speech that Whisper
+  // Tiny also hears a little Japanese and English in, then a window of
+  // stalled playback with one short line in it. The old rule locked that
+  // third window's English, because it was the first to agree with itself.
+  const total = {};
+  addEvidence(total, { ko: 7.1, ja: 2.4, en: 1.6 });
+  eq("the first window is read in what it mostly heard", chooseLanguages(total), ["ko"]);
+  addEvidence(total, { ko: 9.8, ja: 3.0, zh: 0.9 });
+  addEvidence(total, { en: 1.3, ko: 0.4 });
+  eq("a stalled window with an English-sounding line does not move it", chooseLanguages(total), ["ko"]);
+  eq("not settled on twenty seconds", settledLanguage(total), null);
+  addEvidence(total, { ko: 11.2, ja: 1.9 });
+  addEvidence(total, { ko: 10.4, en: 0.8 });
+  eq("settled on Korean once there is enough of it", settledLanguage(total), "ko");
+}
+
+{
+  // Stray readings never become a second language, however long it runs.
+  const total = {};
+  for (let i = 0; i < 20; i += 1) addEvidence(total, { ko: 12, ja: 2.5, en: 1.5 });
+  eq("a long capture of strays is still one language", chooseLanguages(total), ["ko"]);
+}
+
+{
+  // An English report around a Chinese interview: both are real.
+  const total = {};
+  addEvidence(total, { en: 16, zh: 1 });
+  addEvidence(total, { en: 15 });
+  addEvidence(total, { zh: 14, en: 2 });
+  addEvidence(total, { zh: 15 });
+  eq("two languages that both hold real time are both offered", chooseLanguages(total), ["en", "zh"]);
+  eq("and a bilingual capture never settles on one", settledLanguage(total), null);
+}
+
+{
+  // One misheard sentence early on is not a second language.
+  const total = addEvidence({}, { ko: 15, en: 6 });
+  eq("six seconds is not a second language", chooseLanguages(total), ["ko"]);
+}
+
+{
+  ok("settling needs at least LOCK_S of speech", settledLanguage({ ko: LOCK_S - 1 }) === null);
+  eq("and a clear majority of it", settledLanguage({ ko: LOCK_S * 0.6, ja: LOCK_S * 0.4 }), null);
+  const total = addEvidence({}, { ko: 5 });
+  addEvidence(total, { ko: NaN, ja: -2 });
+  eq("nonsense evidence is ignored", total, { ko: 5 });
 }
 
 console.log(`${pass} passed, ${fails.length} failed`);

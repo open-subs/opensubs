@@ -28,7 +28,7 @@ import {
 } from "mediabunny";
 
 import { load, planVoiced, transcriptFrom, transcriptFromKept, type Piece, type Segment, type Transcript } from "./engine";
-import { smoothLabels } from "./languages";
+import { inheritQuiet, smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
 import { hasSpeech, speechSpans } from "./vad";
 import { describeGpu, isIntegratedGpu, startsOnCpu, type GpuInfo } from "./device";
@@ -208,6 +208,8 @@ export interface AsrResult {
    * better one than an empty screen with no explanation.
    */
   noSpeech?: boolean;
+  /** What this clip said about its language, when `chooseLanguage` asked. */
+  heard?: LanguageEvidence;
 }
 
 export interface AsrOptions {
@@ -228,6 +230,26 @@ export interface AsrOptions {
    * cannot, because Korean is not on the ballot.
    */
   secondLanguage?: string;
+  /**
+   * Decide the language from evidence gathered across clips, instead of
+   * detecting it afresh in this one.
+   *
+   * Only consulted when no language is named and the model is
+   * multilingual. The clip is read for language evidence first (see
+   * `languageEvidence`), the caller is handed it, and the clip is then
+   * transcribed in whatever the caller returns: one language, two (which
+   * detection then chooses between, as with `secondLanguage`), or null
+   * for "nothing heard yet" -- the clip comes back with no lines rather
+   * than with whatever Whisper writes over silence in a language picked
+   * at random.
+   *
+   * For a caller that sees a recording one short clip at a time. Each
+   * clip deciding for itself is how a single Korean video came out in
+   * Korean, English and Japanese: a twenty-second clip with a stall in it
+   * is too little to trust, and a clip that happens to agree with itself
+   * in the wrong language is the worst case, not the safe one.
+   */
+  chooseLanguage?: (heard: LanguageEvidence) => string[] | null;
   onProgress?: (progress: AsrProgress) => void;
   signal?: AbortSignal;
   /**
@@ -972,6 +994,104 @@ interface WhisperInternals {
   processor(audio: Float32Array): Promise<{ input_features: unknown }>;
 }
 
+/** What one detection window heard. */
+export interface CellReading {
+  /** The language Whisper ranks first after `<|startoftranscript|>`. */
+  language: string;
+  /**
+   * How sure it was of each language: the language tokens' own
+   * probabilities, renormalised over the language tokens alone, as
+   * Whisper's reference `detect_language` does. Only languages above 1%.
+   */
+  probabilities: Record<string, number>;
+  /**
+   * Whisper's own probability that nobody is speaking in the window, read
+   * from the same decoder step (the `<|nospeech|>` token). Null when the
+   * checkpoint's step could not be read.
+   */
+  noSpeech: number | null;
+}
+
+/**
+ * Read the language token Whisper predicts first for one window -- and,
+ * from the same decoder step, how sure it was and whether it heard a
+ * voice at all.
+ *
+ * The token alone is an argmax over ninety-nine languages with no
+ * "nobody spoke" among them, so a pause, a bar of music or a stalled
+ * video still names a language, and does it as firmly as a sentence
+ * does. The logits of that one step already say which kind of answer it
+ * is. Measured with Whisper Tiny on a Korean drama clip: four-second
+ * windows of speech read Korean at p = 0.9-1.0 with a no-speech
+ * probability of 0.0-0.4, and the windows of a stalled player read
+ * English at p = 0.38 with a no-speech probability of 0.94. Reading them
+ * costs nothing more than the token did.
+ */
+async function readCell(
+  pipe: WhisperInternals,
+  window: Float32Array,
+  idToLang: Map<number, string>,
+  suppress: number[],
+): Promise<CellReading | null> {
+  const { input_features } = await pipe.processor(window);
+  let logits: Float32Array | null = null;
+  // A logits processor sees the scores of the step it is handed.
+  const capture = (_ids: unknown, scores: { data: ArrayLike<number> }) => {
+    logits ??= Float32Array.from(scores.data);
+    return scores;
+  };
+  await pipe.model.generate({
+    inputs: input_features,
+    max_new_tokens: 1,
+    decoder_input_ids: [pipe.model.generation_config.decoder_start_token_id],
+    logits_processor: [capture],
+    // Only the languages the user has ruled out are suppressed, and the
+    // model's own list is set aside for this one step: it suppresses
+    // `<|nospeech|>`, whose probability is half of what this reads. The
+    // language is then taken over the language tokens alone, which is
+    // how Whisper's reference `detect_language` reads it, so nothing that
+    // list was keeping out can be chosen.
+    suppress_tokens: suppress,
+  });
+  const scores = logits as Float32Array | null;
+  if (!scores) return null;
+  let language: string | null = null;
+  let best = -Infinity;
+  for (const [id, code] of idToLang) {
+    const v = scores[id] ?? -Infinity;
+    if (v > best) {
+      best = v;
+      language = code;
+    }
+  }
+  if (!language || !Number.isFinite(best)) return null;
+
+  // Softmax over the language tokens, for how sure it was among languages.
+  let top = -Infinity;
+  for (const id of idToLang.keys()) top = Math.max(top, scores[id] ?? -Infinity);
+  let sum = 0;
+  for (const id of idToLang.keys()) sum += Math.exp((scores[id] ?? -Infinity) - top);
+  const probabilities: Record<string, number> = {};
+  for (const [id, code] of idToLang) {
+    const p = Math.exp((scores[id] ?? -Infinity) - top) / sum;
+    if (p >= 0.01) probabilities[code] = p;
+  }
+
+  // And over the whole vocabulary for `<|nospeech|>`, which is how
+  // Whisper's own decoder reads it. It sits one below
+  // `<|notimestamps|>` in every multilingual checkpoint.
+  const noTimestamps = pipe.model.generation_config.no_timestamps_token_id;
+  let noSpeech: number | null = null;
+  if (typeof noTimestamps === "number" && Number.isFinite(scores[noTimestamps - 1])) {
+    let max = -Infinity;
+    for (const v of scores) if (v > max) max = v;
+    let total = 0;
+    for (const v of scores) total += Math.exp(v - max);
+    noSpeech = Math.exp(scores[noTimestamps - 1] - max) / total;
+  }
+  return { language, probabilities, noSpeech };
+}
+
 /** Read the language token Whisper predicts first for one window. */
 async function detectWindow(
   pipe: WhisperInternals,
@@ -979,28 +1099,95 @@ async function detectWindow(
   idToLang: Map<number, string>,
   suppress: number[],
 ): Promise<string | null> {
-  const { input_features } = await pipe.processor(window);
-  const out = (await pipe.model.generate({
-    inputs: input_features,
-    max_new_tokens: 1,
-    decoder_input_ids: [pipe.model.generation_config.decoder_start_token_id],
-    // Appended to the model's own list rather than replacing it: this
-    // suppresses the languages the user has ruled out, and must not
-    // quietly un-suppress everything Whisper suppresses for its own
-    // reasons.
-    ...(suppress.length > 0
-      ? {
-          suppress_tokens: [
-            ...(pipe.model.generation_config.suppress_tokens ?? []),
-            ...suppress,
-          ],
-        }
-      : {}),
-  })) as { sequences?: { tolist(): unknown[] }[] } & { tolist?: () => unknown[] }[];
-  const first = (out as { sequences?: { tolist(): unknown[] }[] }).sequences?.[0] ?? out[0];
-  const ids = first?.tolist?.() as (number | bigint)[] | undefined;
-  if (!ids?.length) return null;
-  return idToLang.get(Number(ids[ids.length - 1])) ?? null;
+  return (await readCell(pipe, window, idToLang, suppress))?.language ?? null;
+}
+
+/**
+ * Every four-second cell's reading, unsmoothed, with the model already
+ * loaded by `loadLocalModel`. A diagnostic: the extension's e2e prints it
+ * so a rule about language readings can be checked against real ones.
+ */
+export async function probeLanguageCells(
+  audio: Float32Array,
+): Promise<{ at: number; language: string; p: number; noSpeech: number | null }[]> {
+  const pipe = (await pipelinePromise) as unknown as WhisperInternals;
+  const langToId = pipe.model?.generation_config?.lang_to_id;
+  if (!langToId) return [];
+  const idToLang = new Map(
+    Object.entries(langToId).map(([token, id]) => [id, token.replace(/[<|>]/g, "")]),
+  );
+  const cell = DETECT_WINDOW_S * TARGET_SAMPLE_RATE;
+  const out: { at: number; language: string; p: number; noSpeech: number | null }[] = [];
+  for (let i = 0; i * cell < audio.length; i += 1) {
+    const reading = await readCell(pipe, audio.slice(i * cell, Math.min((i + 1) * cell, audio.length)), idToLang, []);
+    if (reading) {
+      out.push({
+        at: i * DETECT_WINDOW_S,
+        language: reading.language,
+        p: reading.probabilities[reading.language] ?? 0,
+        noSpeech: reading.noSpeech,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Seconds of speech heard in each language: a soft count, so a window that
+ * was 60% sure of Korean and 30% of Japanese adds to both in proportion.
+ */
+export type LanguageEvidence = Record<string, number>;
+
+/**
+ * Above this probability of `<|nospeech|>`, a window's vote is not counted.
+ *
+ * Whisper's reference decoder treats 0.6 as "nobody spoke" (paired with a
+ * low log-probability). Below it, the vote is still scaled by the chance
+ * that somebody did.
+ */
+const NO_SPEECH_GATE = 0.6;
+
+/**
+ * What a clip says about which language it is in, read the way
+ * `languageRuns` reads it -- four-second windows -- but kept as evidence
+ * instead of turned into runs.
+ *
+ * For a caller that sees one short clip at a time and has to decide across
+ * many of them, as a live capture does: twenty seconds of audio is too
+ * little to trust a language on, and a stretch of stalled playback or
+ * music inside it votes as confidently as speech. The evidence from each
+ * clip can be added up instead, and only the windows that heard a voice
+ * contribute to it.
+ */
+async function languageEvidence(
+  transcriber: unknown,
+  audio: Float32Array,
+  signal?: AbortSignal,
+): Promise<LanguageEvidence | null> {
+  const pipe = transcriber as WhisperInternals;
+  const langToId = pipe.model?.generation_config?.lang_to_id;
+  if (!langToId) return null;
+  const idToLang = new Map(
+    Object.entries(langToId).map(([token, id]) => [id, token.replace(/[<|>]/g, "")]),
+  );
+  const cell = DETECT_WINDOW_S * TARGET_SAMPLE_RATE;
+  const cells = Math.max(1, Math.ceil(audio.length / cell));
+  const heard: LanguageEvidence = {};
+  for (let i = 0; i < cells; i += 1) {
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    const window = audio.slice(i * cell, Math.min((i + 1) * cell, audio.length));
+    // A sliver at the end is mostly padding, and reads as anything.
+    if (window.length < TARGET_SAMPLE_RATE) continue;
+    const reading = await readCell(pipe, window, idToLang, []);
+    if (!reading) continue;
+    const voice = reading.noSpeech === null ? 1 : 1 - reading.noSpeech;
+    if (reading.noSpeech !== null && reading.noSpeech >= NO_SPEECH_GATE) continue;
+    const seconds = (window.length / TARGET_SAMPLE_RATE) * voice;
+    for (const [code, p] of Object.entries(reading.probabilities)) {
+      heard[code] = (heard[code] ?? 0) + seconds * p;
+    }
+  }
+  return heard;
 }
 
 /**
@@ -1037,13 +1224,16 @@ async function languageRuns(
   const cell = DETECT_WINDOW_S * TARGET_SAMPLE_RATE;
   const cells = Math.max(1, Math.ceil(audio.length / cell));
   const labels: string[] = [];
+  const quiet: boolean[] = [];
 
   for (let i = 0; i < cells; i += 1) {
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     // `slice`, not `subarray`: a copy with its own buffer, because what
     // reaches an ONNX session should not depend on a view's byteOffset.
     const window = audio.slice(i * cell, Math.min((i + 1) * cell, audio.length));
-    labels.push((await detectWindow(pipe, window, idToLang, suppress)) ?? allowed[0] ?? "en");
+    const reading = await readCell(pipe, window, idToLang, suppress);
+    labels.push(reading?.language ?? allowed[0] ?? "en");
+    quiet.push(reading?.noSpeech != null && reading.noSpeech >= NO_SPEECH_GATE);
     onProgress?.({
       stage: "transcribing",
       fraction: (i + 1) / cells,
@@ -1051,6 +1241,9 @@ async function languageRuns(
     });
   }
 
+  // A cell nobody spoke in has no vote: over silence or music Whisper
+  // names a language as firmly as over speech, usually English.
+  inheritQuiet(labels, quiet);
   smoothLabels(labels);
 
   const runs: LanguageRun[] = [];
@@ -1386,10 +1579,32 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     primary && options.secondLanguage && options.secondLanguage !== "none"
       ? options.secondLanguage
       : null;
-  const named = [primary, secondary]
+  let named = [primary, secondary]
     .filter((code): code is string => Boolean(code))
     .map(whisperCode)
     .filter((code, i, all) => all.indexOf(code) === i);
+
+  // The caller decides the language across clips; this clip only adds its
+  // evidence. See `chooseLanguage`.
+  let heard: LanguageEvidence | undefined;
+  if (named.length === 0 && !englishOnly && options.chooseLanguage) {
+    onProgress?.({ stage: "transcribing", fraction: null, note: "Listening for the language" });
+    const evidence = await languageEvidence(transcriber, audio, signal);
+    if (evidence) {
+      heard = evidence;
+      const chosen = options.chooseLanguage(evidence);
+      if (!chosen || chosen.length === 0) {
+        return {
+          transcript: { language: "auto", duration: 0, words: [], segments: [] },
+          audio: clipAudio,
+          audioOffset: 0,
+          noSpeech: true,
+          heard,
+        };
+      }
+      named = chosen.map(whisperCode).filter((code, i, all) => all.indexOf(code) === i);
+    }
+  }
 
   // Where each language starts and stops.
   //
@@ -1610,6 +1825,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
     // that audio began at the trim point.
     audioOffset: 0,
     languages: spoken,
+    heard,
   };
 }
 
