@@ -13,31 +13,61 @@ pub struct ModelOption {
     pub url: &'static str,
     pub size_bytes: u64,
     pub description: &'static str,
+    /// Transcribes English and nothing else. Said in the list, because a
+    /// `.en` model given Chinese writes English words nobody said, and the
+    /// list used to call one of them the good default without saying so.
+    pub english_only: bool,
 }
 
-pub static MODEL_OPTIONS: [ModelOption; 3] = [
+/// The models offered for download, multilingual first. The multilingual
+/// Base the installers carry is listed too (see `list_downloadable_models`),
+/// so after trying another model there is one click back to it.
+pub static MODEL_OPTIONS: [ModelOption; 5] = [
     ModelOption {
-        name: "tiny.en",
-        filename: "ggml-tiny.en.bin",
-        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
-        size_bytes: 77_704_715,
+        name: "tiny",
+        filename: "ggml-tiny.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+        size_bytes: 77_691_713,
         description: "fastest, roughest",
+        english_only: false,
     },
     ModelOption {
-        name: "base.en",
-        filename: "ggml-base.en.bin",
-        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
-        size_bytes: 147_964_211,
-        description: "good default",
+        name: "small",
+        filename: "ggml-small.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+        size_bytes: 487_601_967,
+        description: "more accurate than Base, about three times slower",
+        english_only: false,
     },
     ModelOption {
         name: "large-v3-turbo",
         filename: "ggml-large-v3-turbo.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
         size_bytes: 1_624_555_275,
-        description: "best quality, multilingual",
+        description: "best quality, slowest",
+        english_only: false,
+    },
+    ModelOption {
+        name: "tiny.en",
+        filename: "ggml-tiny.en.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
+        size_bytes: 77_704_715,
+        description: "fastest, for English speech",
+        english_only: true,
+    },
+    ModelOption {
+        name: "base.en",
+        filename: "ggml-base.en.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
+        size_bytes: 147_964_211,
+        description: "a little better than Base on English speech",
+        english_only: true,
     },
 ];
+
+/// The multilingual Base the installers carry, as the list shows it.
+pub const BUNDLED_NAME: &str = "base";
+pub const BUNDLED_DESCRIPTION: &str = "comes with the app; a good default for any language";
 
 /// `~/.cache/opensubs-models` -- the exact path the README already tells
 /// CLI users to populate manually. Deliberately NOT Tauri's app-specific
@@ -252,6 +282,9 @@ pub struct ModelOptionDto {
     pub description: String,
     pub already_downloaded: bool,
     pub local_path: Option<String>,
+    pub english_only: bool,
+    /// The model the installer carries: nothing to download.
+    pub bundled: bool,
 }
 
 fn model_option_to_dto(opt: &ModelOption, dir: &Path) -> ModelOptionDto {
@@ -264,16 +297,56 @@ fn model_option_to_dto(opt: &ModelOption, dir: &Path) -> ModelOptionDto {
         description: opt.description.to_string(),
         already_downloaded: downloaded,
         local_path: downloaded.then(|| dir.join(opt.filename).to_string_lossy().into_owned()),
+        english_only: opt.english_only,
+        bundled: false,
     }
 }
 
+/// The list the window shows: the model that came with the app first,
+/// when this build carries one, then the downloads.
+pub fn model_list(bundled: Option<&Path>, dir: &Path) -> Vec<ModelOptionDto> {
+    let carried = bundled.and_then(|path| {
+        let size = std::fs::metadata(path).ok()?.len();
+        Some(ModelOptionDto {
+            name: BUNDLED_NAME.to_string(),
+            filename: path.file_name()?.to_string_lossy().into_owned(),
+            url: String::new(),
+            size_bytes: size,
+            description: BUNDLED_DESCRIPTION.to_string(),
+            already_downloaded: true,
+            local_path: Some(path.to_string_lossy().into_owned()),
+            english_only: false,
+            bundled: true,
+        })
+    });
+    carried.into_iter().chain(MODEL_OPTIONS.iter().map(|o| model_option_to_dto(o, dir))).collect()
+}
+
 #[tauri::command]
-pub fn list_downloadable_models() -> Result<Vec<ModelOptionDto>, String> {
+pub fn list_downloadable_models(app: AppHandle) -> Result<Vec<ModelOptionDto>, String> {
     let dir = models_dir()?;
-    Ok(MODEL_OPTIONS
-        .iter()
-        .map(|o| model_option_to_dto(o, &dir))
-        .collect())
+    Ok(model_list(crate::commands::bundled_model(&app).as_deref(), &dir))
+}
+
+/// What the window says about the model in use.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInfoDto {
+    /// `None` when the file could not be read as a whisper.cpp model.
+    pub english_only: Option<bool>,
+    /// The path of the multilingual model the app came with, if any, for a
+    /// "switch back to it" button.
+    pub bundled_path: Option<String>,
+}
+
+/// Whether a model only knows English, judged from the file itself rather
+/// than its name, and where the app's own multilingual model is.
+#[tauri::command]
+pub fn describe_model(app: AppHandle, path: String) -> ModelInfoDto {
+    ModelInfoDto {
+        english_only: subs_whisper::model_is_english_only(Path::new(&path)),
+        bundled_path: crate::commands::bundled_model(&app).map(|p| p.to_string_lossy().into_owned()),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -324,9 +397,30 @@ pub async fn download_model(app: AppHandle, filename: String) -> Result<String, 
 mod tests {
     use super::*;
 
+    /// English-only models say so, multilingual Base and Small are on
+    /// offer, and the model the app came with is in the list to go back to.
+    #[test]
+    fn the_list_says_which_models_are_english_only_and_offers_the_bundled_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let bundled = dir.path().join("ggml-base.bin");
+        std::fs::write(&bundled, b"lmgg").unwrap();
+        let list = model_list(Some(&bundled), &dir.path().join("cache"));
+        assert!(list[0].bundled && !list[0].english_only && list[0].already_downloaded);
+        assert_eq!(list[0].local_path.as_deref(), Some(bundled.to_string_lossy().as_ref()));
+        for m in &list {
+            assert_eq!(m.english_only, m.filename.contains(".en."), "{}", m.filename);
+        }
+        let multilingual: Vec<&str> = list.iter().filter(|m| !m.english_only).map(|m| m.name.as_str()).collect();
+        assert!(multilingual.contains(&"base") && multilingual.contains(&"small"), "{multilingual:?}");
+        // No "good default" on an English-only model any more.
+        assert!(list.iter().filter(|m| m.english_only).all(|m| !m.description.contains("default")));
+        // A build without a bundled model lists only the downloads.
+        assert!(model_list(None, dir.path()).iter().all(|m| !m.bundled));
+    }
+
     #[test]
     fn every_curated_model_is_well_formed() {
-        assert_eq!(MODEL_OPTIONS.len(), 3);
+        assert_eq!(MODEL_OPTIONS.len(), 5);
         for opt in &MODEL_OPTIONS {
             assert!(!opt.name.is_empty());
             assert!(!opt.filename.is_empty());
@@ -464,6 +558,7 @@ mod tests {
             url: "https://example.invalid/ggml-tiny.en.bin",
             size_bytes: 11,
             description: "test fixture",
+            english_only: true,
         }
     }
 

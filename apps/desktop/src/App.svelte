@@ -5,6 +5,7 @@
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import Icon from "./lib/Icon.svelte";
   import AccountPanel from "./lib/AccountPanel.svelte";
+  import ErrorNote from "./lib/ErrorNote.svelte";
   import {
     InsufficientCredits,
     NotSignedIn,
@@ -31,6 +32,10 @@
     downloadModel,
     burn,
     reveal,
+    describeModel,
+    errorOf,
+    type UserError,
+    type ModelInfoDto,
     type MediaInfoDto,
     type FfmpegCheck,
     type StyleDto,
@@ -53,7 +58,7 @@
   let videoPath = $state<string | null>(null);
   let mediaInfo = $state<MediaInfoDto | null>(null);
   let probing = $state(false);
-  let probeError = $state<string | null>(null);
+  let probeError = $state<UserError | null>(null);
   let isDragOver = $state(false);
 
   let styles = $state<StyleDto[]>([]);
@@ -76,6 +81,35 @@
   let writeTxt = $state(false);
 
   let translateTo = $state("");
+
+  /**
+   * The script untranslated Chinese speech is written in. Whisper picks one
+   * by itself, differently from one video to the next, so it is set here:
+   * Traditional for a Traditional-Chinese system (Taiwan, Hong Kong, Macau),
+   * Simplified otherwise, and always shown so it can be changed. A
+   * translation into 简体 or 繁體 comes out in that script whatever this says.
+   */
+  type ChineseScript = "simplified" | "traditional";
+  function defaultChineseScript(): ChineseScript {
+    try {
+      const saved = localStorage.getItem("opensubs.chineseScript");
+      if (saved === "simplified" || saved === "traditional") return saved;
+    } catch {
+      // Storage unavailable: fall through to the system language.
+    }
+    const langs = navigator.languages?.length ? navigator.languages : [navigator.language];
+    const zh = langs.find((l) => l.toLowerCase().startsWith("zh"));
+    return zh && /hant|tw|hk|mo/i.test(zh) ? "traditional" : "simplified";
+  }
+  let chineseScript = $state<ChineseScript>(defaultChineseScript());
+  $effect(() => {
+    try {
+      localStorage.setItem("opensubs.chineseScript", chineseScript);
+    } catch {
+      // Not remembered; the default applies next time.
+    }
+  });
+  const translatesToChinese = $derived(/^zh/i.test(translateTo));
   /** "device": the offline model, free. "cloud": our servers, credits. */
   let translateVia = $state<"device" | "cloud">("device");
 
@@ -109,7 +143,20 @@
   let downloadPercent = $state(0);
   let downloadedBytes = $state(0);
   let downloadTotalBytes = $state<number | null>(null);
-  let downloadError = $state<string | null>(null);
+  let downloadError = $state<UserError | null>(null);
+  let modelInfo = $state<ModelInfoDto | null>(null);
+
+  // Whether the model in use only knows English, read from the file.
+  $effect(() => {
+    const path = modelPath;
+    modelInfo = null;
+    if (!path) return;
+    describeModel(path)
+      .then((info) => {
+        if (modelPath === path) modelInfo = info;
+      })
+      .catch(() => {});
+  });
 
   let ffmpeg = $state<FfmpegCheck | null>(null);
   let ffmpegOk = $derived(ffmpeg ? ffmpeg.found && ffmpeg.missing.length === 0 : null);
@@ -120,7 +167,7 @@
 
   let burning = $state(false);
   let progress = $state(0);
-  let burnError = $state<string | null>(null);
+  let burnError = $state<UserError | null>(null);
   let outputPath = $state<string | null>(null);
 
   /** The parsed clip. `end: null` runs to the end of the video. */
@@ -159,9 +206,14 @@
       : [],
   );
 
+  // A video with no sound has nothing to transcribe; the probe already
+  // knows, so the button says so instead of failing three seconds in.
+  const noAudio = $derived(!!mediaInfo && !mediaInfo.hasAudio);
+
   const canBurn = $derived(
     !!videoPath &&
       !!mediaInfo &&
+      !noAudio &&
       !!modelPath &&
       ffmpegOk === true &&
       !burning &&
@@ -249,7 +301,7 @@
     try {
       mediaInfo = await probe(path);
     } catch (e) {
-      probeError = String(e);
+      probeError = errorOf(e);
     } finally {
       probing = false;
     }
@@ -288,7 +340,7 @@
         try {
           downloadableModels = await listDownloadableModels();
         } catch (e) {
-          downloadError = String(e);
+          downloadError = errorOf(e);
         }
       }
     }
@@ -329,7 +381,7 @@
       );
       showModelDownloads = false;
     } catch (e) {
-      downloadError = String(e);
+      downloadError = errorOf(e);
     } finally {
       unlistenProgress?.();
       downloadingFilename = null;
@@ -363,6 +415,7 @@
       writeSrt,
       writeVtt,
       writeTxt,
+      chineseScript,
     };
   }
 
@@ -395,7 +448,9 @@
       pendingCloud = await transcribeForCloud(videoPath, modelPath, burnOptions());
       credits = await accountBalance().catch(() => credits);
     } catch (e) {
-      cloudError = String(e);
+      const err = errorOf(e);
+      if (err.kind === "englishOnlyModel" || err.kind === "noSpeech" || err.kind === "noAudio") burnError = err;
+      else cloudError = err.message + (err.details ? ` (${err.details})` : "");
     } finally {
       pricing = false;
     }
@@ -435,7 +490,7 @@
       outputPath = await burn(videoPath, selectedStyle, modelPath, null, options);
       progress = 100;
     } catch (e) {
-      burnError = String(e);
+      burnError = errorOf(e);
     } finally {
       unlistenProgress?.();
       burning = false;
@@ -447,8 +502,28 @@
     try {
       await reveal(outputPath);
     } catch (e) {
-      burnError = String(e);
+      burnError = errorOf(e);
     }
+  }
+
+  /** After the English-only warning: switch to the app's own model and go again. */
+  async function useBundledModelAndRetry() {
+    const bundled = modelInfo?.bundledPath;
+    if (!bundled) return;
+    modelPath = bundled;
+    try {
+      await setModelPath(bundled);
+    } catch (e) {
+      console.error("set_model_path failed", e);
+    }
+    burnError = null;
+    doBurn();
+  }
+
+  /** After the English-only warning: the person chose to go ahead. */
+  function burnAnyway() {
+    burnError = null;
+    void runBurn({ ...burnOptions(), allowEnglishOnly: true });
   }
 
   async function doInstallFfmpeg() {
@@ -615,7 +690,7 @@
             <p class="oa-mono">Probing&hellip;</p>
           {:else if probeError}
             <p class="filename">{fileName(videoPath)}</p>
-            <p class="error-text">{probeError}</p>
+            <div class="error-text"><ErrorNote error={probeError} /></div>
           {:else if mediaInfo}
             <p class="filename">{mediaInfo.filename}</p>
             <p class="oa-mono file-meta">
@@ -625,6 +700,9 @@
               {#if !mediaInfo.hasAudio}&middot; no audio{/if}
               {#if mediaInfo.isHdr}&middot; <span class="badge">HDR</span>{/if}
             </p>
+            {#if noAudio}
+              <p class="error-text">This video has no sound, so there is nothing to subtitle.</p>
+            {/if}
           {/if}
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick={chooseFile} disabled={burning}>
@@ -803,6 +881,19 @@
         <p class="oa-caption">Subtitle timings are unchanged; only the text is replaced.</p>
       {/if}
 
+      {#if !translatesToChinese}
+        <div class="field-row">
+          <label class="field field-wide">
+            <span class="field-label">Chinese subtitles</span>
+            <select class="input" bind:value={chineseScript} disabled={burning}>
+              <option value="simplified">简体 &middot; Simplified</option>
+              <option value="traditional">繁體 &middot; Traditional</option>
+            </select>
+          </label>
+        </div>
+        <p class="oa-caption">Used when the speech is Chinese{translateTo !== "" ? " and it is not translated" : ""}.</p>
+      {/if}
+
       <div class="checkbox-row">
         <label class="checkbox">
           <input type="checkbox" bind:checked={writeSrt} disabled={burning} />
@@ -824,7 +915,10 @@
     <h2 class="section-title">Model</h2>
     {#if modelPath}
       <div class="model-row">
-        <span class="oa-mono model-path">{fileName(modelPath)}</span>
+        <span class="model-name">
+          <span class="oa-mono model-path">{fileName(modelPath)}</span>
+          {#if modelInfo?.englishOnly}<span class="tag tag-warning">English only</span>{/if}
+        </span>
         <div class="model-row-actions">
           <button
             type="button"
@@ -871,13 +965,45 @@
       </div>
     {/if}
 
+    {#if modelInfo?.englishOnly}
+      <p class="oa-caption model-warning">
+        This model only understands English. Speech in any other language comes out as English
+        words.
+        {#if modelInfo.bundledPath && modelPath !== modelInfo.bundledPath}
+          <button
+            type="button"
+            class="link-btn"
+            disabled={burning || downloadingFilename !== null}
+            onclick={async () => {
+              modelPath = modelInfo!.bundledPath;
+              try {
+                await setModelPath(modelInfo!.bundledPath!);
+              } catch (e) {
+                console.error("set_model_path failed", e);
+              }
+            }}>Use Base (multilingual), which came with the app</button
+          >
+        {/if}
+      </p>
+    {/if}
+
     {#if showModelDownloads}
       <div class="model-download-list">
         {#each downloadableModels as m (m.filename)}
           <div class="model-download-row">
             <div class="model-download-info">
-              <span class="model-download-name">{m.name}</span>
-              <span class="oa-caption">{formatModelSize(m.sizeBytes)} &middot; {m.description}</span>
+              <span class="model-download-name">
+                {m.name}
+                {#if m.englishOnly}
+                  <span class="tag tag-warning">English only</span>
+                {:else}
+                  <span class="tag">Multilingual</span>
+                {/if}
+                {#if m.bundled}<span class="tag tag-free">Included</span>{/if}
+              </span>
+              <span class="oa-caption">
+                {m.bundled ? m.description : `${formatModelSize(m.sizeBytes)} · ${m.description}`}
+              </span>
             </div>
             {#if downloadingFilename === m.filename}
               <div class="model-download-progress">
@@ -924,17 +1050,44 @@
           </div>
         {/each}
         {#if downloadError}
-          <p class="error-text">{downloadError}</p>
+          <div class="error-text"><ErrorNote error={downloadError} /></div>
         {/if}
       </div>
     {/if}
   </section>
 
   {#if burnError}
-    <div class="banner banner-danger">
-      <Icon name="alert-triangle" />
-      <p>{burnError}</p>
-    </div>
+    {#if burnError.kind === "noSpeech"}
+      <div class="banner banner-info" role="status">
+        <Icon name="info" />
+        <div class="banner-body">
+          <strong>No speech found</strong>
+          <ErrorNote error={burnError} />
+        </div>
+      </div>
+    {:else if burnError.kind === "englishOnlyModel"}
+      <div class="banner banner-warning" role="alert">
+        <Icon name="alert-triangle" />
+        <div class="banner-body">
+          <ErrorNote error={burnError} />
+          <div class="banner-actions">
+            {#if modelInfo?.bundledPath}
+              <button type="button" class="btn btn-secondary btn-sm" onclick={() => void useBundledModelAndRetry()}>
+                Use Base (multilingual) and burn
+              </button>
+            {/if}
+            <button type="button" class="btn btn-ghost btn-sm" onclick={burnAnyway}>Burn anyway</button>
+          </div>
+        </div>
+      </div>
+    {:else}
+      <div class="banner banner-danger" role="alert">
+        <Icon name="alert-triangle" />
+        <div class="banner-body">
+          <ErrorNote error={burnError} />
+        </div>
+      </div>
+    {/if}
   {/if}
 
   {#if outputPath}
@@ -1030,7 +1183,9 @@
             <button type="button" class="link-btn" onclick={() => void openSignIn()}>Sign in</button>
           </span>
         {/if}
-        {#if videoPath && !modelPath}
+        {#if noAudio}
+          <span class="oa-caption">This video has no sound to subtitle.</span>
+        {:else if videoPath && !modelPath}
           <span class="oa-caption">Pick a whisper model to enable burning.</span>
         {:else if ffmpegOk === false}
           <span class="oa-caption">ffmpeg needs {ffmpeg && !ffmpeg.found ? "installing" : "libass"} before this can run.</span>

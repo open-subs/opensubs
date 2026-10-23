@@ -26,6 +26,7 @@ pub fn run() {
             commands::install_ffmpeg,
             models::list_downloadable_models,
             models::download_model,
+            models::describe_model,
             commands::get_model_path,
             commands::set_model_path,
             commands::burn,

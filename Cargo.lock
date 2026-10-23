@@ -4327,6 +4327,7 @@ dependencies = [
 name = "subs-pipeline"
 version = "1.0.5"
 dependencies = [
+ "ferrous-opencc",
  "subs-asr",
  "subs-media",
  "subs-style",

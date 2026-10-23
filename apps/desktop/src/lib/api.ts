@@ -4,6 +4,40 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+/**
+ * A failure as the Rust side reports it (`UserError` in commands.rs): a
+ * sentence for the person, and the technical text -- with the home
+ * directory taken out -- for a "Details" toggle.
+ */
+export interface UserError {
+  kind:
+    | "noAudio"
+    | "unreadable"
+    | "noSpeech"
+    | "englishOnlyModel"
+    | "model"
+    | "ffmpeg"
+    | "clip"
+    | "style"
+    | "translation"
+    | "failed"
+    | "other";
+  message: string;
+  details: string | null;
+  /** For `englishOnlyModel`: the language the speech sounded like. */
+  language?: string | null;
+}
+
+/** Whatever a command threw, as a `UserError`. */
+export function errorOf(e: unknown): UserError {
+  if (e && typeof e === "object" && "kind" in e && "message" in e) {
+    const u = e as UserError;
+    return { kind: u.kind, message: u.message, details: u.details ?? null, language: u.language ?? null };
+  }
+  const text = e instanceof Error ? e.message : String(e);
+  return { kind: "other", message: "Something went wrong.", details: text };
+}
+
 export interface MediaInfoDto {
   filename: string;
   displayWidth: number;
@@ -60,6 +94,10 @@ export interface BurnOptions {
   writeTxt?: boolean;
   /** Translations bought from cloud translation, for a priced transcript. */
   cloud?: { jobId: string; translations: string[] } | null;
+  /** The script untranslated Chinese speech is written in. */
+  chineseScript?: "simplified" | "traditional" | null;
+  /** Go ahead with an English-only model on speech that is not English. */
+  allowEnglishOnly?: boolean;
 }
 
 /** A transcript priced for cloud translation; see `transcribeForCloud`. */
@@ -155,11 +193,31 @@ export interface ModelOptionDto {
   description: string;
   alreadyDownloaded: boolean;
   localPath: string | null;
+  /** Transcribes English and nothing else. */
+  englishOnly: boolean;
+  /** The model the app came with; nothing to download. */
+  bundled: boolean;
 }
 
-/** The 3 curated models, each annotated with whether it's already sitting in ~/.cache/opensubs-models. */
+/**
+ * The model the app came with (when this build carries one), then the
+ * curated downloads, each annotated with whether it's already sitting in
+ * ~/.cache/opensubs-models.
+ */
 export function listDownloadableModels(): Promise<ModelOptionDto[]> {
   return invoke("list_downloadable_models");
+}
+
+export interface ModelInfoDto {
+  /** Null when the file could not be read as a whisper.cpp model. */
+  englishOnly: boolean | null;
+  /** The multilingual model the app came with, to switch back to. */
+  bundledPath: string | null;
+}
+
+/** Whether a model only knows English, judged from the file itself. */
+export function describeModel(path: string): Promise<ModelInfoDto> {
+  return invoke("describe_model", { path });
 }
 
 /**

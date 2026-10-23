@@ -5,7 +5,7 @@
   // than fetched from the Lucide CDN, since this app should work fully
   // offline like the rest of the OpenApps suite.
   interface Props {
-    name: "film" | "folder-open" | "check-circle" | "alert-triangle" | "upload" | "download" | "user";
+    name: "film" | "folder-open" | "check-circle" | "alert-triangle" | "info" | "upload" | "download" | "user";
     size?: number;
   }
   let { name, size = 18 }: Props = $props();
@@ -38,6 +38,10 @@
     <path d="M12 3.5 21.5 20h-19L12 3.5Z" />
     <path d="M12 10v4" />
     <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none" />
+  {:else if name === "info"}
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5" />
+    <circle cx="12" cy="8" r="0.5" fill="currentColor" stroke="none" />
   {:else if name === "upload"}
     <path d="M12 15V4M8 8l4-4 4 4" />
     <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />

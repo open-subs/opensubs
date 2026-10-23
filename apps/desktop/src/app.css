@@ -159,6 +159,18 @@ body {
   color: var(--danger-fg);
 }
 
+.banner-warning {
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+}
+
+.banner-info {
+  background: var(--info-bg);
+  color: var(--info-fg);
+}
+
+.banner-warning :global(svg),
+.banner-info :global(svg),
 .banner-danger :global(svg) {
   flex-shrink: 0;
   margin-top: 2px;
@@ -353,6 +365,22 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.model-warning {
+  margin: var(--space-2) 0 0;
+  color: var(--warning-fg);
+}
+
+.model-download-name .tag {
+  margin-left: var(--space-1, 4px);
 }
 
 .model-row-actions {
@@ -637,6 +665,11 @@ body {
 .tag-free {
   color: var(--text-brand);
   background: var(--brand-soft);
+}
+
+.tag-warning {
+  color: var(--warning-fg);
+  background: var(--warning-bg);
 }
 
 .features-toggle {
