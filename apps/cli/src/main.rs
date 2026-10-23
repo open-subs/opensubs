@@ -429,6 +429,7 @@ fn cmd_burn(b: &BurnArgs) -> i32 {
             Some(src) => TranslateRequest::to(target).from_language(src),
             None => TranslateRequest::to(target),
         }),
+        chinese_script: b.chinese.as_deref().and_then(subs_pipeline::ChineseScript::parse),
     };
 
     let planned = match plan_job(&spec, &info, transcriber.as_ref(), translator.as_deref()) {

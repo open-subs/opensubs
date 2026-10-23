@@ -4,6 +4,7 @@ mod ffmpeg_install;
 pub mod job;
 mod paths;
 pub mod progress;
+pub mod script;
 
 pub use ffmpeg_install::{
     brew_binary, install_ffmpeg_full, install_method, missing_filters, missing_from_listing,
@@ -11,3 +12,4 @@ pub use ffmpeg_install::{
 };
 pub use job::{ffmpeg_binary, plan_job, write_ass, JobError, JobSpec, PlannedJob};
 pub use progress::{NullSink, ProgressEvent, ProgressParser, ProgressSink};
+pub use script::ChineseScript;

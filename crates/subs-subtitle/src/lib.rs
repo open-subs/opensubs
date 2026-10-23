@@ -4,6 +4,7 @@
 //! lets the segmentation invariants be property-tested exhaustively.
 
 pub mod cue;
+pub mod fit;
 pub mod linebreak;
 pub mod parse;
 pub mod segment;
@@ -12,6 +13,7 @@ pub mod snap;
 pub mod width;
 
 pub use cue::{fmt_ass, fmt_srt, fmt_vtt, Cue};
+pub use fit::fit_cues;
 pub use linebreak::{wrap_lines, MAX_LINES};
 pub use parse::{parse_subtitles, ParseError};
 pub use segment::{segment, SegmentConfig};

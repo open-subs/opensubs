@@ -8,7 +8,7 @@ pub mod presets;
 pub mod template;
 
 pub use advanced::advanced_presets;
-pub use ass::{merge_bilingual, to_ass, EffectOn};
+pub use ass::{line_capacity, merge_bilingual, to_ass, EffectOn};
 pub use color::Rgba;
 pub use json::{from_json_str, to_json_string, StyleError};
 pub use presets::{preset_by_name, presets};

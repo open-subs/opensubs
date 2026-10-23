@@ -36,6 +36,8 @@ opensubs burn <INPUT> [options]
       --srt <PATH>         also write a sidecar .srt
       --vtt <PATH>         also write a sidecar .vtt
       --source-srt <PATH>  with --translate-to, also write the spoken-language .srt
+      --chinese <SCRIPT>   Chinese speech as simplified or traditional
+                           (default: as Whisper wrote it)
 
   misc
       --ffmpeg <PATH>      ffmpeg binary (default: search PATH)
@@ -88,6 +90,8 @@ pub struct BurnArgs {
     pub asr: AsrChoice,
     pub language: Option<String>,
     pub translate_to: Option<String>,
+    /// `simplified` or `traditional`, for untranslated Chinese speech.
+    pub chinese: Option<String>,
     pub srt: Option<PathBuf>,
     pub vtt: Option<PathBuf>,
     pub source_srt: Option<PathBuf>,
@@ -226,6 +230,7 @@ fn parse_burn(rest: &[String]) -> Result<BurnArgs, UsageError> {
     let mut mock: Option<PathBuf> = None;
     let mut language: Option<String> = None;
     let mut translate_to: Option<String> = None;
+    let mut chinese: Option<String> = None;
     let mut srt: Option<PathBuf> = None;
     let mut vtt: Option<PathBuf> = None;
     let mut source_srt: Option<PathBuf> = None;
@@ -275,6 +280,14 @@ fn parse_burn(rest: &[String]) -> Result<BurnArgs, UsageError> {
             }
             "--language" => {
                 language = Some(take_value(tok)?);
+                i += 2;
+            }
+            "--chinese" => {
+                let v = take_value(tok)?;
+                if !matches!(v.as_str(), "simplified" | "traditional") {
+                    return Err(UsageError::msg(format!("--chinese takes simplified or traditional, not '{v}'")));
+                }
+                chinese = Some(v);
                 i += 2;
             }
             "--mock" => {
@@ -462,6 +475,7 @@ fn parse_burn(rest: &[String]) -> Result<BurnArgs, UsageError> {
         asr,
         language,
         translate_to,
+        chinese,
         srt,
         vtt,
         source_srt,

@@ -120,6 +120,35 @@ fn line_room(style: &StyleTemplate, play_res: (u32, u32), px: f64, scale: f64) -
     (f64::from(play_res.0) - 40.0 - 2.0 * border).max(px) * 0.97
 }
 
+/// The width of an average character of spaced text, as a share of the ASS
+/// font size, for deciding how many fit on a line *before* the text is cut
+/// into cues.
+///
+/// Measured on a burned 1080x1920 frame in the Shorts look (type 125 px
+/// tall, the system's fallback for Inter): four lines of 13 to 15
+/// characters were 704 to 728 px wide, 0.38 to 0.43 of the size per
+/// character, outline included. This takes 0.46, a little over the widest,
+/// because the number decides how much text a cue may hold -- a cue one
+/// line too long is the defect it exists to prevent -- and capitals and
+/// wide letters run wider than lowercase prose.
+const LATIN_FIT: f64 = 0.46;
+
+/// How many characters fit on one line of a `play_res` frame in `style`:
+/// `(spaced scripts, Chinese and Japanese)`.
+///
+/// What the segmenter needs to cut cues that stay within two lines on the
+/// frame they are drawn on. The same cue that is two lines at 16:9 was six
+/// on a 1080x1920 frame in the Shorts look, whose type is 125 px tall there
+/// and whose line holds about fifteen characters, not the 42 a broadcast
+/// line is cut to.
+pub fn line_capacity(style: &StyleTemplate, play_res: (u32, u32)) -> (usize, usize) {
+    let px = (style.size_pct / 100.0 * f64::from(play_res.1)).round().max(1.0);
+    let room = line_room(style, play_res, px, 1.0);
+    let latin = (room / (LATIN_FIT * px)).floor() as usize;
+    let cjk = (room / (CJK_ADVANCE * px)).floor() as usize;
+    (latin.max(1), cjk.max(1))
+}
+
 /// Mark where a line of Chinese or Japanese has to break to fit the frame.
 ///
 /// A vertical 360x640 video burned a 28-character Chinese cue on a
@@ -1487,6 +1516,20 @@ mod tests {
         // Without this, outlines do not scale with PlayRes and look wrong
         // at anything but the authoring resolution.
         assert!(to_ass(&cues(), &style(), (1280, 720)).contains("ScaledBorderAndShadow: yes"));
+    }
+
+    #[test]
+    fn the_line_holds_fewer_characters_on_a_vertical_frame_in_large_type() {
+        let shorts = crate::preset_by_name("Shorts").unwrap();
+        let clean = crate::preset_by_name("Clean").unwrap();
+        let (vertical, _) = line_capacity(&shorts, (1080, 1920));
+        assert!((15..=19).contains(&vertical), "{vertical}");
+        // The same look on a landscape frame has room for a broadcast line.
+        assert!(line_capacity(&shorts, (1920, 1080)).0 >= 42);
+        assert!(line_capacity(&clean, (1920, 1080)).0 >= 42);
+        // Chinese at Shorts size on a vertical frame: about eleven.
+        let (_, cjk) = line_capacity(&shorts, (1080, 1920));
+        assert!((10..=12).contains(&cjk), "{cjk}");
     }
 
     #[test]

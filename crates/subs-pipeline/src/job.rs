@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 use subs_asr::{AsrError, AsrOptions, AudioRef, Transcriber, Transcript};
 use subs_media::{burn_args, BurnJob, MediaInfo, OutputSize, TrimRange, VideoEncoder};
-use subs_style::{to_ass, StyleTemplate};
-use subs_subtitle::{segment, Cue, SegmentConfig};
+use subs_style::{line_capacity, to_ass, StyleTemplate};
+use subs_subtitle::{fit_cues, segment, Cue, SegmentConfig};
+
+use crate::script::{script_for, ChineseScript};
 use subs_translate::{translate_cues, TranslateError, TranslateRequest, Translator};
 
 #[derive(Debug, thiserror::Error)]
@@ -35,6 +37,10 @@ pub struct JobSpec {
     /// Translate the subtitles before burning them. `None` burns the
     /// language that was spoken.
     pub translate: Option<TranslateRequest>,
+    /// The script untranslated Chinese speech comes out in. `None` leaves
+    /// it in whichever script Whisper wrote. A translation into `zh-Hans`
+    /// or `zh-Hant` always comes out in that script, whatever this says.
+    pub chinese_script: Option<ChineseScript>,
 }
 
 impl JobSpec {
@@ -61,6 +67,7 @@ impl JobSpec {
             trim: TrimRange::FULL,
             size: OutputSize::Source,
             translate: None,
+            chinese_script: None,
         }
     }
 }
@@ -113,11 +120,38 @@ pub fn plan_job(
         transcript.shift(info.start_time);
     }
 
-    let source_cues = segment(&transcript, info.fps, &SegmentConfig::default());
+    // PlayRes must follow the dimensions actually encoded: the *display*
+    // dimensions (or rotated phone footage renders subtitles sideways),
+    // after any resize (or the subtitles are scaled along with the
+    // picture).
+    let play_res = spec.size.resolve(info.display_dimensions());
+
+    // Cut for the line the frame really has. The broadcast 42 characters
+    // a line assumes a landscape frame and ordinary type; Shorts on a
+    // vertical video holds about fifteen, and a cue cut for 42 a line was
+    // drawn there on six.
+    let (latin, cjk) = line_capacity(&spec.style, play_res);
+    let config = SegmentConfig::default().fitting(latin, cjk);
+    let target = spec.translate.as_ref().map(|r| r.target.as_str());
+    // Chinese "translated" into Chinese is a choice of script, not a
+    // translation: the offline translator hands it back unchanged, and
+    // re-wrapping it as a translation put spaces round every number. The
+    // target's script is applied to the spoken text instead.
+    let same_language = target.is_some_and(|t| base_language(t) == base_language(&transcript.language));
+    let spoken_script = if same_language {
+        script_for(target, &transcript.language, spec.chinese_script)
+    } else {
+        script_for(None, &transcript.language, spec.chinese_script)
+    };
+    let mut source_cues = segment(&transcript, info.fps, &config);
+    if let Some(script) = spoken_script {
+        source_cues = script.apply_to_cues(&source_cues);
+    }
 
     // Translation replaces cue text and nothing else -- see
     // `subs_translate` for why it cannot run before segmentation.
     let cues = match (&spec.translate, translator) {
+        (Some(_), _) if same_language => source_cues.clone(),
         (Some(req), Some(t)) => {
             // An offline translator has to be told the source language; a
             // hosted model works it out. Whisper already did, so say it.
@@ -135,11 +169,16 @@ pub fn plan_job(
         (None, _) => source_cues.clone(),
     };
 
-    // PlayRes must follow the dimensions actually encoded: the *display*
-    // dimensions (or rotated phone footage renders subtitles sideways),
-    // after any resize (or the subtitles are scaled along with the
-    // picture).
-    let play_res = spec.size.resolve(info.display_dimensions());
+    // The script last, after any translator: an offline one handed Chinese
+    // to translate into Chinese returns it as it came, in whichever script
+    // Whisper chose.
+    let cues = match script_for(target, &transcript.language, spec.chinese_script) {
+        Some(script) if target.is_some() => script.apply_to_cues(&cues),
+        _ => cues,
+    };
+    // A translation was wrapped for its own script's broadcast line, not
+    // for this frame; the spoken text was already cut for it.
+    let cues = fit_cues(&cues, latin, cjk);
 
     // The ASS document is the one artefact that lives on the *source*
     // timeline rather than the clip's.
@@ -196,6 +235,11 @@ pub fn plan_job(
     })
 }
 
+/// "zh-Hans" -> "zh", "pt-BR" -> "pt".
+fn base_language(code: &str) -> String {
+    code.split(['-', '_']).next().unwrap_or(code).to_ascii_lowercase()
+}
+
 /// Write the planned ASS file so ffmpeg can read it.
 pub fn write_ass(planned: &PlannedJob) -> std::io::Result<()> {
     if let Some(parent) = planned.ass_path.parent() {
@@ -228,6 +272,7 @@ mod tests {
     use subs_media::{ColorMeta, MediaInfo, Rational};
     use subs_style::preset_by_name;
     use subs_translate::MockTranslator;
+    use crate::script::ChineseScript;
 
     fn info(rotation: u32) -> MediaInfo {
         MediaInfo {
@@ -314,6 +359,74 @@ mod tests {
         assert!(joined.contains(&subs_media::filter_path(&p.ass_path)));
         assert!(joined.contains("out.mp4"));
         assert!(joined.contains("-c:a copy"));
+    }
+
+    fn spoken(language: &str, text_words: &[&str]) -> MockTranscriber {
+        let words = text_words
+            .iter()
+            .enumerate()
+            .map(|(i, w)| Word { start: i as f64 * 0.4, end: i as f64 * 0.4 + 0.35, text: w.to_string(), confidence: 1.0 })
+            .collect::<Vec<_>>();
+        MockTranscriber::from_transcript(Transcript {
+            language: language.into(),
+            duration: words.last().map_or(0.0, |w| w.end),
+            words,
+            segments: Vec::new(),
+        })
+    }
+
+    /// Traditional speech with Simplified asked for, both untranslated and
+    /// "translated" from Chinese to Chinese (which an offline translator
+    /// returns as it came).
+    #[test]
+    fn chinese_comes_out_in_the_script_asked_for() {
+        let heard = spoken("zh", &["我叫小王，", "今年30歲，", "在杭州一家軟件公司做設計師。"]);
+        let mut s = spec();
+        s.chinese_script = Some(ChineseScript::Simplified);
+        let p = plan_job(&s, &info(0), &heard, None).unwrap();
+        let all = |p: &PlannedJob| p.cues.iter().map(|c| c.lines.concat()).collect::<String>();
+        assert_eq!(all(&p), "我叫小王，今年30岁，在杭州一家软件公司做设计师。");
+
+        let echo = MockTranslator::new(Vec::new());
+        let mut s = spec();
+        s.chinese_script = Some(ChineseScript::Traditional);
+        s.translate = Some(TranslateRequest::to("zh-Hans"));
+        let p = plan_job(&s, &info(0), &heard, Some(&echo)).unwrap();
+        assert!(!all(&p).contains('歲'), "the target's script wins: {:?}", p.cues);
+
+        let mut s = spec();
+        s.translate = Some(TranslateRequest::to("zh-Hant"));
+        let simplified = spoken("zh", &["我叫小王，", "在杭州一家软件公司做设计师。"]);
+        let p = plan_job(&s, &info(0), &simplified, Some(&echo)).unwrap();
+        assert_eq!(all(&p), "我叫小王，在杭州一家軟體公司做設計師。");
+    }
+
+    #[test]
+    fn untranslated_chinese_without_a_setting_is_left_as_written() {
+        let heard = spoken("zh", &["今年30歲，"]);
+        let p = plan_job(&spec(), &info(0), &heard, None).unwrap();
+        assert_eq!(p.cues[0].text(), "今年30歲，");
+    }
+
+    /// Shorts on a 1080x1920 frame: every cue fits on two of the frame's
+    /// lines, where the same speech at 16:9 is cut for 42 characters a line.
+    #[test]
+    fn a_vertical_frame_in_large_type_gets_cues_of_two_lines() {
+        let text = "the lighthouse keeper wrote everything down. Every ship that passed the point that winter went into the book with its name and the hour";
+        let words: Vec<&str> = text.split(' ').collect();
+        let mut s = spec();
+        s.style = preset_by_name("Shorts").unwrap();
+        let mut vertical = info(0);
+        vertical.width = 1080;
+        vertical.height = 1920;
+        let p = plan_job(&s, &vertical, &spoken("en", &words), None).unwrap();
+        let (latin, _) = subs_style::line_capacity(&s.style, (1080, 1920));
+        for c in &p.cues {
+            assert!(c.lines.len() <= 2, "{c:?}");
+            assert!(c.lines.iter().all(|l| l.chars().count() <= latin), "{c:?} (room for {latin})");
+        }
+        let landscape = plan_job(&s, &info(0), &spoken("en", &words), None).unwrap();
+        assert!(landscape.cues.len() < p.cues.len());
     }
 
     #[test]

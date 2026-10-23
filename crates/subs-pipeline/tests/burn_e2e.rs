@@ -238,6 +238,7 @@ fn burns_subtitles_and_preserves_audio_colour_and_timing() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -324,6 +325,7 @@ fn silent_input_does_not_hard_fail() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -367,6 +369,7 @@ fn rotated_input_produces_ass_matching_the_display_orientation() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -428,6 +431,7 @@ fn ass_burn_draws_pixels_during_cues_and_not_in_the_gap() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
     write_ass(&planned).unwrap();
@@ -519,6 +523,7 @@ fn q3_vfr_input_is_burned_without_duplicating_or_dropping_a_frame() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -605,6 +610,7 @@ fn q6_rotated_input_burns_to_an_upright_portrait_video() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -755,6 +761,7 @@ fn hdr_source_actually_burns_and_lands_on_bt709() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
 
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
@@ -1008,6 +1015,7 @@ fn a_burn_runs_from_a_windows_shaped_path() {
         trim: TrimRange::FULL,
         size: OutputSize::Source,
         translate: None,
+        chinese_script: None,
     };
     let planned = plan_job(&spec, &info, &transcriber(), None).unwrap();
     write_ass(&planned).unwrap();

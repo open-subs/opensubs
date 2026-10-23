@@ -11,3 +11,6 @@ subs-style = { workspace = true }
 subs-subtitle = { workspace = true }
 subs-translate = { workspace = true }
 thiserror = { workspace = true }
+# Chinese script conversion with OpenCC's dictionaries, compiled in. The
+# same crate and version subs-m2m already uses.
+ferrous-opencc = "0.4"

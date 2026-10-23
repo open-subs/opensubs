@@ -1,5 +1,5 @@
-use crate::width::{join_tokens, joined_len};
-use crate::{enforce_gaps, line_budget, snap_to_frame, wrap_lines, Cue, MAX_LINES, MIN_GAP_FRAMES};
+use crate::width::{is_cjk_dominant, join_tokens, joined_len, MAX_CHARS_CJK, MAX_CHARS_LATIN};
+use crate::{enforce_gaps, snap_to_frame, wrap_lines, Cue, MAX_LINES, MIN_GAP_FRAMES};
 use subs_asr::{Transcript, Word};
 use subs_media::Rational;
 
@@ -13,6 +13,32 @@ pub struct SegmentConfig {
     pub min_gap_frames: u32,
     /// A silence at least this long always ends a cue.
     pub pause_split: f64,
+    /// How many characters fit on one line, for text in spaced scripts and
+    /// for Chinese and Japanese. The defaults are the broadcast ceilings
+    /// (42 and 20); a frame narrower than the type is large -- Shorts on a
+    /// vertical video fits about 14 -- passes what fits there, or a cue cut
+    /// for 42 characters a line is drawn on six.
+    pub latin_line_chars: usize,
+    pub cjk_line_chars: usize,
+}
+
+impl SegmentConfig {
+    /// The characters one line of `text` may hold.
+    pub fn budget(&self, text: &str) -> usize {
+        if is_cjk_dominant(text) {
+            self.cjk_line_chars
+        } else {
+            self.latin_line_chars
+        }
+    }
+
+    /// These limits, narrowed to what fits on a line of the frame. Never
+    /// widened: the broadcast ceilings are about reading, not room.
+    pub fn fitting(mut self, latin: usize, cjk: usize) -> Self {
+        self.latin_line_chars = self.latin_line_chars.min(latin.max(1));
+        self.cjk_line_chars = self.cjk_line_chars.min(cjk.max(1));
+        self
+    }
 }
 
 impl Default for SegmentConfig {
@@ -24,6 +50,8 @@ impl Default for SegmentConfig {
             max_lines: MAX_LINES,
             min_gap_frames: MIN_GAP_FRAMES,
             pause_split: 0.7,
+            latin_line_chars: MAX_CHARS_LATIN,
+            cjk_line_chars: MAX_CHARS_CJK,
         }
     }
 }
@@ -52,7 +80,7 @@ fn must_break(group: &[&Word], next: &Word, cfg: &SegmentConfig) -> bool {
     let mut tokens = tokens_of(group);
     tokens.push(next.text.as_str());
     let text = join_tokens(&tokens);
-    let budget = line_budget(&text);
+    let budget = cfg.budget(&text);
     let chars = joined_len(&tokens);
 
     // Two lines of `budget` characters is the hard capacity of a cue.
@@ -92,7 +120,7 @@ fn fits(words: &[&Word], cfg: &SegmentConfig) -> bool {
     }
     let tokens = tokens_of(words);
     let text = join_tokens(&tokens);
-    joined_len(&tokens) <= line_budget(&text) * cfg.max_lines
+    joined_len(&tokens) <= cfg.budget(&text) * cfg.max_lines
 }
 
 /// The silence between two adjacent groups.
@@ -275,7 +303,7 @@ fn recut<'a>(
 fn build_cue(group: &[&Word], fps: Rational, cfg: &SegmentConfig) -> Cue {
     let tokens = tokens_of(group);
     let text = join_tokens(&tokens);
-    let budget = line_budget(&text);
+    let budget = cfg.budget(&text);
     let chars = joined_len(&tokens);
 
     let start = group[0].start;
@@ -800,6 +828,35 @@ mod tests {
         let w = words(&[(0.0, 0.4, "这个"), (0.5, 0.9, "CapCut"), (1.0, 1.4, "工具")]);
         let cues = segment(&transcript(w), fps30(), &SegmentConfig::default());
         assert_eq!(cues[0].text(), "这个 CapCut 工具");
+    }
+
+    /// The cue from a vertical Shorts export that was drawn on six lines:
+    /// cut for the frame's fifteen characters a line, every cue is two.
+    #[test]
+    fn a_narrow_frame_gets_cues_that_fit_on_two_of_its_lines() {
+        let text = "the lighthouse keeper wrote everything down. Every ship that passed the point that winter went into the book";
+        let ws: Vec<&str> = text.split(' ').collect();
+        let specs: Vec<(f64, f64, &str)> =
+            ws.iter().enumerate().map(|(i, w)| (i as f64 * 0.3, i as f64 * 0.3 + 0.28, *w)).collect();
+        let t = transcript(words(&specs));
+        let wide = segment(&t, fps30(), &SegmentConfig::default());
+        assert!(wide.iter().any(|c| c.text().chars().count() > 30), "the default cuts long cues");
+        let narrow = segment(&t, fps30(), &SegmentConfig::default().fitting(15, 11));
+        // Cut to two of the frame's lines' worth of text...
+        for c in &narrow {
+            assert!(c.text().chars().count() <= 30, "{c:?}");
+        }
+        // ...which `fit_cues` then wraps, splitting where whole words do
+        // not fall evenly onto two lines.
+        for c in &crate::fit_cues(&narrow, 15, 11) {
+            assert!(c.lines.len() <= 2, "{c:?}");
+            for l in &c.lines {
+                assert!(l.chars().count() <= 15, "{l:?} in {c:?}");
+            }
+        }
+        // Nothing lost.
+        let joined: Vec<String> = narrow.iter().map(|c| c.text()).collect();
+        assert_eq!(joined.join(" "), text);
     }
 
     #[test]
