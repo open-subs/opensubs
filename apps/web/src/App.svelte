@@ -2695,14 +2695,14 @@
               {#if !hasVideo}
                 <p class="oa-caption file-meta">{t("No video loaded")}</p>
               {:else if hasDimensions}
-                <p class="oa-caption file-meta">
-                  <span class="oa-mono">{videoName}</span>
-                  &middot; {videoWidth}&times;{videoHeight}
-                  &middot; {formatDuration(videoDuration)}
+                <p class="oa-caption file-meta" title={videoName}>
+                  <span class="oa-mono file-name">{videoName}</span>
+                  <span class="file-facts">&middot; {videoWidth}&times;{videoHeight} &middot; {formatDuration(videoDuration)}</span>
                 </p>
               {:else}
-                <p class="oa-caption file-meta">
-                  <span class="oa-mono">{videoName}</span> &middot; {t("reading…")}
+                <p class="oa-caption file-meta" title={videoName}>
+                  <span class="oa-mono file-name">{videoName}</span>
+                  <span class="file-facts">&middot; {t("reading…")}</span>
                 </p>
               {/if}
               <label class="btn btn-ghost btn-sm" class:disabled={burning || transcribing}>

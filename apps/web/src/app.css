@@ -826,6 +826,32 @@ html {
   min-width: 0;
 }
 
+/* One line, whatever the file is called. A long name used to wrap to three
+   lines, and in the workspace's height-capped column every extra line came
+   off the video. The name gives way with an ellipsis (the whole name is the
+   row's tooltip); the size and length after it never do. */
+.workspace-output .file-row {
+  flex-wrap: nowrap;
+}
+
+.workspace-output .file-row .file-meta {
+  display: flex;
+  flex: 1 1 0%;
+  gap: 0.35em;
+  white-space: nowrap;
+}
+
+.workspace-output .file-row .file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-output .file-row .file-facts,
+.workspace-output .file-row .btn {
+  flex-shrink: 0;
+}
+
 /* A <label> styled as a button still needs the disabled look when its
    hidden input is disabled -- :disabled does not apply to the label. */
 .btn.disabled {
@@ -1328,6 +1354,30 @@ html {
   /* Never taller than the window, or the sticky panel scrolls past its
      own bottom and the cue list becomes unreachable. */
   max-height: calc(100vh - var(--space-8));
+}
+
+/* When the column is too short for everything, the cue list gives way and
+   scrolls; the picture and the row under it never do. Left to the default,
+   the stage was the item that shrank -- its overflow is hidden, so it could
+   go to nothing -- and the video lost its bottom edge, controls included:
+   121 px of it on a 1280x680 window with fifteen cues. */
+.workspace-output > .stage,
+.workspace-output > .file-row {
+  flex-shrink: 0;
+}
+
+.workspace-output .cue-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* And on a short window the picture is capped, so the cues keep room to be
+   worked on: on a 680 px window that leaves about 200 px of them rather
+   than 100. */
+@media (min-width: 62.0625rem) {
+  .workspace-output .stage video {
+    max-height: clamp(12rem, calc(100vh - 22rem), 60vh);
+  }
 }
 
 /* One settings panel at a time once there are cues. Sticky, like the
