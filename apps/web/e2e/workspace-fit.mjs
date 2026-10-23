@@ -65,7 +65,7 @@ if (made.status !== 0) {
 const PORTRAIT = readFileSync(portraitPath);
 
 const SHORT = "talk.mp4";
-const LONG = "@OpenRouter co-founder Alex Atallah on the _everyone is building the same thing_ take_.mp4";
+const LONG = "Quarterly all-hands recording, full session with questions from the floor and the closing remarks_final_v2.mp4";
 const srt = (n) =>
   Array.from({ length: n }, (_, i) => {
     const t = (s) => `00:00:${String(s).padStart(2, "0")},000`;
