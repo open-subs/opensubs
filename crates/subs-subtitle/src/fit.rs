@@ -38,69 +38,82 @@ fn ends_clause(piece: &str) -> bool {
 
 /// Every cue at most `MAX_LINES` lines of at most `latin`/`cjk` characters.
 pub fn fit_cues(cues: &[Cue], latin: usize, cjk: usize) -> Vec<Cue> {
+    fit_cues_indexed(cues, latin, cjk).into_iter().map(|(_, c)| c).collect()
+}
+
+/// [`fit_cues`], with the index of the input cue each output cue came
+/// from, for a caller that holds something per cue (per-word loudness) and
+/// has to share it out over the pieces of a split cue.
+pub fn fit_cues_indexed(cues: &[Cue], latin: usize, cjk: usize) -> Vec<(usize, Cue)> {
     let mut out = Vec::with_capacity(cues.len());
-    for cue in cues {
-        let text = cue.text();
-        let budget = if is_cjk_dominant(&text) { cjk } else { latin }.max(1);
-        let parts = pieces(&text);
-        let refs: Vec<&str> = parts.iter().map(String::as_str).collect();
-        let total = joined_len(&refs);
-        let fits_lines = cue.lines.len() <= MAX_LINES && cue.lines.iter().all(|l| l.chars().count() <= budget);
-        if fits_lines || refs.is_empty() {
-            out.push(cue.clone());
-            continue;
-        }
-        let rewrapped = wrap_lines(&refs, budget, MAX_LINES);
-        if rewrapped.len() <= MAX_LINES && rewrapped.iter().all(|l| l.chars().count() <= budget) {
-            out.push(Cue { start: cue.start, end: cue.end, lines: rewrapped });
-            continue;
-        }
-
-        // Greedy groups of what wraps onto two lines, ending at a clause mark
-        // where one falls in the last third of a group.
-        let capacity = budget * MAX_LINES;
-        let wraps = |g: &[&str]| {
-            let lines = wrap_lines(g, budget, MAX_LINES);
-            lines.len() <= MAX_LINES && lines.iter().all(|l| l.chars().count() <= budget)
-        };
-        let mut groups: Vec<Vec<&str>> = Vec::new();
-        let mut current: Vec<&str> = Vec::new();
-        for (i, p) in refs.iter().enumerate() {
-            let mut trial = current.clone();
-            trial.push(p);
-            if !current.is_empty() && !wraps(&trial) {
-                // Step back to a clause end if there is one late in the group.
-                let cut = current
-                    .iter()
-                    .rposition(|q| ends_clause(q))
-                    .filter(|&k| joined_len(&current[..=k]) * 3 >= capacity * 2)
-                    .map(|k| k + 1)
-                    .unwrap_or(current.len());
-                let rest = current.split_off(cut);
-                groups.push(std::mem::take(&mut current));
-                current = rest;
-            }
-            current.push(refs[i]);
-        }
-        if !current.is_empty() {
-            groups.push(current);
-        }
-
-        let span = cue.end - cue.start;
-        let mut at = cue.start;
-        let n = groups.len();
-        for (k, g) in groups.iter().enumerate() {
-            let share = joined_len(g) as f64 / total.max(1) as f64;
-            let end = if k + 1 == n { cue.end } else { (at + span * share).min(cue.end) };
-            let mut lines = wrap_lines(g, budget, MAX_LINES);
-            if lines.is_empty() {
-                lines = vec![join_tokens(g)];
-            }
-            out.push(Cue { start: at, end, lines });
-            at = end;
-        }
+    for (index, cue) in cues.iter().enumerate() {
+        let mut out_one = Vec::new();
+        fit_one(cue, latin, cjk, &mut out_one);
+        out.extend(out_one.into_iter().map(|c| (index, c)));
     }
     out
+}
+
+fn fit_one(cue: &Cue, latin: usize, cjk: usize, out: &mut Vec<Cue>) {
+    let text = cue.text();
+    let budget = if is_cjk_dominant(&text) { cjk } else { latin }.max(1);
+    let parts = pieces(&text);
+    let refs: Vec<&str> = parts.iter().map(String::as_str).collect();
+    let total = joined_len(&refs);
+    let fits_lines = cue.lines.len() <= MAX_LINES && cue.lines.iter().all(|l| l.chars().count() <= budget);
+    if fits_lines || refs.is_empty() {
+        out.push(cue.clone());
+        return;
+    }
+    let rewrapped = wrap_lines(&refs, budget, MAX_LINES);
+    if rewrapped.len() <= MAX_LINES && rewrapped.iter().all(|l| l.chars().count() <= budget) {
+        out.push(Cue { start: cue.start, end: cue.end, lines: rewrapped });
+        return;
+    }
+
+    // Greedy groups of what wraps onto two lines, ending at a clause mark
+    // where one falls in the last third of a group.
+    let capacity = budget * MAX_LINES;
+    let wraps = |g: &[&str]| {
+        let lines = wrap_lines(g, budget, MAX_LINES);
+        lines.len() <= MAX_LINES && lines.iter().all(|l| l.chars().count() <= budget)
+    };
+    let mut groups: Vec<Vec<&str>> = Vec::new();
+    let mut current: Vec<&str> = Vec::new();
+    for (i, p) in refs.iter().enumerate() {
+        let mut trial = current.clone();
+        trial.push(p);
+        if !current.is_empty() && !wraps(&trial) {
+            // Step back to a clause end if there is one late in the group.
+            let cut = current
+                .iter()
+                .rposition(|q| ends_clause(q))
+                .filter(|&k| joined_len(&current[..=k]) * 3 >= capacity * 2)
+                .map(|k| k + 1)
+                .unwrap_or(current.len());
+            let rest = current.split_off(cut);
+            groups.push(std::mem::take(&mut current));
+            current = rest;
+        }
+        current.push(refs[i]);
+    }
+    if !current.is_empty() {
+        groups.push(current);
+    }
+
+    let span = cue.end - cue.start;
+    let mut at = cue.start;
+    let n = groups.len();
+    for (k, g) in groups.iter().enumerate() {
+        let share = joined_len(g) as f64 / total.max(1) as f64;
+        let end = if k + 1 == n { cue.end } else { (at + span * share).min(cue.end) };
+        let mut lines = wrap_lines(g, budget, MAX_LINES);
+        if lines.is_empty() {
+            lines = vec![join_tokens(g)];
+        }
+        out.push(Cue { start: at, end, lines });
+        at = end;
+    }
 }
 
 #[cfg(test)]

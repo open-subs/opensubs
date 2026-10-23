@@ -11,7 +11,7 @@ pub use ffmpeg_whisper::{
 };
 pub use mock::MockTranscriber;
 pub use speech::{
-    aligned_words, fit_to_speech, has_speech, near_speech, plausible_alignment, retime, speech_seconds, transcript_from_speech, Span,
+    aligned_words, fit_to_speech, has_speech, map_back, near_speech, plausible_alignment, retime, transcript_from_voiced, trim_quiet_leads, voiced_plan, Levels, Piece, speech_seconds, transcript_from_speech, Span,
     TimedSegment, NEAR_SPEECH_S,
 };
 pub use transcript::{Segment, Transcript, Word};

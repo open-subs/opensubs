@@ -13,7 +13,7 @@ pub mod snap;
 pub mod width;
 
 pub use cue::{fmt_ass, fmt_srt, fmt_vtt, Cue};
-pub use fit::fit_cues;
+pub use fit::{fit_cues, fit_cues_indexed};
 pub use linebreak::{wrap_lines, MAX_LINES};
 pub use parse::{parse_subtitles, ParseError};
 pub use segment::{segment, SegmentConfig};

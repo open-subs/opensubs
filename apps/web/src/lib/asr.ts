@@ -27,10 +27,10 @@ import {
   Input,
 } from "mediabunny";
 
-import { load, transcriptFrom, type Segment, type Transcript } from "./engine";
+import { load, planVoiced, transcriptFrom, transcriptFromKept, type Piece, type Segment, type Transcript } from "./engine";
 import { smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
-import { hasSpeech, speechSeconds } from "./vad";
+import { hasSpeech, speechSpans } from "./vad";
 import { describeGpu, isIntegratedGpu, startsOnCpu, type GpuInfo } from "./device";
 import { passEnd, plannedWindows, windowProgress } from "./windows";
 import {
@@ -1303,7 +1303,7 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   const device: "webgpu" | "wasm" = options.device === "wasm" ? "wasm" : support.device;
 
   onProgress?.({ stage: "audio", fraction: 0, note: "Reading the audio" });
-  const audio = await extractAudio(
+  const clipAudio = await extractAudio(
     file,
     start,
     end,
@@ -1322,19 +1322,42 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   // `allowEmpty` callers -- one window of a live capture -- skip it. A
   // ten-second window of silence between two sentences is ordinary and
   // has its own handling; this test is about a whole clip.
+  // `audio` is what Whisper is shown; `clipAudio` is the clip. They differ
+  // when the speech plan below cuts silence or music out.
+  let audio = clipAudio;
+  /** The cut, when there was one; `null` when Whisper hears the whole clip. */
+  let pieces: Piece[] | null = null;
+  let voiceSpans: { start: number; end: number }[] = [];
   if (!allowEmpty) {
     onProgress?.({ stage: "audio", fraction: null, note: "Listening for a voice" });
     try {
-      const heard = await speechSeconds(audio, (fraction) =>
+      // The whole clip, not just enough to say somebody spoke: the answer
+      // is also *where*, and that is what times the first subtitle.
+      const heard = await speechSpans(clipAudio, (fraction) =>
         onProgress?.({ stage: "audio", fraction, note: "Listening for a voice" }),
       );
-      if (!hasSpeech(heard)) {
+      if (!hasSpeech({ seconds: heard.seconds, total: clipAudio.length / TARGET_SAMPLE_RATE, enough: false })) {
         return {
           transcript: { language: language ?? "auto", duration: 0, words: [], segments: [] },
-          audio,
+          audio: clipAudio,
           audioOffset: 0,
           noSpeech: true,
         };
+      }
+      // Show Whisper the speech only. Given ten seconds of silence and
+      // then a voice, it timed the first sentence from 0.0 s -- this model
+      // times sentences, not words, and a sentence's start is wherever its
+      // window began. Given only the speech, its times are the speech's
+      // own; `transcriptFromKept` puts them back on the clip's clock. The
+      // same plan, in the same Rust, serves the desktop's tests; the desktop
+      // itself also has word-level alignment, which these ONNX exports
+      // cannot provide.
+      await load();
+      const plan = planVoiced(heard.spans, clipAudio.length / TARGET_SAMPLE_RATE);
+      if (plan.length > 1 || plan[0].from > 0 || plan[0].to < clipAudio.length / TARGET_SAMPLE_RATE - 0.05) {
+        pieces = plan;
+        voiceSpans = heard.spans;
+        audio = cutTo(clipAudio, plan);
       }
     } catch (e) {
       // A VAD that cannot load must not stop a transcription. The worst
@@ -1576,14 +1599,45 @@ export async function transcribeLocally(options: AsrOptions): Promise<AsrResult>
   // Word timings come from the engine, shared with the desktop. See the
   // note in `transcribeRemotely` for why the load is asked for here.
   await load();
+  const spokenLanguage = spoken.length === 1 ? spoken[0] : "mixed";
   return {
-    transcript: transcriptFrom(segments, spoken.length === 1 ? spoken[0] : "mixed"),
-    audio,
+    transcript: pieces
+      ? transcriptFromKept(segments, pieces, voiceSpans, levelsOf(clipAudio), spokenLanguage)
+      : transcriptFrom(segments, spokenLanguage),
+    // The clip, on whose clock the transcript now is.
+    audio: clipAudio,
     // Whisper reports times from the start of the audio it was given, and
     // that audio began at the trim point.
     audioOffset: 0,
     languages: spoken,
   };
+}
+
+/** The level of `samples`, in dBFS, per 50 ms. */
+function levelsOf(samples: Float32Array): { frameS: number; db: number[] } {
+  const frameS = 0.05;
+  const n = Math.round(frameS * TARGET_SAMPLE_RATE);
+  const db: number[] = [];
+  for (let i = 0; i < samples.length; i += n) {
+    let sum = 0;
+    const end = Math.min(samples.length, i + n);
+    for (let k = i; k < end; k += 1) sum += samples[k] * samples[k];
+    db.push(Math.round(20 * Math.log10(Math.sqrt(sum / Math.max(1, end - i)) + 1e-9) * 10) / 10);
+  }
+  return { frameS, db };
+}
+
+/** The pieces of `samples` a speech plan keeps, at the places it puts them. */
+function cutTo(samples: Float32Array, plan: Piece[]): Float32Array {
+  const last = plan[plan.length - 1];
+  const out = new Float32Array(Math.ceil((last.at + last.to - last.from) * TARGET_SAMPLE_RATE));
+  for (const p of plan) {
+    const a = Math.max(0, Math.floor(p.from * TARGET_SAMPLE_RATE));
+    const b = Math.min(samples.length, Math.ceil(p.to * TARGET_SAMPLE_RATE));
+    const at = Math.round(p.at * TARGET_SAMPLE_RATE);
+    if (b > a) out.set(samples.subarray(a, Math.min(b, a + out.length - at)), at);
+  }
+  return out;
 }
 
 /**

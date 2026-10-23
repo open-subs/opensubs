@@ -34,6 +34,9 @@ import init, {
   maxEmphasisStrength,
   toSrt,
   transcriptFromSegments,
+  transcriptFromVoiced,
+  voicedPlan,
+  fitCuesToFrame,
   toTxt,
   toVtt,
   translateRequestBody,
@@ -374,6 +377,61 @@ export interface Segment {
  */
 export function transcriptFrom(segments: Segment[], language = "en"): Transcript {
   return JSON.parse(transcriptFromSegments(JSON.stringify(segments), language));
+}
+
+/** A stretch `[from, to)` of the clip kept for transcription, `at` seconds into the shortened audio. */
+export interface Piece {
+  from: number;
+  to: number;
+  at: number;
+}
+
+/**
+ * Which parts of a clip to transcribe, given where the voice detector heard
+ * speech: the speech, padded, with silent or musical intros and long pauses
+ * cut out. One piece covering the whole clip means there was little to cut.
+ * Shared with the desktop's engine (`subs_asr::speech::voiced_plan`).
+ */
+export function planVoiced(spans: { start: number; end: number }[], duration: number): Piece[] {
+  return JSON.parse(voicedPlan(JSON.stringify(spans), duration));
+}
+
+/**
+ * Segments timed on the shortened audio, as a transcript on the clip's own
+ * clock. `spans` (the detector's speech) and `levels` (the clip's level in
+ * dBFS per `frameS` seconds) let a sentence Whisper began in a silent
+ * lead-in start at the voice instead.
+ */
+export function transcriptFromKept(
+  segments: Segment[],
+  pieces: Piece[],
+  spans: { start: number; end: number }[],
+  levels: { frameS: number; db: number[] },
+  language = "en",
+): Transcript {
+  return JSON.parse(
+    transcriptFromVoiced(
+      JSON.stringify(segments),
+      JSON.stringify(pieces),
+      JSON.stringify(spans),
+      JSON.stringify({ frame_s: levels.frameS, db: levels.db }),
+      language,
+    ),
+  );
+}
+
+/**
+ * Cues that fit the frame they are drawn on: at most two of the lines one
+ * line of `style` holds at `playW` x `playH`. `origin[i]` is the input cue
+ * that output cue `i` came from, for sharing out anything held per cue.
+ */
+export function fitToFrame(
+  cues: Cue[],
+  style: string,
+  playW: number,
+  playH: number,
+): { cues: Cue[]; origin: number[] } {
+  return JSON.parse(fitCuesToFrame(JSON.stringify(cues), style, playW, playH));
 }
 
 // --- clip and size -----------------------------------------------------

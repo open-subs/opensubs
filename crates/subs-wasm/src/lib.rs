@@ -187,6 +187,66 @@ pub fn transcript_from_segments_js(segments_json: &str, language: &str) -> Resul
     to_json(&subs_asr::transcript_from_segments(segments, language))
 }
 
+/// Which parts of a clip to transcribe, given where a voice detector heard
+/// speech (`[{start, end}]`, seconds): the speech, padded, with silent or
+/// musical intros and long pauses cut out. Returns `[{from, to, at}]`; one
+/// piece covering the whole clip means there was little to cut.
+///
+/// Browser Whisper times sentences, not words, and shown ten seconds of
+/// silence before speech it timed the first sentence from 0.0 s. Shown only
+/// the speech, its times are right, and `transcriptFromVoiced` puts them
+/// back on the clip's clock. See `subs_asr::speech::voiced_plan`.
+#[wasm_bindgen(js_name = voicedPlan)]
+pub fn voiced_plan_js(spans_json: &str, duration: f64) -> Result<String, String> {
+    let spans: Vec<subs_asr::Span> = from_json(spans_json, "the speech spans")?;
+    to_json(&subs_asr::voiced_plan(&spans, duration))
+}
+
+/// Segments timed on the audio `voicedPlan` kept, as a transcript on the
+/// clip's own clock, word timings spread over the kept audio only.
+///
+/// `spans_json` is the detector's speech, and `levels_json` the clip's level
+/// per frame (`{frame_s, db}`); with them a sentence Whisper started in a
+/// silent lead-in starts at the voice instead.
+#[wasm_bindgen(js_name = transcriptFromVoiced)]
+pub fn transcript_from_voiced_js(
+    segments_json: &str,
+    pieces_json: &str,
+    spans_json: &str,
+    levels_json: &str,
+    language: &str,
+) -> Result<String, String> {
+    let segments: Vec<subs_asr::Segment> = from_json(segments_json, "the segments")?;
+    let pieces: Vec<subs_asr::Piece> = from_json(pieces_json, "the pieces")?;
+    let spans: Vec<subs_asr::Span> = from_json(spans_json, "the speech spans")?;
+    let levels: subs_asr::Levels = from_json(levels_json, "the levels")?;
+    to_json(&subs_asr::transcript_from_voiced(segments, &pieces, &spans, &levels, language))
+}
+
+#[derive(Serialize)]
+struct FittedCues {
+    cues: Vec<Cue>,
+    /// For each output cue, the index of the input cue it came from.
+    origin: Vec<usize>,
+}
+
+/// Cues that fit the frame they are drawn on: at most two lines of what one
+/// line of `style` holds at `play_w` x `play_h`, a cue that needs more split
+/// over its own time. Cues are cut for a broadcast line of 42 characters,
+/// and the Shorts look on a 1080x1920 frame holds about seventeen, so one
+/// cue was drawn on six lines. Returns `{cues, origin}`.
+#[wasm_bindgen(js_name = fitCuesToFrame)]
+pub fn fit_cues_to_frame_js(cues_json: &str, style: &str, play_w: u32, play_h: u32) -> Result<String, String> {
+    let cues: Vec<Cue> = from_json(cues_json, "the cues")?;
+    let template = resolve_style(style)?;
+    let (latin, cjk) = subs_style::line_capacity(&template, (play_w.max(2), play_h.max(2)));
+    let fitted = subs_subtitle::fit_cues_indexed(&cues, latin, cjk);
+    to_json(&FittedCues {
+        origin: fitted.iter().map(|(i, _)| *i).collect(),
+        cues: fitted.into_iter().map(|(_, c)| c).collect(),
+    })
+}
+
 #[wasm_bindgen(js_name = toSrt)]
 pub fn to_srt_js(cues_json: &str) -> Result<String, String> {
     let cues: Vec<Cue> = from_json(cues_json, "the cues")?;
@@ -1060,6 +1120,36 @@ mod tests {
     fn languages_and_batch_size_come_from_the_engine() {
         assert!(languages_js().unwrap().contains("zh-Hans"));
         assert_eq!(translation_batch_size(), subs_translate::MAX_BATCH);
+    }
+
+    /// The page's path for a clip that opens on ten seconds of silence:
+    /// detector spans in, a plan out, Whisper's times on the shortened audio
+    /// back on the clip's clock.
+    #[test]
+    fn a_silent_intro_is_cut_and_the_first_word_lands_at_the_voice() {
+        let spans = r#"[{"start":10.0,"end":21.3}]"#;
+        let plan = voiced_plan_js(spans, 21.4).unwrap();
+        let levels = format!(r#"{{"frame_s":0.5,"db":[{}]}}"#, (0..43).map(|i| if i < 20 { "-90" } else { "-20" }).collect::<Vec<_>>().join(","));
+        let t = transcript_from_voiced_js(r#"[{"start":0.0,"end":3.2,"text":"The ferry left at dawn."}]"#, &plan, spans, &levels, "en").unwrap();
+        let t: Transcript = serde_json::from_str(&t).unwrap();
+        assert!((t.words[0].start - 9.9).abs() < 1e-6, "{:?}", t.words[0]);
+    }
+
+    /// Shorts on 1080x1920: a cue cut for 42 characters a line comes back
+    /// as cues of at most two of the frame's lines, each knowing its source.
+    #[test]
+    fn cues_are_fitted_to_a_vertical_frame() {
+        let cues = r#"[{"start":0,"end":6,"lines":["the lighthouse keeper wrote everything down.","Every ship that passed the point that winter"]}]"#;
+        let out: serde_json::Value = serde_json::from_str(&fit_cues_to_frame_js(cues, "Shorts", 1080, 1920).unwrap()).unwrap();
+        let fitted = out["cues"].as_array().unwrap();
+        assert!(fitted.len() >= 2);
+        for c in fitted {
+            assert!(c["lines"].as_array().unwrap().len() <= 2, "{c}");
+        }
+        assert!(out["origin"].as_array().unwrap().iter().all(|i| i == 0));
+        // Landscape is left as it was.
+        let same: serde_json::Value = serde_json::from_str(&fit_cues_to_frame_js(cues, "Shorts", 1920, 1080).unwrap()).unwrap();
+        assert_eq!(same["cues"].as_array().unwrap().len(), 1);
     }
 
     #[test]

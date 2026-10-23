@@ -23,7 +23,7 @@
 use crate::{Segment, Transcript, Word};
 
 /// A stretch of audio, in seconds, that holds a voice.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     pub start: f64,
     pub end: f64,
@@ -427,6 +427,171 @@ pub fn transcript_from_speech(segments: Vec<Segment>, speech: Option<&[Span]>, l
     }
 }
 
+/// A stretch of the original audio kept for transcription: `[from, to)` on
+/// the clip's own clock, starting `at` seconds into the shortened audio.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Piece {
+    pub from: f64,
+    pub to: f64,
+    pub at: f64,
+}
+
+/// Speech is padded by this much before it, and `PIECE_TAIL_S` after,
+/// before the rest is cut. Generous on purpose: a detector misses quiet
+/// speech under music. The browser's Silero scored nothing at all for
+/// Tears of Steel's first line of dialogue, spoken from 23.0 s under the
+/// score, until 24.55 s -- cut tight, the line would never reach Whisper.
+/// What the lead adds in front of a clean silence, `trim_quiet_leads`
+/// takes off again.
+const PIECE_LEAD_S: f64 = 1.5;
+const PIECE_TAIL_S: f64 = 0.5;
+/// Pieces closer than this are kept as one, pause and all.
+const PIECE_JOIN_S: f64 = 1.0;
+/// Cutting less than this is not worth changing anything for.
+const MIN_CUT_S: f64 = 2.0;
+/// Silence put between two kept pieces in the shortened audio. Butted
+/// together, the end of one piece and the start of the next ran into one
+/// sentence: on Tears of Steel, Whisper began the first line of dialogue
+/// in the music before the cut, and it came out eleven seconds early. A
+/// second of silence makes the join a pause Whisper can hear.
+const PIECE_GAP_S: f64 = 1.0;
+
+/// Which parts of a clip to transcribe: the speech, padded, with long
+/// silences and music cut out.
+///
+/// For a recogniser that can only time sentences, not words -- the browser's
+/// Whisper, whose small ONNX exports cannot align words to audio -- the
+/// cure for a silent or musical intro is not to show it the intro. Given ten
+/// seconds of silence and then speech it timed the first sentence from
+/// 0.0 s; given only the speech, its times are the speech's own, and
+/// [`map_back`] puts them back on the clip's clock. This is what
+/// whisper.cpp's and faster-whisper's own voice-activity modes do.
+///
+/// A single piece covering the whole clip when there is little to cut, so
+/// the caller can tell nothing changed.
+pub fn voiced_plan(speech: &[Span], duration: f64) -> Vec<Piece> {
+    let whole = vec![Piece { from: 0.0, to: duration, at: 0.0 }];
+    if speech.is_empty() || duration <= 0.0 {
+        return whole;
+    }
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for s in speech {
+        let (a, b) = ((s.start - PIECE_LEAD_S).max(0.0), (s.end + PIECE_TAIL_S).min(duration));
+        if b <= a {
+            continue;
+        }
+        match merged.last_mut() {
+            Some(last) if a - last.1 < PIECE_JOIN_S => last.1 = last.1.max(b),
+            _ => merged.push((a, b)),
+        }
+    }
+    let kept: f64 = merged.iter().map(|(a, b)| b - a).sum();
+    if merged.is_empty() || duration - kept < MIN_CUT_S {
+        return whole;
+    }
+    let mut at = 0.0;
+    merged
+        .into_iter()
+        .map(|(from, to)| {
+            let p = Piece { from, to, at };
+            at += to - from + PIECE_GAP_S;
+            p
+        })
+        .collect()
+}
+
+/// A time in the shortened audio, on the clip's own clock. A time exactly
+/// at the join of two pieces belongs to the later one when `starting`, so a
+/// sentence that begins at the join begins after the cut, not before it.
+/// A time in the silence between two pieces is the start of the next piece
+/// when `starting`, and the end of the one before otherwise.
+pub fn map_back(t: f64, pieces: &[Piece], starting: bool) -> f64 {
+    let Some(last) = pieces.last() else {
+        return t;
+    };
+    for (i, p) in pieces.iter().enumerate() {
+        let len = p.to - p.from;
+        let inside = t - p.at;
+        if inside < 0.0 && i > 0 && !starting {
+            return pieces[i - 1].to;
+        }
+        let next_starts_here = starting && i + 1 < pieces.len() && inside >= len - 1e-9;
+        if inside <= len + 1e-9 && !next_starts_here {
+            return p.from + inside.max(0.0).min(len);
+        }
+    }
+    last.to
+}
+
+/// How loud the audio is, frame by frame: `db[i]` is the level, in dBFS, of
+/// the `frame_s` seconds starting at `i * frame_s`.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Levels {
+    pub frame_s: f64,
+    pub db: Vec<f32>,
+}
+
+impl Levels {
+    /// The loudest frame between two times, or `None` with no frames there.
+    fn loudest(&self, from: f64, to: f64) -> Option<f32> {
+        if self.frame_s <= 0.0 || to <= from {
+            return None;
+        }
+        let a = (from / self.frame_s).floor().max(0.0) as usize;
+        let b = ((to / self.frame_s).ceil() as usize).min(self.db.len());
+        self.db.get(a..b).and_then(|f| f.iter().copied().reduce(f32::max))
+    }
+}
+
+/// Below this, a stretch of audio is silence, not quiet speech.
+const SILENT_DB: f32 = -45.0;
+
+/// Start each segment at the voice when what comes before the voice, inside
+/// the segment, is silence.
+///
+/// Only over silence: a lead-in the detector called non-speech may be quiet
+/// speech under music (see `PIECE_LEAD_S`), and moving a start past that
+/// would hide the words being said. Over true silence there is nothing to
+/// hide, and the start moves to the voice, less 0.1 s.
+pub fn trim_quiet_leads(segments: &mut [Segment], speech: &[Span], levels: &Levels) {
+    for seg in segments.iter_mut() {
+        let Some(voice) = speech.iter().find(|s| s.end > seg.start && s.start < seg.end) else {
+            continue;
+        };
+        let to = voice.start - LEAD_S;
+        if to <= seg.start {
+            continue;
+        }
+        if levels.loudest(seg.start, voice.start).is_some_and(|db| db < SILENT_DB) {
+            seg.start = to.min(seg.end);
+        }
+    }
+}
+
+/// Segments timed on the shortened audio, as a transcript on the clip's own
+/// clock, with word times spread over the kept pieces only -- a segment
+/// that runs across a cut does not put words in the silence that was cut.
+/// `speech` and `levels`, when given, take silent lead-ins off segment
+/// starts (`trim_quiet_leads`).
+pub fn transcript_from_voiced(
+    segments: Vec<Segment>,
+    pieces: &[Piece],
+    speech: &[Span],
+    levels: &Levels,
+    language: &str,
+) -> Transcript {
+    let mut mapped: Vec<Segment> = segments
+        .into_iter()
+        .map(|s| {
+            let start = map_back(s.start, pieces, true);
+            Segment { start, end: map_back(s.end, pieces, false).max(start), text: s.text }
+        })
+        .collect();
+    trim_quiet_leads(&mut mapped, speech, levels);
+    let spans: Vec<Span> = pieces.iter().map(|p| Span::new(p.from, p.to)).collect();
+    transcript_from_speech(mapped, Some(&spans), language)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +768,43 @@ mod tests {
         ];
         let words = retime("We have", &original);
         assert_eq!(words.iter().map(|w| w.start).collect::<Vec<_>>(), [4.8, 5.1]);
+    }
+
+    /// Ten seconds of silence, then speech with a long pause in it.
+    #[test]
+    fn the_plan_cuts_the_intro_and_long_pauses_and_maps_back() {
+        let speech = [Span::new(10.0, 14.0), Span::new(14.5, 16.0), Span::new(25.0, 27.0)];
+        let plan = voiced_plan(&speech, 30.0);
+        assert_eq!(plan.len(), 2, "{plan:?}");
+        assert!((plan[0].from - 8.5).abs() < 1e-9 && plan[0].at == 0.0);
+        assert!((plan[1].at - (16.5 - 8.5 + 1.0)).abs() < 1e-9);
+        // 1.5 s into the shortened audio is 10.0 s on the clip.
+        assert!((map_back(1.5, &plan, true) - 10.0).abs() < 1e-9);
+        // A sentence starting at the join, or in the silence put there,
+        // starts after the cut; one ending there ends before it.
+        let join = plan[1].at;
+        assert!((map_back(join, &plan, true) - 23.5).abs() < 1e-9);
+        assert!((map_back(join - 0.5, &plan, true) - 23.5).abs() < 1e-9);
+        assert!((map_back(join - 0.5, &plan, false) - 16.5).abs() < 1e-9);
+        // Whisper starts the first sentence at 0.0 of the shortened audio;
+        // over the silent lead it is moved to the voice. A segment running
+        // across the cut puts no word inside it.
+        let silent = Levels { frame_s: 0.5, db: (0..60).map(|i| if i < 20 { -90.0 } else { -20.0 }).collect() };
+        let t = transcript_from_voiced(vec![seg(0.0, join + 2.0, "one two three four five six")], &plan, &speech, &silent, "en");
+        assert!((t.words[0].start - 9.9).abs() < 1e-9, "{:?}", t.words[0]);
+        assert!(t.words.iter().all(|w| !(w.start > 16.5 + 1e-9 && w.start < 23.5 - 1e-9)), "{:?}", t.words);
+        // Over music, the lead stays: it may be quiet speech.
+        let music = Levels { frame_s: 0.5, db: vec![-25.0; 60] };
+        let t = transcript_from_voiced(vec![seg(0.0, 3.0, "You're a jerk, Tom!")], &plan, &speech, &music, "en");
+        assert!((t.words[0].start - 8.5).abs() < 1e-9, "{:?}", t.words[0]);
+    }
+
+    #[test]
+    fn little_to_cut_is_left_whole() {
+        let plan = voiced_plan(&[Span::new(0.5, 9.0)], 10.0);
+        assert_eq!(plan, [Piece { from: 0.0, to: 10.0, at: 0.0 }]);
+        assert_eq!(map_back(3.0, &plan, true), 3.0);
+        assert_eq!(voiced_plan(&[], 10.0).len(), 1);
     }
 
     #[test]

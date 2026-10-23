@@ -43,6 +43,15 @@ export function features(): string;
 export function ffmpegCommand(request_json: string): string;
 
 /**
+ * Cues that fit the frame they are drawn on: at most two lines of what one
+ * line of `style` holds at `play_w` x `play_h`, a cue that needs more split
+ * over its own time. Cues are cut for a broadcast line of 42 characters,
+ * and the Shorts look on a 1080x1920 frame holds about seventeen, so one
+ * cue was drawn on six lines. Returns `{cues, origin}`.
+ */
+export function fitCuesToFrame(cues_json: string, style: string, play_w: number, play_h: number): string;
+
+/**
  * The offered target languages.
  */
 export function languages(): string;
@@ -227,6 +236,16 @@ export function toVtt(cues_json: string): string;
 export function transcriptFromSegments(segments_json: string, language: string): string;
 
 /**
+ * Segments timed on the audio `voicedPlan` kept, as a transcript on the
+ * clip's own clock, word timings spread over the kept audio only.
+ *
+ * `spans_json` is the detector's speech, and `levels_json` the clip's level
+ * per frame (`{frame_s, db}`); with them a sentence Whisper started in a
+ * silent lead-in starts at the voice instead.
+ */
+export function transcriptFromVoiced(segments_json: string, pieces_json: string, spans_json: string, levels_json: string, language: string): string;
+
+/**
  * Build the Claude Messages API request body for one batch of cue text.
  *
  * The page performs the `fetch` itself — a browser has one, and linking an
@@ -257,6 +276,19 @@ export function validateStyle(json: string): string;
  */
 export function version(): string;
 
+/**
+ * Which parts of a clip to transcribe, given where a voice detector heard
+ * speech (`[{start, end}]`, seconds): the speech, padded, with silent or
+ * musical intros and long pauses cut out. Returns `[{from, to, at}]`; one
+ * piece covering the whole clip means there was little to cut.
+ *
+ * Browser Whisper times sentences, not words, and shown ten seconds of
+ * silence before speech it timed the first sentence from 0.0 s. Shown only
+ * the speech, its times are right, and `transcriptFromVoiced` puts them
+ * back on the clip's clock. See `subs_asr::speech::voiced_plan`.
+ */
+export function voicedPlan(spans_json: string, duration: number): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -266,6 +298,7 @@ export interface InitOutput {
     readonly creditPricing: (a: number) => void;
     readonly features: (a: number) => void;
     readonly ffmpegCommand: (a: number, b: number, c: number) => void;
+    readonly fitCuesToFrame: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly languages: (a: number) => void;
     readonly mergeBilingual: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly parseSubtitles: (a: number, b: number, c: number) => void;
@@ -286,10 +319,12 @@ export interface InitOutput {
     readonly toTxt: (a: number, b: number, c: number, d: number) => void;
     readonly toVtt: (a: number, b: number, c: number) => void;
     readonly transcriptFromSegments: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly transcriptFromVoiced: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
     readonly translateRequestBody: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly trimError: (a: number, b: number, c: number, d: number) => void;
     readonly validateStyle: (a: number, b: number, c: number) => void;
     readonly version: (a: number) => void;
+    readonly voicedPlan: (a: number, b: number, c: number, d: number) => void;
     readonly maxEmphasisStrength: () => number;
     readonly maxGlow: () => number;
     readonly minBilingualScale: () => number;

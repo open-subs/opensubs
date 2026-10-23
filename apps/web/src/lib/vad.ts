@@ -170,3 +170,80 @@ export async function speechSeconds(
 export function hasSpeech(report: SpeechReport): boolean {
   return report.seconds >= ENOUGH_SPEECH_S;
 }
+
+/** A stretch of the clip, in seconds, that holds a voice. */
+export interface SpeechSpan {
+  start: number;
+  end: number;
+}
+
+/**
+ * Where in the clip somebody is speaking: the whole clip scanned, frame by
+ * frame, and the frames joined into spans the way whisper.cpp's own
+ * detector joins them -- a voice starts above Silero's 0.5, ends only after
+ * 300 ms below 0.35, and a span shorter than 250 ms is a click, not a word.
+ *
+ * `speechSeconds` stops as soon as it has heard enough to say "somebody
+ * spoke"; this has to look everywhere, because the answer is *where*. The
+ * cost is one pass of a tiny model over audio already decoded: about a
+ * second per minute of clip.
+ */
+export async function speechSpans(
+  samples: Float32Array,
+  onProgress?: (fraction: number) => void,
+): Promise<{ spans: SpeechSpan[]; seconds: number }> {
+  const { session: s, Tensor } = await load();
+
+  let state = new Tensor("float32", new Float32Array(2 * 128), [2, 1, 128]);
+  const sr = new Tensor("int64", BigInt64Array.from([BigInt(RATE)]), []);
+  const frame = new Float32Array(WINDOW);
+  const perFrame = HOP / RATE;
+
+  const probs: number[] = [];
+  for (let i = 0; i + HOP <= samples.length; i += HOP) {
+    frame.set(samples.subarray(i, i + HOP), CONTEXT);
+    const out = await s.run({ input: new Tensor("float32", frame.slice(), [1, WINDOW]), state, sr });
+    state = out.stateN as never;
+    probs.push(Number(out.output.data[0]));
+    frame.copyWithin(0, WINDOW - CONTEXT);
+    if ((probs.length & 63) === 0) onProgress?.(i / samples.length);
+  }
+  const spans = spansFrom(probs, perFrame);
+  return { spans, seconds: spans.reduce((n, sp) => n + sp.end - sp.start, 0) };
+}
+
+const OFF_P = SPEECH_P - 0.15;
+const MIN_SILENCE_S = 0.3;
+const MIN_SPEECH_S = 0.25;
+const PAD_S = 0.03;
+
+/** Per-frame probabilities to spans; exported for its test. */
+export function spansFrom(probs: number[], perFrame: number): SpeechSpan[] {
+  const spans: SpeechSpan[] = [];
+  let start = -1;
+  let quietSince = -1;
+  for (let k = 0; k < probs.length; k += 1) {
+    const p = probs[k];
+    if (start < 0) {
+      if (p >= SPEECH_P) {
+        start = k;
+        quietSince = -1;
+      }
+      continue;
+    }
+    if (p < OFF_P) {
+      if (quietSince < 0) quietSince = k;
+      if ((k - quietSince + 1) * perFrame >= MIN_SILENCE_S) {
+        spans.push({ start: start * perFrame, end: quietSince * perFrame });
+        start = -1;
+      }
+    } else {
+      quietSince = -1;
+    }
+  }
+  if (start >= 0) spans.push({ start: start * perFrame, end: (quietSince >= 0 ? quietSince : probs.length) * perFrame });
+  const total = probs.length * perFrame;
+  return spans
+    .filter((s) => s.end - s.start >= MIN_SPEECH_S)
+    .map((s) => ({ start: Math.max(0, s.start - PAD_S), end: Math.min(total, s.end + PAD_S) }));
+}

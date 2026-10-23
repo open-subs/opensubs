@@ -103,6 +103,7 @@
     writeSrt,
     writeTxt,
     writeVtt,
+    fitToFrame,
     clipError,
     clipLength,
     exportSize,
@@ -773,9 +774,16 @@
         }
         return writeAssBilingual(top, bottom, selectedStyle, w, h, topScale, bottomScale);
       }
+      // The frame decides how much one cue may hold. Cues are cut for a
+      // broadcast line of 42 characters; the Shorts look on a 1080x1920
+      // frame holds about seventeen, and one cue was drawn on six lines
+      // over the middle of the picture. A cue too long for two of the
+      // frame's lines is split over its own time here, where the frame is
+      // known -- the list on the left, and the .srt, keep the cues as cut.
+      const framed = (list: Cue[]) => fitToFrame($state.snapshot(list) as Cue[], selectedStyle, w, h);
       if (wordEffect === "karaoke") {
         return writeAssKaraoke(
-          cues,
+          framed(cues).cues,
           selectedStyle,
           w,
           h,
@@ -784,13 +792,40 @@
           karaokeAccent,
         );
       }
-      return emphasise && loudness.length === cues.length
-        ? writeAssEmphasised(cues, selectedStyle, w, h, loudness, emphasisStrength)
-        : writeAss(shownCues, selectedStyle, w, h);
+      if (emphasise && loudness.length === cues.length) {
+        const fitted = framed(cues);
+        return writeAssEmphasised(
+          fitted.cues,
+          selectedStyle,
+          w,
+          h,
+          shareLevels(fitted, loudness),
+          emphasisStrength,
+        );
+      }
+      return writeAss(framed(shownCues).cues, selectedStyle, w, h);
     } catch {
       return "";
     }
   });
+
+  /**
+   * Per-word loudness for cues that `fitToFrame` may have split: each piece
+   * takes the next run of its source cue's levels, a word apiece. A source
+   * whose words no longer add up gets no emphasis rather than misplaced
+   * emphasis, which is what the writer does with a mismatch anyway.
+   */
+  function shareLevels(fitted: { cues: Cue[]; origin: number[] }, levels: number[][]): number[][] {
+    const used = new Map<number, number>();
+    const words = (c: Cue) => c.lines.join(" ").split(/\s+/).filter(Boolean).length;
+    return fitted.cues.map((cue, i) => {
+      const source = levels[fitted.origin[i]] ?? [];
+      const from = used.get(fitted.origin[i]) ?? 0;
+      const n = words(cue);
+      used.set(fitted.origin[i], from + n);
+      return from + n <= source.length ? source.slice(from, from + n) : [];
+    });
+  }
 
   /**
    * How many cues the emphasis silently declined to touch.
