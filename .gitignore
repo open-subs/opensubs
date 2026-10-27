@@ -45,6 +45,7 @@ test-results/
 # something a first push should carry.
 /apps/web/e2e/video-results/
 /apps/web/e2e/shots/
+/apps/web/e2e/output-support/
 
 # Internal planning documents. They carry absolute paths from the machine
 # they were written on and reference sibling products, neither of which
@@ -81,3 +82,16 @@ apps/desktop/src-tauri/bundled/
 
 # the speech model the mobile apps carry; fetched by apps/mobile/scripts/fetch-models.mjs
 apps/mobile/models-cache/
+
+# Store submission material (listings, answers, screenshots, review notes) is
+# not a build input and stays out of the repository. It is kept in
+# ../.store/opensubs beside the checkout.
+docs/store-listing/
+**/store/listing/
+**/store/listings/
+**/store/screenshots/
+**/store-listing/
+answers.md
+data-safety*.md
+review-notes*.md
+PLAY-LISTING.md

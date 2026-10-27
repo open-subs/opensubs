@@ -26,7 +26,7 @@
   import { Say } from "./lib/say";
   import { languageFromScript, sameLanguage } from "./lib/sourcelang";
   import AppleCredits from "./lib/AppleCredits.svelte";
-  import { appleStore, inNativeShell, mustUseInAppPurchase } from "./lib/native";
+  import { appleStore, inNativeShell, mustUseInAppPurchase, nativeShare, shareFile } from "./lib/native";
   import {
     saveWork,
     loadWork,
@@ -52,8 +52,10 @@
     type Decoded,
   } from "./lib/decode";
   import { burnInBrowser, burnSupport, type BurnSupport } from "./lib/burn";
+  import { supportCode } from "./lib/supportcode";
   import {
     exportGateOn,
+    exportGateNow,
     primeExportGate,
     exportGateLastKnown,
     markPendingExport,
@@ -61,10 +63,14 @@
     clearPendingExport,
   } from "./lib/exportgate";
   import ExportGate from "./lib/ExportGate.svelte";
+  import { looksSignedIn, confirmationStale, confirmSession } from "./lib/offlinesession";
+  import * as funnel from "./lib/funnel";
   import { isChinese, toSimplified, wantsTraditional } from "./lib/script";
   import { initLocale, t } from "./lib/i18n/index.svelte";
   import LanguagePicker from "./lib/LanguagePicker.svelte";
   import Rich from "./lib/Rich.svelte";
+  import CueList from "./lib/CueList.svelte";
+  import { History, exportable, type Track } from "./lib/cueedit";
   import { keepWorkAcrossLanguageLinks } from "./lib/i18n/inplace";
   import { humanRemaining, progressLabel, secondsRemaining } from "./lib/eta";
   import {
@@ -86,6 +92,7 @@
     PROVIDERS,
     deviceAvailability,
     detectionAvailable,
+    detectLanguageConfidently,
     opensubsConfigured,
     opensubsRequests,
     provider as providerById,
@@ -286,6 +293,15 @@
    */
   let originalScale = $state(0.8);
   let translateError = $state<string | null>(null);
+  let translateErrorCode = $state("translate");
+  /**
+   * Back from Google, Apple or GitHub and still signed out: the provider's
+   * code was refused or had run out. Said, rather than silently showing the
+   * sign-in buttons again as if the trip had never happened. Read before
+   * anything takes the code out of the address bar.
+   */
+  const signInReturn = new URLSearchParams(location.hash.replace(/^#/, "")).has("code");
+  let signInFailed = $state(false);
   /**
    * Some lines came back untranslated. Not an error: everything
    * else was translated and is on screen, so this sits beside the result and
@@ -508,13 +524,35 @@
   );
   let burnStartedAt = 0;
   let burnPercent = $state(0);
-  let burnError = $state<string | null>(null);
+  let burnError = $state<string | Say | null>(null);
+  /**
+   * The burn failed because the chosen file can no longer be read, and the
+   * fix is choosing it again: the button for that is shown, and the burn
+   * starts by itself once a new file is open (`reselectFrom` is the file
+   * that failed, so the old one cannot set it off).
+   */
+  let burnReselect = $state(false);
+  let reselectFrom = $state<File | null>(null);
+  /** The failed burn's error name, for the "having trouble?" box beside it. */
+  let burnErrorCode = $state("burn");
   let burnedUrl = $state<string | null>(null);
+  /** The burned file itself, for the iOS share sheet, which takes bytes
+   *  rather than a blob URL. */
+  let burnedBlob: Blob | null = null;
   let burnedName = $state("");
   let burnedNote = $state<string | null>(null);
   let burnAbort: AbortController | null = null;
   /** The sign-in sheet in front of exporting a video is open. */
   let exportGateOpen = $state(false);
+  /** It was opened with no connection to sign in over, and says so. */
+  let exportGateOffline = $state(false);
+  /** Offline, with a session last confirmed too long ago: connect once. */
+  let connectOnce = $state(false);
+  /**
+   * Kept subtitles were offered back to a signed-out visitor with the
+   * switch on; the first burn after signing in reports it (funnel.ts).
+   */
+  let restoredSignedOut = false;
   /**
    * Whether the copy says burning takes a free sign-in. Only where the
    * switch is on: the phone apps run this same page and are not gated.
@@ -913,7 +951,15 @@
     // has no `window` to read a preference from.
     initLocale();
     primeExportGate();
-    void exportGateOn().then((on) => (exportGateCopy = on));
+    void exportGateOn().then((on) => {
+      exportGateCopy = on;
+      // Once per page load, with a connection: is the session here still
+      // good? An answer moves the clock an export offline is judged by; a
+      // refusal signs the visitor out (offlinesession.ts).
+      if (on && signedIn() && navigator.onLine !== false) {
+        void confirmSession().then(() => (session.signedIn = signedIn()));
+      }
+    });
     stopLanguageLinks = keepWorkAcrossLanguageLinks(() => !starting);
     try {
       await load();
@@ -926,24 +972,40 @@
       // One client for the whole page, so `<openapps-login>` and this
       // module share a session rather than each holding their own.
       configureAccount();
+      if (signInReturn) {
+        // The same exchange the login element runs: the SDK shares one
+        // between callers, so the code is still spent exactly once.
+        void account()
+          .auth.completeRedirect()
+          .catch(() => {})
+          .finally(() => (signInFailed = !signedIn()));
+      }
       onAccountChange(() => {
         const now = signedIn();
         // Signed in a moment ago, not now, and nobody pressed sign out:
         // the session ended under the page.
         if (session.signedIn && !now && Date.now() - signedOutAt > 5000) signInExpired = true;
-        if (now) signInExpired = false;
+        if (now) {
+          signInExpired = false;
+          signInFailed = false;
+          funnel.signedIn();
+        }
         session.signedIn = now;
         paidVersion += 1;
         void refreshBalance();
       });
       session.signedIn = signedIn();
+      if (session.signedIn) funnel.signedIn();
       void refreshBalance();
 
       // Offer back whatever survived the last visit. Not applied silently:
       // the video cannot come back with it, so a page that simply showed
       // cues over an empty player would look broken. The user is told what
       // is waiting and for which file.
-      restored = loadWork();
+      // Past its age the record is deleted, and the video pointer with it:
+      // a handle to someone's file is not kept for subtitles that are gone.
+      restored = loadWork(() => funnel.pendingExpired());
+      if (!restored) void forgetVideo();
       // An export was pressed before a sign-in took the page away. The
       // work comes back without asking -- the person already chose to
       // carry on -- and the export waits for the video.
@@ -954,6 +1016,9 @@
         } else {
           clearPendingExport();
         }
+      } else if (restored && !signInReturn && !signedIn() && exportGateCopy) {
+        restoredSignedOut = true;
+        funnel.pendingRestored();
       }
       // The handle is looked up alongside the cues, so the restore card
       // can offer the video back in the same breath rather than as a
@@ -1248,6 +1313,7 @@
           ? restored.translateTo || null
           : null;
     restored = null;
+    forgetEdits();
   }
 
   function discardWork() {
@@ -1260,9 +1326,11 @@
   function clearBurned() {
     if (burnedUrl) URL.revokeObjectURL(burnedUrl);
     burnedUrl = null;
+    burnedBlob = null;
     burnedName = "";
     burnedNote = null;
     burnError = null;
+    burnReselect = false;
     burnPercent = 0;
     burnNote = "";
     burnRemaining = "";
@@ -1270,11 +1338,17 @@
 
   async function doBurn() {
     if (!videoFile || !assDocument || burning) return;
+    if (restoredSignedOut && signedIn()) {
+      restoredSignedOut = false;
+      funnel.pendingRecovered();
+    }
     clearBurned();
     burning = true;
     burnAbort = new AbortController();
     burnStartedAt = performance.now();
     const [w, h] = outputSize;
+    let reached: string | null = null;
+    funnel.burnStart();
     try {
       const result = await burnInBrowser({
         file: videoFile,
@@ -1287,18 +1361,27 @@
         onProgress: (fraction, note) => {
           burnPercent = Math.round(fraction * 100);
           burnNote = note;
+          reached = note;
           const left = secondsRemaining((performance.now() - burnStartedAt) / 1000, fraction);
           burnRemaining = left === null ? "" : humanRemaining(left);
         },
       });
       burnedUrl = URL.createObjectURL(result.blob);
+      burnedBlob = result.blob;
       burnedName = burnedFileName(videoName, result.extension);
       burnedNote = result.audioDropped
         ? "The source audio could not be carried into this container, so the export is silent."
         : null;
+      funnel.burnComplete();
     } catch (e) {
+      funnel.burnFailed(reached, e);
       const message = e instanceof Error ? e.message : String(e);
-      burnError = message.includes("cancelled") ? null : message;
+      burnError = e instanceof Say ? e : message.includes("cancelled") ? null : message;
+      burnErrorCode = funnel.failureCode(reached, e);
+      if (funnel.errorType(e) === "file-read") {
+        burnReselect = true;
+        reselectFrom = videoFile;
+      }
     } finally {
       burning = false;
       burnAbort = null;
@@ -1313,17 +1396,44 @@
    */
   async function requestBurn() {
     if (!videoFile || !assDocument || burning || exportGateOpen) return;
-    if (!signedIn() && (await exportGateOn())) {
-      markPendingExport(videoName);
-      exportGateOpen = true;
+    funnel.burnClick();
+    connectOnce = false;
+    const gate = await exportGateNow();
+    if (!gate.on) return void doBurn();
+    if (gate.offline) {
+      // Nobody can sign in over no connection. A session the server vouched
+      // for recently is enough; one it has not seen for too long is asked to
+      // connect once, without the sheet; anyone else gets the sheet, which
+      // says why it cannot finish. The subtitles stay where they are.
+      if (looksSignedIn()) return void doBurn();
+      if (confirmationStale()) {
+        connectOnce = true;
+        return;
+      }
+      openExportGate(true);
       return;
     }
-    void doBurn();
+    // A check already under way is waited for, so a session the server has
+    // just refused is not used for this export.
+    if (signedIn()) {
+      await Promise.race([confirmSession(), new Promise((ok) => setTimeout(ok, 3000))]);
+      session.signedIn = signedIn();
+      if (signedIn()) return void doBurn();
+    }
+    openExportGate(false);
+  }
+
+  function openExportGate(offline: boolean) {
+    markPendingExport(videoName);
+    exportGateOffline = offline;
+    exportGateOpen = true;
+    funnel.signinShown();
   }
 
   function closeExportGate() {
     exportGateOpen = false;
     clearPendingExport();
+    funnel.signinDismissed();
   }
 
   // Signed in with the sheet open, without leaving the page: carry on.
@@ -1344,6 +1454,17 @@
       if (burning || burnedUrl) return;
       exportWaiting = false;
       clearPendingExport();
+      void doBurn();
+    });
+  });
+
+  // The file that failed was chosen again: carry on with the burn.
+  $effect(() => {
+    if (!reselectFrom || !videoFile || videoFile === reselectFrom) return;
+    if (!assDocument || !hasDimensions || !support?.ok) return;
+    untrack(() => {
+      if (burning || burnedUrl) return;
+      reselectFrom = null;
       void doBurn();
     });
   });
@@ -1438,6 +1559,12 @@
   async function useSubtitleFile(file: File) {
     subtitleError = null;
     try {
+      // The file inputs are on screen while the engine is still loading, and
+      // a file picked in that moment reached the parser before the wasm
+      // existed ("Cannot read properties of undefined"). `load` is the same
+      // promise onMount is waiting on, so this only ever waits, never loads
+      // twice, and a failed load lands in subtitleError below.
+      await load();
       subtitleBytes = await file.arrayBuffer();
       const decoded: Decoded = decodeSubtitles(subtitleBytes);
       subtitleEncoding = decoded.encoding;
@@ -1455,6 +1582,7 @@
       translatedTo = null;
       bilingual = false;
       knownSource = null;
+      forgetEdits();
     } catch (e) {
       cues = [];
       cuesVideo = null;
@@ -1464,15 +1592,17 @@
   }
 
   /** Read the same file again, under the encoding the user says it is. */
-  function rereadSubtitles(encoding: string) {
+  async function rereadSubtitles(encoding: string) {
     if (!subtitleBytes) return;
     subtitleEncoding = encoding;
     subtitleError = null;
     try {
+      await load();
       cues = readSubtitles(decodeAs(subtitleBytes, encoding));
       sourceCues = null;
       translatedTo = null;
       bilingual = false;
+      forgetEdits();
     } catch (e) {
       subtitleError = String(e);
     }
@@ -1497,11 +1627,70 @@
     }
   }
 
-  function editCue(index: number, text: string) {
-    // Split on newlines so a two-line cue stays two lines; the engine's
-    // own wrapping only runs when text comes from ASR or a translation.
-    cues[index] = { ...cues[index], lines: text.split("\n") };
-    cues = [...cues];
+  /**
+   * Edits made in the list, for undo. Cleared whenever the cues are
+   * replaced wholesale -- a transcription, a file, a translation, restored
+   * work -- because stepping back past one of those would bring back cues
+   * without the state that went with them.
+   */
+  const edits = new History();
+  let editsRev = $state(0);
+
+  function currentTrack(): Track {
+    return {
+      cues: $state.snapshot(cues),
+      source: sourceCues ? $state.snapshot(sourceCues) : null,
+      loudness: $state.snapshot(loudness),
+    };
+  }
+
+  function useTrack(next: Track, select: number | null) {
+    cues = next.cues;
+    sourceCues = next.source;
+    loudness = next.loudness;
+    selectedCue = select;
+  }
+
+  function applyEdit(next: Track, select: number | null, key?: string) {
+    edits.record(currentTrack(), key ?? null);
+    editsRev += 1;
+    useTrack(next, select);
+  }
+
+  function forgetEdits() {
+    edits.clear();
+    editsRev += 1;
+  }
+
+  const canUndo = $derived(editsRev >= 0 && edits.canUndo);
+  const canRedo = $derived(editsRev >= 0 && edits.canRedo);
+
+  function stepEdits(direction: "undo" | "redo") {
+    const now = currentTrack();
+    const next = direction === "undo" ? edits.undo(now) : edits.redo(now);
+    editsRev += 1;
+    if (!next) return;
+    const keep = selectedCue !== null && selectedCue < next.cues.length ? selectedCue : null;
+    useTrack(next, keep);
+  }
+
+  /**
+   * Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z (or Ctrl+Y) undo and redo the list --
+   * but not while typing in a field, where they are the browser's own undo
+   * for that text, and two undos fighting over one keystroke would be worse
+   * than either.
+   */
+  function onUndoKey(event: KeyboardEvent) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    const redo = (key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey);
+    const undo = key === "z" && !event.shiftKey;
+    if (!undo && !redo) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+    if (undo ? !edits.canUndo : !edits.canRedo) return;
+    event.preventDefault();
+    stepEdits(undo ? "undo" : "redo");
   }
 
   /**
@@ -1541,6 +1730,12 @@
 
   function download(text: string, filename: string, type: string) {
     const blob = new Blob([text], { type });
+    // Inside the iOS shell a download link goes nowhere; the share sheet
+    // is how a phone saves a file.
+    if (nativeShare()) {
+      void shareFile(blob, filename).catch((e) => console.warn("share failed", e));
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1678,6 +1873,7 @@
       subtitleEncodingCertain = true;
       loudness = loudnessFor(cues, audio, audioOffset);
       selectedCue = null;
+      forgetEdits();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       asrError = message.includes("Cancelled") ? null : message;
@@ -1977,6 +2173,19 @@
     // result is in the language that was asked for, not the one shown now.
     const target = translateTo;
     try {
+      // A file imported with no language set goes to the paid route as
+      // "auto", where nothing can refuse a same-language job until the model
+      // has run. Where this browser can tell the language, ask it first: a
+      // confident answer that the text is already in the target sends
+      // nothing. (The gateway also charges nothing when the text comes back
+      // unchanged; this saves the round trip.)
+      if (providerId === "opensubs" && !knownSource && canDetect) {
+        const heard = await detectLanguageConfidently(from.map((c) => c.lines.join(" ")).join("\n"));
+        if (sameLanguage(heard, target)) {
+          translateError = t("The subtitles are already in this language, so there is nothing to translate. Pick another language.");
+          return;
+        }
+      }
       const translated = await translateCues({
         cues: from,
         target,
@@ -2011,6 +2220,7 @@
           ? await simplify(translated)
           : translated;
       translateProgress = "";
+      forgetEdits();
     } catch (e) {
       if (e instanceof SignInExpired) {
         signInExpired = true;
@@ -2020,6 +2230,7 @@
       }
       if (e instanceof InsufficientCredits) topUpOpen = true;
       translateError = sayError(e);
+      translateErrorCode = supportCode("translate", e);
     } finally {
       translating = false;
       translateProgress = "";
@@ -2084,14 +2295,6 @@
     if (event.composedPath().some((el) => tags.includes((el as Element).tagName))) {
       signedOutAt = Date.now();
     }
-  }
-
-  function formatTime(seconds: number): string {
-    const total = Math.max(0, seconds);
-    const m = Math.floor(total / 60);
-    const s = Math.floor(total % 60);
-    const ms = Math.round((total % 1) * 100);
-    return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(2, "0")}`;
   }
 
   function formatDuration(seconds: number): string {
@@ -2379,6 +2582,7 @@
       <span class="credit-balance">
         {#if signInExpired}
           {t("Your sign-in has expired. Sign in again to use your credits.")}
+          <openapps-support context="signin" error-code="signin:expired"></openapps-support>
         {:else}
           {#if quote}
             {t("Costs")} <strong>{priceText(quote.credits)}</strong> &mdash;
@@ -2411,6 +2615,12 @@
       {:else if appleStore()}
         <AppleCredits store={appleStore()!} oncredited={() => void refreshBalance()} />
       {/if}
+      <!--
+        Invisible unless this account has a purchase still pending — a card
+        checkout left half-way, a payment that has not landed — and then it
+        offers the box with that top-up attached, so it can be traced.
+      -->
+      <openapps-support context="payment" auto="pending-topup"></openapps-support>
     </div>
   {/if}
   <p class="oa-caption">
@@ -2421,6 +2631,7 @@
 <svelte:document onvisibilitychange={checkAccountOnReturn} />
 
 <svelte:window
+  onkeydown={onUndoKey}
   onfocus={checkAccountOnReturn}
   onclickcapture={noteSignOut}
   ondragover={(e) => {
@@ -2456,7 +2667,17 @@
 <main class="screen" class:drag-over={isDragOver}>
 
   {#if exportGateOpen}
-    <ExportGate onclose={closeExportGate} />
+    <ExportGate onclose={closeExportGate} offline={exportGateOffline} />
+  {/if}
+
+  {#if signInFailed && !session.signedIn}
+    <div class="banner banner-danger signin-failed" role="alert" data-testid="signin-failed">
+      <Icon name="alert-triangle" />
+      <div>
+        <p>{t("That sign-in didn't finish, so you're not signed in. Try again, or choose another way to sign in.")}</p>
+        <openapps-support context="signin" error-code="signin:no_session"></openapps-support>
+      </div>
+    </div>
   {/if}
 
   {#if exportWaiting && session.signedIn && !videoFile}
@@ -2612,7 +2833,7 @@
         </div>
         <p class="start-fine">
           {exportGateCopy
-            ? t("MP4, MOV, WebM and MKV. Free, no account to try. The speech model downloads once, when you generate.")
+            ? t("MP4, MOV, WebM and MKV. Free, no account to try; burning into a video takes a free sign-in. The speech model downloads once, when you generate.")
             : t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
         </p>
       </div>
@@ -2755,30 +2976,21 @@
                 {t("Replace")}
               </label>
             </div>
-            <ol class="cue-list">
-              {#each cues as cue, i (i)}
-                <li class="cue" class:selected={selectedCue === i}>
-                  <button
-                    type="button"
-                    class="cue-time oa-mono"
-                    onclick={() => {
-                      selectedCue = i;
-                      seekTo(cue.start);
-                    }}
-                    title={t("Jump here")}
-                  >
-                    {formatTime(cue.start)}
-                  </button>
-                  <textarea
-                    class="cue-text"
-                    rows={cue.lines.length}
-                    value={cue.lines.join("\n")}
-                    oninput={(e) => editCue(i, (e.currentTarget as HTMLTextAreaElement).value)}
-                    onfocus={() => (selectedCue = i)}
-                  ></textarea>
-                </li>
-              {/each}
-            </ol>
+            <CueList
+              {cues}
+              source={sourceCues}
+              {loudness}
+              bind:selected={selectedCue}
+              duration={hasVideo ? videoDuration : 0}
+              playhead={() => (videoEl && hasVideo ? videoEl.currentTime : null)}
+              onseek={seekTo}
+              onedit={applyEdit}
+              onsettle={() => edits.settle()}
+              {canUndo}
+              {canRedo}
+              onundo={() => stepEdits("undo")}
+              onredo={() => stepEdits("redo")}
+            />
           </div>
         {/if}
       </div>
@@ -2838,7 +3050,7 @@
             {@render noSpeechNotice()}
           {/if}
           {#if asrError}
-            <p class="field-error">{asrError}</p>
+            <p class="field-error">{t(asrError)}</p>
           {/if}
           {:else}
           {#if transcribing}
@@ -2856,7 +3068,7 @@
             {@render noSpeechNotice()}
           {/if}
           {#if asrError}
-            <p class="field-error">{asrError}</p>
+            <p class="field-error">{t(asrError)}</p>
           {/if}
           {/if}
           {#if subtitleError}
@@ -3251,6 +3463,7 @@
         {/if}
         {#if translateError}
           <p class="field-error">{translateError}</p>
+          <openapps-support context="general" error-code={translateErrorCode}></openapps-support>
         {/if}
 
         {#if canShowBoth}
@@ -3351,7 +3564,17 @@
                 {/if}
               </div>
               <div class="success-actions">
-                <a class="btn btn-primary btn-sm" href={burnedUrl} download={burnedName}>
+                <a
+                  class="btn btn-primary btn-sm"
+                  href={burnedUrl}
+                  download={burnedName}
+                  onclick={(e) => {
+                    if (burnedBlob && nativeShare()) {
+                      e.preventDefault();
+                      void shareFile(burnedBlob, burnedName).catch((err) => console.warn("share failed", err));
+                    }
+                  }}
+                >
                   <Icon name="download" size={14} />
                   {t("Save")}
                 </a>
@@ -3390,13 +3613,28 @@
                 disabled={!assDocument}
                 onclick={requestBurn}
               >
-                {t("Burn subtitles into the video")}
+                {exportGateCopy && !session.signedIn ? t("Sign in free to burn the video") : t("Burn subtitles into the video")}
               </button>
             </div>
+            {#if exportGateCopy && !session.signedIn}
+              <p class="oa-caption gate-note" data-gate-note>{t("Free account. The video is burned here, on your device, and never uploaded.")}</p>
+            {/if}
+            {#if connectOnce}
+              <p class="oa-caption gate-note" role="status" data-connect-once>{t("Connect to the internet once to keep saving. Your work stays here.")}</p>
+            {/if}
           {/if}
 
           {#if burnError}
-            <p class="field-error">{burnError}</p>
+            <p class="field-error">{burnError instanceof Say ? t(burnError.key, burnError.params) : burnError}</p>
+            {#if burnReselect}
+              <div class="checkbox-row">
+                <label class="btn btn-primary btn-sm" data-burn-reselect>
+                  <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
+                  {t("Choose the video again")}
+                </label>
+              </div>
+            {/if}
+            <openapps-support context="export" error-code={burnErrorCode}></openapps-support>
           {/if}
         {/if}
 
@@ -3412,7 +3650,7 @@
             type="button"
             class="btn btn-secondary btn-sm"
             disabled={!assDocument}
-            onclick={() => download(assDocument, assName(videoName), "text/plain")}
+            onclick={() => { download(assDocument, assName(videoName), "text/plain"); funnel.subtitleDownload("ass"); }}
           >
             <Icon name="download" size={14} />
             .ass
@@ -3420,7 +3658,7 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            onclick={() => download(writeSrt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain")}
+            onclick={() => { download(writeSrt(exportable(shownCues)), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.srt`, "text/plain"); funnel.subtitleDownload("srt"); }}
           >
             <Icon name="download" size={14} />
             .srt
@@ -3428,7 +3666,7 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            onclick={() => download(writeVtt(shownCues), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt")}
+            onclick={() => { download(writeVtt(exportable(shownCues)), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.vtt`, "text/vtt"); funnel.subtitleDownload("vtt"); }}
           >
             <Icon name="download" size={14} />
             .vtt
@@ -3436,7 +3674,7 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            onclick={() => download(writeTxt(shownCues, exportsBoth), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.txt`, "text/plain")}
+            onclick={() => { download(writeTxt(exportable(shownCues), exportsBoth), `${videoName.replace(/\.[^.]+$/, "") || "subs"}.txt`, "text/plain"); funnel.subtitleDownload("txt"); }}
           >
             <Icon name="download" size={14} />
             .txt
@@ -3512,5 +3750,7 @@
     <p class="oa-caption">
       {t("Engine {version} running in WebAssembly — the same Rust the desktop app and CLI use.", { version })}
     </p>
+    <!-- The quiet way to reach us, always there. -->
+    <openapps-support variant="link"></openapps-support>
   </footer>
 </main>

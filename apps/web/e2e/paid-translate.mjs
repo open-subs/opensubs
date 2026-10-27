@@ -111,6 +111,11 @@ await context.route("https://gateway.opensubs.app/**", async (route) => {
   if (mode === "already") {
     return json(route, 409, { error: "already_charged", message: "this job was already completed and paid for" });
   }
+  // Text already in the target, sent with no source: the vendor hands the
+  // lines back, and the gateway releases the hold and says so.
+  if ((!body.source || body.source === "auto") && body.target === "en" && body.lines.every((l) => ENGLISH.includes(l))) {
+    return json(route, 400, { error: "same_language", charged: 0 });
+  }
   const translations =
     body.target === "ko" ? body.lines.map((_, i) => KOREAN_BACK[i % KOREAN_BACK.length]) : body.lines.map((l) => `[${body.target}] ${l}`);
   state.balance -= 1;
@@ -337,6 +342,56 @@ await section("failures, in the interface's language", async () => {
   await translateNow();
   const last = gatewayCalls[gatewayCalls.length - 1];
   check(last.key.endsWith("-g1"), "and running it again is a new job under a new key", last.key);
+});
+
+// --- text already in the target, with nothing to say what language it is ---
+await section("an imported English file with no language set, into English", async () => {
+
+  await reload();
+  await open(ENGLISH, "plain.srt");
+  await paidRoute();
+  const enOption = into.locator('option[value="en"]');
+  check(!(await enOption.evaluate((o) => o.disabled)), "nothing on the page knows the language, so English is offered");
+  await into.selectOption("en");
+  await page.waitForTimeout(300);
+  const balanceBefore = state.balance;
+  const callsBefore = gatewayCalls.length;
+  await translateNow();
+  const sent = gatewayCalls.slice(callsBefore);
+  check(sent.length === 1 && (!sent[0].source || sent[0].source === "auto"), "it goes to the gateway with no source", JSON.stringify(sent.map((c) => c.source)));
+  check(state.balance === balanceBefore, "no credit is taken", `${balanceBefore} -> ${state.balance}`);
+  const message = await panel.locator(".field-error").innerText();
+  check(message.includes("字幕已经是这种语言"), "the panel says the subtitles are already in English", message);
+  const shown = await panel.locator(".credit-balance-count").first().innerText().catch(() => "");
+  check(shown.replace(/\D/g, "") === String(balanceBefore), "and the balance shown has not moved", shown);
+  check(JSON.stringify(await cueTexts()) === JSON.stringify(ENGLISH), "the subtitles are untouched");
+  await shot("7b-same-language-unknown-source");
+});
+
+await section("with a language detector, it is refused before anything is sent", async () => {
+
+  await context.addInitScript(() => {
+    self.LanguageDetector = {
+      availability: async () => "available",
+      create: async () => ({ detect: async () => [{ detectedLanguage: "en", confidence: 0.99 }] }),
+    };
+  });
+  await reload();
+  await open(ENGLISH, "plain2.srt");
+  await paidRoute();
+  await into.selectOption("en");
+  await page.waitForTimeout(300);
+  const balanceBefore = state.balance;
+  const callsBefore = gatewayCalls.length;
+  await translateNow();
+  check(gatewayCalls.length === callsBefore, "nothing is sent", `${gatewayCalls.length - callsBefore} calls`);
+  check(state.balance === balanceBefore, "no credit is taken");
+  const message = await panel.locator(".field-error").innerText();
+  check(message.includes("字幕已经是这种语言"), "and the panel says why", message);
+  await into.selectOption("es");
+  await page.waitForTimeout(300);
+  await translateNow();
+  check(gatewayCalls.length === callsBefore + 1 && state.balance === balanceBefore - 1, "a different language is still translated, and charged", `${gatewayCalls.length - callsBefore} calls, balance ${state.balance}`);
 });
 
 // --- a token that ran out while the page sat open --------------------------

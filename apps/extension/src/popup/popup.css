@@ -40,6 +40,9 @@ h1 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
 .row.check { display: flex; align-items: center; gap: 8px; }
 label { display: block; margin-bottom: 4px; font-weight: 500; }
 .row.check label { margin: 0; font-weight: 400; }
+/* Words longer than the panel is wide -- a German compound, a URL in an
+   error -- break rather than push the panel sideways. */
+.status, .hint, .foot, label { overflow-wrap: anywhere; }
 select, input[type="range"] { width: 100%; }
 select { padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px;
          background: var(--bg); color: var(--fg); font: inherit; }
@@ -49,7 +52,28 @@ output { color: var(--muted); font-weight: 400; }
           background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .status.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
 .actions { display: flex; gap: 8px; margin-top: 12px; }
-button { flex: 1; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px;
+/* Folded settings, under the action rather than in front of it. The summary
+   is a full-width row with its own marker, so it reads as a control and not
+   as a heading; the count of changed settings sits on it, so folding never
+   hides that something inside was moved off its default. */
+.advanced { margin-top: 12px; border-top: 1px solid var(--line); }
+.advanced > summary { display: flex; align-items: center; gap: 6px; padding: 9px 0 3px;
+                      cursor: pointer; font-weight: 500; list-style: none; }
+.advanced > summary::-webkit-details-marker { display: none; }
+.advanced > summary::before { content: ""; flex: none; width: 6px; height: 6px; margin-inline: 1px 3px;
+  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg); transition: transform 120ms ease; }
+.advanced[open] > summary::before { transform: rotate(45deg); }
+/* Logical properties throughout, so a right-to-left language needs only its
+   `dir` (set from lib/i18n.ts) -- and the closed marker, which points along
+   the line, turns with it. */
+[dir="rtl"] .advanced:not([open]) > summary::before { transform: rotate(135deg); }
+.advanced[open] > summary { margin-bottom: 8px; }
+.changed { margin-inline-start: auto; padding: 1px 7px; border-radius: 999px; font-size: 11px;
+           font-weight: 500; color: var(--fg);
+           background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.group-hint { margin: -6px 0 11px; }
+button { flex: 1; min-width: 0; padding: 7px 8px; line-height: 1.25; border: 1px solid var(--line); border-radius: 6px;
          background: var(--bg); color: var(--fg); font: inherit; font-weight: 500; cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 button:disabled { opacity: .5; cursor: default; }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sign in with Apple (OpenSubsAuth.swift, signInWithApple). The App ID
+	     has the capability; the provisioning profile must be made after it
+	     was turned on, or the archive fails to sign. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

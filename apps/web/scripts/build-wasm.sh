@@ -65,4 +65,8 @@ else
   echo "wasm-opt not found on PATH -- skipping (the glue still works, just larger)"
 fi
 
+# After wasm-opt, the last step that rewrites the module: fails the build if
+# the remapping above did not take.
+"$WORKSPACE_DIR/scripts/check-build-paths.sh" "$OUT_DIR/subs_engine_bg.wasm"
+
 ls -lh "$OUT_DIR/subs_engine_bg.wasm" | awk '{print "wasm build complete: " $9 " (" $5 ")"}'

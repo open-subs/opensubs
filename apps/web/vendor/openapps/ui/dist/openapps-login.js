@@ -15,9 +15,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
  */
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { OpenAppsError } from "@openapps/sdk";
 import { OpenAppsElement } from "./base.js";
-import { appleMark, ethereumMark, githubMark, googleMark, nostrMark } from "./provider-marks.js";
+import { appleMark, emailMark, ethereumMark, githubMark, googleMark, nostrMark, } from "./provider-marks.js";
 import { notify } from "./context.js";
+import { loadLocale, localeFor, t } from "./i18n.js";
 import { clearReferral, referralInUrl, storedReferral } from "./referral-code.js";
 import { connectEthereum, discoverEthereumWallets, nostrProviderNames, signNostr, signNostrWithBunker, signNostrWithSecretKey, signSiwe, waitForNostrProvider, } from "./wallet.js";
 let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
@@ -80,10 +82,60 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         this.nostrHint = null;
         /** A bunker asking the user to approve in a browser. */
         this.authUrl = null;
+        /**
+         * Email sign-in: closed, asking for the address, or asking for the code
+         * that was sent to it.
+         */
+        this.emailStep = "closed";
+        this.emailAddress = "";
+        this.emailFlow = null;
+        this.emailError = null;
+        /** Seconds until "Send a new code" is allowed again. */
+        this.resendIn = 0;
+        /**
+         * The proof of work for the next send, started as soon as the email form
+         * opens so it is usually done before the address is typed.
+         */
+        this.#pow = null;
+        this.#shownLocale = null;
+    }
+    #resendTimer;
+    /**
+     * The proof of work for the next send, started as soon as the email form
+     * opens so it is usually done before the address is typed.
+     */
+    #pow;
+    /** Re-render when the page switches language. */
+    #langObserver;
+    #shownLocale;
+    /** The page's language, read fresh so a language switch is followed. */
+    get locale() {
+        return localeFor(this);
+    }
+    tr(key, vars) {
+        return t(this.locale, key, vars);
+    }
+    /** Fetch the page language's strings the first time it is seen. */
+    willUpdate() {
+        const locale = this.locale;
+        if (locale !== this.#shownLocale) {
+            this.#shownLocale = locale;
+            void loadLocale(locale).then(() => this.requestUpdate());
+        }
     }
     connectedCallback() {
         super.connectedCallback();
+        this.#langObserver = new MutationObserver(() => this.requestUpdate());
+        this.#langObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["lang"],
+        });
         void this.load();
+    }
+    disconnectedCallback() {
+        this.#langObserver?.disconnect();
+        clearInterval(this.#resendTimer);
+        super.disconnectedCallback();
     }
     onSessionChange() {
         void this.load();
@@ -231,6 +283,169 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             });
         }
     }
+    // ---------- email ----------
+    openEmail() {
+        this.error = null;
+        this.emailError = null;
+        this.emailStep = "address";
+        this.prepareEmailPow();
+        void this.updateComplete.then(() => this.renderRoot.querySelector("#oa-email")?.focus());
+    }
+    /** Start solving the next proof of work, if one is not already under way. */
+    prepareEmailPow() {
+        if (this.#pow)
+            return;
+        const pending = this.sdk.auth.emailPow().then((challenge) => solve(challenge));
+        // A failure here is reported when the send needs it, not before.
+        pending.catch(() => undefined);
+        this.#pow = pending;
+    }
+    /** The prepared proof of work, spent: each one is good for one send. */
+    async takeEmailPow() {
+        this.prepareEmailPow();
+        const pow = this.#pow;
+        this.#pow = null;
+        try {
+            return await pow;
+        }
+        catch {
+            // Expired or failed in the background: one fresh attempt.
+            return solve(await this.sdk.auth.emailPow());
+        }
+    }
+    async sendEmailCode(event) {
+        event?.preventDefault();
+        const input = this.renderRoot.querySelector("#oa-email");
+        const address = (input?.value ?? this.emailAddress).trim();
+        if (!address || (input && !input.checkValidity())) {
+            this.emailError = this.tr("Enter a valid email address.");
+            return;
+        }
+        this.emailAddress = address;
+        this.emailError = null;
+        this.busy = true;
+        try {
+            let pow = await this.takeEmailPow();
+            let flow;
+            try {
+                flow = await this.sdk.auth.emailStart(address, pow, { lang: this.locale });
+            }
+            catch (cause) {
+                // A proof of work that went stale while the address was typed is
+                // ours to fix, not the person's: solve a fresh one and send once.
+                if (!(cause instanceof OpenAppsError && cause.code === "pow_invalid"))
+                    throw cause;
+                pow = await solve(await this.sdk.auth.emailPow());
+                flow = await this.sdk.auth.emailStart(address, pow, { lang: this.locale });
+            }
+            this.emailFlow = flow;
+            this.emailStep = "code";
+            this.startResendCountdown(flow.resend_after);
+            // The next send (a resend) should not wait for its proof of work.
+            this.prepareEmailPow();
+            void this.updateComplete.then(() => this.renderRoot.querySelector("#oa-code")?.focus());
+        }
+        catch (cause) {
+            this.emailError = this.describeEmailError(cause);
+        }
+        finally {
+            this.busy = false;
+        }
+    }
+    startResendCountdown(seconds) {
+        clearInterval(this.#resendTimer);
+        this.resendIn = Math.max(0, Math.ceil(seconds));
+        if (this.resendIn === 0)
+            return;
+        this.#resendTimer = setInterval(() => {
+            this.resendIn = Math.max(0, this.resendIn - 1);
+            if (this.resendIn === 0)
+                clearInterval(this.#resendTimer);
+        }, 1000);
+    }
+    onCodeInput(event) {
+        const input = event.target;
+        const digits = input.value.replace(/\D/g, "").slice(0, 6);
+        if (digits !== input.value)
+            input.value = digits;
+        // Six digits is the whole answer: submit without making the person
+        // find the button, which on a phone is often under the keyboard.
+        if (digits.length === 6 && !this.busy)
+            void this.verifyEmailCode();
+    }
+    async verifyEmailCode(event) {
+        event?.preventDefault();
+        const input = this.renderRoot.querySelector("#oa-code");
+        const code = (input?.value ?? "").replace(/\D/g, "");
+        if (!this.emailFlow)
+            return;
+        if (code.length !== 6) {
+            this.emailError = this.tr("The code is 6 digits.");
+            return;
+        }
+        this.emailError = null;
+        this.busy = true;
+        try {
+            const result = await this.sdk.auth.emailVerify(this.emailFlow.flow_id, code, {
+                referralCode: referralFromUrl(),
+            });
+            this.closeEmail();
+            clearReferral();
+            this.emit("openapps-login", result);
+            notify();
+        }
+        catch (cause) {
+            if (input)
+                input.value = "";
+            this.emailError = this.describeEmailError(cause);
+        }
+        finally {
+            this.busy = false;
+        }
+    }
+    closeEmail() {
+        clearInterval(this.#resendTimer);
+        this.emailStep = "closed";
+        this.emailFlow = null;
+        this.emailError = null;
+        this.resendIn = 0;
+    }
+    describeEmailError(cause) {
+        if (!(cause instanceof OpenAppsError)) {
+            return this.tr("Could not reach the server. Check your connection and try again.");
+        }
+        const detail = cause.detail ?? {};
+        const retry = Number(detail.retry_after ?? 0);
+        switch (cause.code) {
+            case "email_invalid":
+                return this.tr("Enter a valid email address.");
+            case "code_wrong": {
+                const left = Number(detail.attempts_left ?? 0);
+                return left === 1
+                    ? this.tr("That code is not right. 1 try left.")
+                    : this.tr("That code is not right. {n} tries left.", { n: left });
+            }
+            case "code_expired":
+                return this.tr("This code has expired or was tried too many times. Send a new one.");
+            case "code_format":
+                return this.tr("The code is 6 digits.");
+            case "email_too_soon":
+                this.startResendCountdown(retry);
+                return this.tr("Wait {s} s before asking for another code.", { s: Math.max(1, retry) });
+            case "email_limited":
+            case "rate_limited":
+                return this.tr("Too many codes were requested. Try again in {m} min, or sign in another way.", { m: Math.max(1, Math.ceil(retry / 60)) });
+            case "email_busy":
+                return this.tr("Email sign-in is busy right now. Sign in another way, or try again later.");
+            case "email_send_failed":
+                return this.tr("The code could not be sent. Try again in a minute, or sign in another way.");
+            case "email_unavailable":
+            case "not_found":
+                return this.tr("Email sign-in is not available here.");
+            default:
+                return this.tr("Could not reach the server. Check your connection and try again.");
+        }
+    }
     loginWithRedirect(provider) {
         // A full-page redirect, not a popup: popups are blocked by default in
         // extensions and on mobile Safari. Come back to this exact page —
@@ -256,14 +471,15 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         // signer is discovered when the user clicks, because extensions inject
         // at unpredictable times and hiding a button the user could have used
         // is worse than showing one that explains itself.
+        const email = this.enabled?.email ?? false;
         const apple = this.enabled?.apple ?? false;
         const google = this.enabled?.google ?? false;
         const github = this.enabled?.github ?? false;
         const wallet = this.enabled?.eip155 ?? false;
         const nostr = this.enabled?.nostr ?? false;
-        if (this.enabled && !apple && !google && !github && !wallet && !nostr) {
+        if (this.enabled && !email && !apple && !google && !github && !wallet && !nostr) {
             return this.frame(html `
-        <p class="muted">This server has no login methods configured.</p>
+        <p class="muted">${this.tr("This server has no login methods configured.")}</p>
         ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
       `);
         }
@@ -272,8 +488,32 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         // ProviderButton does, and it keeps the coloured mark — the thing a user
         // actually recognises — as the only colour in the row.
         const block = this.variant === "panel" ? "block" : "";
+        const googleButton = html `<button
+      class="provider ${block}"
+      ?disabled=${this.busy}
+      @click=${() => this.loginWithRedirect("google")}
+    >
+      ${googleMark}<span>${this.tr("Continue with Google")}</span>
+    </button>`;
+        const emailButton = html `<button
+      class="provider ${block}"
+      ?disabled=${this.busy}
+      aria-expanded=${this.emailStep !== "closed" ? "true" : "false"}
+      @click=${() => (this.emailStep === "closed" ? this.openEmail() : this.closeEmail())}
+    >
+      ${emailMark}<span>${this.tr("Continue with email")}</span>
+    </button>`;
         return this.frame(html `
       <div class="stack">
+        ${email && google
+            ? // Email first, beside Google: the two a person without a wallet
+                // or an Apple device is most likely to have. The pair wraps to
+                // two rows when the box is too narrow for both labels.
+                html `<div class="pair">${emailButton}${googleButton}</div>`
+            : email
+                ? emailButton
+                : nothing}
+        ${email && this.emailStep !== "closed" ? this.renderEmailForm() : nothing}
         ${apple
             ? // First, and the same size as the rest: Apple's guidelines ask
                 // that it be at least as prominent as any other sign-in offered.
@@ -282,25 +522,17 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
               ?disabled=${this.busy}
               @click=${() => this.loginWithRedirect("apple")}
             >
-              ${appleMark}<span>Continue with Apple</span>
+              ${appleMark}<span>${this.tr("Continue with Apple")}</span>
             </button>`
             : nothing}
-        ${google
-            ? html `<button
-              class="provider ${block}"
-              ?disabled=${this.busy}
-              @click=${() => this.loginWithRedirect("google")}
-            >
-              ${googleMark}<span>Continue with Google</span>
-            </button>`
-            : nothing}
+        ${google && !email ? googleButton : nothing}
         ${github
             ? html `<button
               class="provider ${block}"
               ?disabled=${this.busy}
               @click=${() => this.loginWithRedirect("github")}
             >
-              ${githubMark}<span>Continue with GitHub</span>
+              ${githubMark}<span>${this.tr("Continue with GitHub")}</span>
             </button>`
             : nothing}
         ${wallet && this.wallets
@@ -311,7 +543,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
                 ?disabled=${this.busy}
                 @click=${() => this.loginWithWallet(w)}
               >
-                ${ethereumMark}<span>Continue with ${w.name}</span>
+                ${ethereumMark}<span>${this.tr("Continue with {name}", { name: w.name })}</span>
               </button>`)
             : wallet
                 ? html `<button
@@ -319,7 +551,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
                 ?disabled=${this.busy}
                 @click=${() => this.beginWalletLogin()}
               >
-                ${ethereumMark}<span>Continue with a wallet</span>
+                ${ethereumMark}<span>${this.tr("Continue with a wallet")}</span>
               </button>`
                 : nothing}
         ${nostr
@@ -329,7 +561,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
                 ?disabled=${this.busy}
                 @click=${this.loginWithNostr}
               >
-                ${nostrMark}<span>Continue with Nostr</span>
+                ${nostrMark}<span>${this.tr("Continue with Nostr")}</span>
               </button>
               ${this.renderNostrFallback()}
             `
@@ -362,6 +594,95 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
     `;
     }
     /**
+     * The email form: the address, then the code sent to it.
+     *
+     * `autocomplete="one-time-code"` lets iOS and Android offer the code
+     * straight from the mail notification, and `inputmode="numeric"` brings
+     * up the number pad; neither needs the code to leave this page.
+     */
+    renderEmailForm() {
+        const error = this.emailError
+            ? html `<p class="error" role="alert">${this.emailError}</p>`
+            : nothing;
+        if (this.emailStep === "address") {
+            return html `
+        <form class="email" @submit=${this.sendEmailCode} novalidate>
+          <div class="field">
+            <label for="oa-email">${this.tr("Email address")}</label>
+            <input
+              id="oa-email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              autocapitalize="off"
+              spellcheck="false"
+              required
+              maxlength="254"
+              .value=${this.emailAddress}
+              ?disabled=${this.busy}
+            />
+          </div>
+          ${error}
+          <button class="primary" type="submit" ?disabled=${this.busy}>
+            ${this.busy ? this.tr("Sending…") : this.tr("Send code")}
+          </button>
+        </form>
+      `;
+        }
+        return html `
+      <form class="email" @submit=${this.verifyEmailCode} novalidate>
+        <p class="muted small">
+          ${this.tr("We sent a 6-digit code to {email}. It works for 10 minutes.", {
+            email: this.emailAddress,
+        })}
+        </p>
+        <div class="field">
+          <label for="oa-code">${this.tr("Code")}</label>
+          <input
+            id="oa-code"
+            class="code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]*"
+            maxlength="6"
+            spellcheck="false"
+            ?disabled=${this.busy}
+            @input=${this.onCodeInput}
+          />
+          <span class="hint">${this.tr("Not there? Check your spam folder.")}</span>
+        </div>
+        ${error}
+        <button class="primary" type="submit" ?disabled=${this.busy}>
+          ${this.busy ? this.tr("Checking…") : this.tr("Sign in")}
+        </button>
+        <div class="row wrap">
+          <button
+            class="link"
+            type="button"
+            ?disabled=${this.busy || this.resendIn > 0}
+            @click=${() => this.sendEmailCode()}
+          >
+            ${this.resendIn > 0
+            ? this.tr("Send a new code in {s}s", { s: this.resendIn })
+            : this.tr("Send a new code")}
+          </button>
+          <button
+            class="link"
+            type="button"
+            ?disabled=${this.busy}
+            @click=${() => {
+            this.closeEmail();
+            this.openEmail();
+        }}
+          >
+            ${this.tr("Use a different email")}
+          </button>
+        </div>
+      </form>
+    `;
+    }
+    /**
      * The two ways to sign Nostr without a browser extension.
      *
      * A remote signer is offered first and by name, because it is strictly
@@ -382,7 +703,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
             this.nostrHint = null;
         }}
       >
-        No extension? Use a remote signer
+        ${this.tr("No extension? Use a remote signer")}
       </button>
     `;
     }
@@ -486,11 +807,12 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
     `;
     }
     renderSignedIn(me) {
-        const identity = me.display_name ?? me.linked_accounts[0]?.caip10 ?? me.id;
+        // An email identity reads as the address, not as `email:jane@…`.
+        const identity = (me.display_name ?? me.linked_accounts[0]?.caip10 ?? me.id).replace(/^email:/, "");
         return html `
       <div class="row">
         <span class="identity" title=${identity}>${shorten(identity)}</span>
-        <button ?disabled=${this.busy} @click=${this.logout}>Sign out</button>
+        <button ?disabled=${this.busy} @click=${this.logout}>${this.tr("Sign out")}</button>
       </div>
       ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
     `;
@@ -521,6 +843,47 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         display: flex;
         flex-direction: column;
         gap: 0.5em;
+      }
+      /* Email and Google side by side, each half the row, labels on one
+         line. When the box is too narrow for both whole labels (a phone, a
+         long translation) the pair wraps to two full-width rows rather than
+         breaking a label in two. Email stays first either way. */
+      .pair {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5em;
+      }
+      .pair > button.provider {
+        flex: 1 1 0;
+        min-width: max-content;
+        justify-content: center;
+        gap: 8px;
+        padding-inline: 10px;
+        font-size: 0.875em;
+      }
+      .pair > button.provider span,
+      .pair > button.provider.block span {
+        flex: 0 1 auto;
+        margin-right: 0;
+        white-space: nowrap;
+      }
+      .email {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6em;
+        border: 1px solid var(--border-hairline, var(--fb-hairline));
+        border-radius: var(--radius-lg, 12px);
+        padding: 0.8em;
+      }
+      .email input.code {
+        font-family: var(--font-mono, "Geist Mono", ui-monospace, monospace);
+        font-size: 1.25em;
+        letter-spacing: 0.3em;
+        text-align: center;
+      }
+      .row.wrap {
+        flex-wrap: wrap;
+        justify-content: space-between;
       }
       .row {
         display: flex;
@@ -612,10 +975,33 @@ __decorate([
 __decorate([
     state()
 ], OpenAppsLogin.prototype, "authUrl", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "emailStep", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "emailAddress", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "emailFlow", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "emailError", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "resendIn", void 0);
 OpenAppsLogin = __decorate([
     customElement("openapps-login")
 ], OpenAppsLogin);
 export { OpenAppsLogin };
+/**
+ * The proof-of-work solver, fetched the first time someone opens the email
+ * form: every page carries the sign-in box, and most never use email.
+ */
+async function solve(challenge) {
+    const { solvePow } = await import("./pow.js");
+    return solvePow(challenge);
+}
 /** Middle-truncate long identifiers (addresses, npubs) for display. */
 export function shorten(value, head = 10, tail = 6) {
     return value.length <= head + tail + 1

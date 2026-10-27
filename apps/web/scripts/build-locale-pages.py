@@ -168,6 +168,15 @@ def has_page(locale, path):
     return os.path.exists(os.path.join(DIST, locale, rel))
 
 
+# Hand-written locale task pages (2026-10-28) that answer on the same path as
+# an English page: /zh-Hant/transcribe-video, /zh-Hant/add-subtitles-to-video,
+# /pt/transcribe-video. A link written to the English page keeps pointing at
+# the English page -- it was there first and is how crawlers reach it from
+# the locale pages -- and the locale copy is offered as a link of its own, in
+# the footer (LOCALE_ONLY below).
+KEEP_ENGLISH = {"transcribe-video", "add-subtitles-to-video"}
+
+
 def localise_link(href, locale):
     """Point an in-site link at this locale's copy of the same page.
 
@@ -186,6 +195,8 @@ def localise_link(href, locale):
             return href
     if path == "/":
         path = ""
+    if path.lstrip("/") in KEEP_ENGLISH:
+        return href
     if not has_page(locale, path.lstrip("/")):
         # No copy of that page in this language. The English one exists and
         # says something; `/zh-Hant/blog/srt-to-vtt` is a 404. The seven
@@ -259,8 +270,31 @@ def translate_page(raw, page, locale, catalogue, stats):
             return None
         return hit
 
+    # 0. Sections this locale has rewritten rather than translated. A
+    #    catalogue key "#<id>" holds the whole inner HTML of the element
+    #    with that id, list items and buttons included, and replaces it
+    #    wholesale; the blocks inside are then left alone, or the two
+    #    edits would overlap. Used where a language's copy needs a
+    #    different shape from the English -- zh-Hans pricing has a list of
+    #    a different length and a start button -- which a sentence-by-
+    #    sentence catalogue cannot express. Every other locale, and every
+    #    section without such a key, translates as below. The override is
+    #    a finished piece of HTML: a markup change to that section in the
+    #    template does not reach it.
+    rewritten = []
+    for node in tree.root.walk():
+        ident = node.attrs.get("id")
+        if ident and ("#" + ident) in catalogue and node.inner_end is not None:
+            edits.append((node.inner_start, node.inner_end, catalogue["#" + ident]))
+            rewritten.append((node.inner_start, node.inner_end))
+
+    def inside_rewritten(at):
+        return any(a <= at < b for a, b in rewritten)
+
     # 1. Blocks of copy.
     for node in S.copy_blocks(tree):
+        if inside_rewritten(node.inner_start):
+            continue
         key, values = S.keyed(tree, node)
         hit = look_up(key)
         if hit is not None:
@@ -269,6 +303,8 @@ def translate_page(raw, page, locale, catalogue, stats):
     # 2. Attributes that hold copy, and the meta tags that carry the
     #    page's own title and description into a search result.
     for node, name in S.copy_attrs(tree):
+        if inside_rewritten(node.tag_start):
+            continue
         span = S.attr_span(tree, node, name)
         if span is None:
             continue
@@ -354,7 +390,12 @@ def translate_page(raw, page, locale, catalogue, stats):
 # which is the condition that was reported, reintroduced one language
 # further in.
 LOCALE_ONLY = {
-    "pt": [("/pt/blog/how-to-add-captions-to-a-video", "Guia")],
+    "pt": [("/pt/blog/how-to-add-captions-to-a-video", "Guia"),
+           ("/pt/transcribe-video", "Transcrever vídeo em texto")],
+    # Each one goes in right after the burn link, so the last listed ends up
+    # first: 影片轉文字, then 影片上字幕.
+    "zh-Hant": [("/zh-Hant/add-subtitles-to-video", "影片上字幕"),
+                ("/zh-Hant/transcribe-video", "影片轉文字")],
 }
 
 

@@ -32,6 +32,8 @@ import {
 } from "./lib/protocol";
 import { FIRST_WINDOW_S } from "./lib/pace";
 import { stitch, toSrt, toVtt } from "./lib/seam";
+import { t, tn, useLocale } from "./lib/i18n";
+import { NOT_A_WEB_PAGE } from "./lib/pages";
 import type { Engine } from "./engine/engine";
 
 const offscreenApi = (globalThis as unknown as {
@@ -81,8 +83,12 @@ function held(tabId?: number): Cue[] {
 
 /** How Stop reads once there is something to save. */
 function stoppedNote(lines: number): string {
-  if (!lines) return "Stopped";
-  return `Stopped. ${lines} line${lines === 1 ? "" : "s"} kept -- save them, or press Start to carry on.`;
+  if (!lines) return t("Stopped");
+  return tn(
+    "Stopped. {n} line kept -- save it, or press Start to carry on.",
+    "Stopped. {n} lines kept -- save them, or press Start to carry on.",
+    lines,
+  );
 }
 /**
  * What went wrong last, kept after the session it ended. A Start that fails
@@ -207,7 +213,7 @@ async function fromEngine(message: FromEngine) {
     setStatus({
       stage: "listening",
       fraction: null,
-      note: `${session.cues.length} line${session.cues.length === 1 ? "" : "s"}`,
+      note: tn("{n} line", "{n} lines", session.cues.length),
       device: session.status.device,
     });
     return;
@@ -222,27 +228,32 @@ async function fromEngine(message: FromEngine) {
 // --- commands ------------------------------------------------------------
 
 async function start(tabId: number, next: Settings) {
+  useLocale(next.locale);
   if (session && session.tabId !== tabId) await stop(session.tabId);
   await api.storage.local.set({ settings: next });
-  session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: "Starting" }, take: 0 };
+  session = { tabId, settings: next, cues: [], status: { stage: "model", fraction: null, note: t("Starting") }, take: 0 };
   holdAwake(true);
   starting ??= startEngine();
   await starting;
   const refused = await inject(tabId);
   if (refused) {
-    setStatus({ stage: "error", fraction: null, note: `This page cannot be subtitled: ${refused}` });
+    // The browser's own words ("The extensions gallery cannot be scripted.")
+    // say what is wrong and not what to do, so they go to the console and the
+    // person is told where the extension does work. See lib/pages.ts.
+    console.warn(`OpenSubs: the page refused the content script: ${refused}`);
+    setStatus({ stage: "error", fraction: null, note: t(NOT_A_WEB_PAGE) });
     session = null;
     holdAwake(false);
     return;
   }
-  await toEngine({ kind: "warm", model: next.model, backend: next.backend });
+  await toEngine({ kind: "warm", model: next.model, backend: next.backend, locale: next.locale });
   // The page answers "begin" once it has found the video and opened its
   // audio, or with why it could not. Only then is "Listening" true -- set
   // before, it overwrote the page's "no video" and stayed there.
   // No answer at all is how 1.0.1 looked to everyone who tried it.
   const answer = await ask(tabId, { kind: "begin", settings: next });
   if (!answer) {
-    setStatus({ stage: "error", fraction: null, note: "The page did not answer. Reload it and press Start again." });
+    setStatus({ stage: "error", fraction: null, note: t("The page did not answer. Reload it and press Start again.") });
     session = null;
     holdAwake(false);
     return;
@@ -274,7 +285,7 @@ async function start(tabId: number, next: Settings) {
     fraction: null,
     // Recording has to happen before there is anything to read, and on a
     // second Start that wait is all there is to see.
-    note: answer.waiting ?? `Listening -- recording the first ${FIRST_WINDOW_S} seconds`,
+    note: answer.waiting ?? t("Listening -- recording the first {n} seconds", { n: FIRST_WINDOW_S }),
   });
 }
 
@@ -294,6 +305,11 @@ async function storedSettings(): Promise<Settings> {
   const stored = await api.storage.local.get("settings");
   return { ...DEFAULT_SETTINGS, ...(stored.settings as Partial<Settings> | undefined) };
 }
+
+// The interface language chosen in the popup, for what this worker says before
+// the next Start or change brings it again -- a worker restarted mid-session
+// would otherwise answer in the browser's language.
+void storedSettings().then((s) => useLocale(s.locale), () => undefined);
 
 // --- one router ----------------------------------------------------------
 
@@ -318,6 +334,7 @@ api.runtime.onMessage.addListener(
         // you judge by looking at it.
         case "settings": {
           const next = message.settings;
+          useLocale(next.locale);
           await api.storage.local.set({ settings: next });
           if (session) {
             session.settings = next;
@@ -352,7 +369,7 @@ api.runtime.onMessage.addListener(
             setStatus({
               stage: "error",
               fraction: null,
-              note: "The browser stopped the extension in the background, so subtitling stopped. Press Start again.",
+              note: t("The browser stopped the extension in the background, so subtitling stopped. Press Start again."),
             });
             return respond({ ok: false, lost: true });
           }
@@ -380,7 +397,7 @@ api.runtime.onMessage.addListener(
             session.take = message.take;
             session.cues = [];
             await page(tabId, { kind: "cues", cues: [] });
-            setStatus({ stage: "listening", fraction: null, note: "Listening (moved to the video now playing)" });
+            setStatus({ stage: "listening", fraction: null, note: t("Listening (moved to the video now playing)") });
           }
           return respond({ ok: true });
 
@@ -389,14 +406,14 @@ api.runtime.onMessage.addListener(
             setStatus({
               stage: "listening",
               fraction: null,
-              note: "The video ended. Save .srt to keep the subtitles, or play another and press Start.",
+              note: t("The video ended. Save .srt to keep the subtitles, or play another and press Start."),
             });
           }
           return respond({ ok: true });
 
         case "media":
           if (!message.found) {
-            setStatus({ stage: "error", fraction: null, note: message.reason ?? "No video found." });
+            setStatus({ stage: "error", fraction: null, note: message.reason ?? t("No video found.") });
           }
           return respond({ ok: true });
 
@@ -431,7 +448,12 @@ api.runtime.onMessage.addListener(
               const why = e instanceof Error ? e.message : String(e);
               // Closing the dialog is an answer, not a fault.
               if (/cancel/i.test(why)) return;
-              setStatus({ stage: "error", fraction: null, note: `The subtitles could not be saved: ${why}` });
+              console.warn(`OpenSubs: the download failed: ${why}`);
+              setStatus({
+                stage: "error",
+                fraction: null,
+                note: t("The subtitles could not be saved. Press Save .srt to try again."),
+              });
             })
             // Long after the dialog: the URL has to outlive the person
             // deciding where to put the file, and this page is not going
@@ -447,9 +469,9 @@ api.runtime.onMessage.addListener(
           if (session && (tabId === undefined || session.tabId === tabId)) {
             session.cues = [];
             await page(session.tabId, { kind: "cues", cues: [] });
-            setStatus({ ...session.status, note: "Subtitles cleared" });
+            setStatus({ ...session.status, note: t("Subtitles cleared") });
           } else {
-            setStatus({ stage: "idle", fraction: null, note: "Subtitles cleared" });
+            setStatus({ stage: "idle", fraction: null, note: t("Subtitles cleared") });
           }
           return respond({ ok: true });
 

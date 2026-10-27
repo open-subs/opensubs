@@ -17,8 +17,41 @@ export interface AuthMethods {
     /** Sign in with Apple — offered alongside Google, as App Store
      *  guideline 4.8 requires of an app with a third-party sign-in. */
     apple?: boolean;
+    /**
+     * A 6-digit code sent to any email address. Answered per host, and false
+     * until the operator switches it on — so a sign-in box shows it only
+     * where a code can really be sent.
+     */
+    email?: boolean;
     eip155: boolean;
     nostr: boolean;
+}
+/**
+ * A proof-of-work challenge for an email code. Find a decimal `nonce` such
+ * that SHA-256(`${salt}:${nonce}`) starts with `bits` zero bits, then hand
+ * the whole thing back with the nonce. It costs a browser about a second
+ * and a script sending thousands of codes a great deal more.
+ */
+export interface EmailPowChallenge {
+    salt: string;
+    bits: number;
+    signature: string;
+    expires_at: number;
+}
+export interface EmailPowSolution {
+    salt: string;
+    bits: number;
+    signature: string;
+    nonce: string;
+}
+/** A code is on its way. Hold `flow_id` for {@link OpenApps.auth.emailVerify}. */
+export interface EmailStart {
+    flow_id: string;
+    /** Unix seconds; the code stops working then. */
+    expires_at: number;
+    /** Seconds before another code may be asked for. */
+    resend_after: number;
+    code_length: number;
 }
 export interface Challenge {
     challenge_id: string;

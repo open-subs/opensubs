@@ -1,0 +1,37 @@
+/** The sign-in box in ja. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "メールアドレスで続ける",
+    "Continue with Google": "Google で続ける",
+    "Continue with Apple": "Apple で続ける",
+    "Continue with GitHub": "GitHub で続ける",
+    "Continue with a wallet": "ウォレットで続ける",
+    "Continue with {name}": "{name} で続ける",
+    "Continue with Nostr": "Nostr で続ける",
+    "No extension? Use a remote signer": "拡張機能がない場合はリモート署名を使う",
+    "Email address": "メールアドレス",
+    "Send code": "コードを送信",
+    "Sending…": "送信中…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "{email} に 6 桁のコードを送信しました。有効期限は 10 分です。",
+    "Code": "コード",
+    "Sign in": "サインイン",
+    "Checking…": "確認中…",
+    "Send a new code": "コードを再送信",
+    "Send a new code in {s}s": "{s} 秒後に再送信できます",
+    "Use a different email": "別のメールアドレスを使う",
+    "Not there? Check your spam folder.": "届かない場合は迷惑メールフォルダを確認してください。",
+    "Enter a valid email address.": "有効なメールアドレスを入力してください。",
+    "That code is not right. 1 try left.": "コードが正しくありません。あと 1 回試せます。",
+    "That code is not right. {n} tries left.": "コードが正しくありません。あと {n} 回試せます。",
+    "This code has expired or was tried too many times. Send a new one.": "このコードは期限切れか、試行回数の上限に達しました。新しいコードを送信してください。",
+    "The code is 6 digits.": "コードは 6 桁の数字です。",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "コードのリクエストが多すぎます。{m} 分後にもう一度お試しいただくか、別の方法でサインインしてください。",
+    "Wait {s} s before asking for another code.": "新しいコードをリクエストするまで {s} 秒お待ちください。",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "メールでのサインインが混み合っています。別の方法でサインインするか、しばらくしてからお試しください。",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "コードを送信できませんでした。1 分後にもう一度お試しいただくか、別の方法でサインインしてください。",
+    "Email sign-in is not available here.": "ここではメールでのサインインを利用できません。",
+    "Could not reach the server. Check your connection and try again.": "サーバーに接続できません。接続を確認して、もう一度お試しください。",
+    "Sign out": "サインアウト",
+    "This server has no login methods configured.": "このサーバーにはサインイン方法が設定されていません。"
+};
+export default catalogue;
+//# sourceMappingURL=ja.js.map

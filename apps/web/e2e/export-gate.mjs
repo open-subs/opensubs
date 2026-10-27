@@ -138,7 +138,7 @@ async function section(name, fn) {
 }
 const shot = async (page, name) => shots && page.screenshot({ path: join(shots, `${name}.png`) });
 
-const BURN = /^(Burn subtitles into the video|将字幕烧录进视频)$/;
+const BURN = /^(Burn subtitles into the video|将字幕烧录进视频|Sign in free to burn the video|免费登录后烧录视频)$/;
 const SHEET = "[data-export-gate]";
 const started = (page) => page.locator(".burn-progress, .burn-done").first();
 const startedNow = async (page, timeout = 15000) =>

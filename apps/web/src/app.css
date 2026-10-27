@@ -692,10 +692,10 @@ html {
 
 .cue {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
   align-items: start;
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-1);
   border-top: var(--border-width) solid var(--border-hairline);
 }
 
@@ -703,9 +703,25 @@ html {
   background: var(--surface-selected);
 }
 
+.cue-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.cue-clocks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .cue-time {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
   color: var(--text-muted);
   background: none;
   border: 0;
@@ -718,6 +734,34 @@ html {
   background: var(--surface-hover);
 }
 
+/* Wide enough for 0:00.000, and for 1:00:00.000 at a squeeze. */
+.cue-clock {
+  width: 6.6em;
+  padding: 3px var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: transparent;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-xs);
+}
+
+.cue-clock:hover {
+  border-color: var(--border-hairline);
+}
+
+.cue-clock:focus {
+  color: var(--text-body);
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+}
+
+.cue-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .cue-text {
   width: 100%;
   padding: var(--space-2);
@@ -726,7 +770,9 @@ html {
   background: var(--surface-card);
   border: var(--border-width) solid transparent;
   border-radius: var(--radius-sm);
-  resize: vertical;
+  /* Sized to its text by the list; a drag handle would only fight that. */
+  resize: none;
+  overflow: hidden;
 }
 
 .cue-text:hover {
@@ -736,6 +782,77 @@ html {
 .cue-text:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;
+}
+
+.cue-tools,
+.cue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.cue-actions-gap {
+  flex: 1;
+}
+
+/* The original under its translation: the same box, quieter. */
+.cue-original {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font: var(--type-caption);
+  color: var(--text-muted);
+  background: transparent;
+  border: var(--border-width) dashed var(--border-hairline);
+  border-radius: var(--radius-sm);
+  resize: none;
+  overflow: hidden;
+}
+
+.cue-original:focus {
+  color: var(--text-body);
+  background: var(--surface-card);
+}
+
+.cue-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--warning-fg);
+}
+
+.cue-problem {
+  margin: 0;
+}
+
+/* Above a selected cue's tools: the playhead buttons use where the video is. */
+.cue-hint {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+/* Phones zoom the page into any field set under 16 px when it is tapped. */
+@media (pointer: coarse) {
+  .cue-clock {
+    font-size: 16px;
+  }
+}
+
+/* On a phone the times go on a line of their own above the text, which
+   then has the whole width: beside it, the text had a third of the row. */
+@media (max-width: 30rem) {
+  .cue {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .cue-clocks {
+    flex-direction: row;
+    gap: var(--space-1);
+  }
 }
 
 .command {
@@ -1522,4 +1639,19 @@ html {
   flex-direction: column;
   gap: var(--space-3);
   padding-top: var(--space-3);
+}
+
+/* The "having trouble?" box (lib/support.ts). Nothing until it is defined,
+   which in the phone shells is never. */
+openapps-support:not(:defined) {
+  display: none;
+}
+.banner.signin-failed p {
+  margin: 0 0 var(--space-1);
+}
+
+/* Under the export button while burning takes a sign-in, and the
+   "connect once" line an export offline can show. */
+.gate-note {
+  margin: var(--space-2) 0 0;
 }

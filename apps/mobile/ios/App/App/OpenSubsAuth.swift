@@ -33,10 +33,13 @@ import WebKit
 /// allowed `return_to` origin, and every redirect provider, and linking a
 /// provider to an existing account, goes through the same two paths.
 @objc(OpenSubsAuth)
-public class OpenSubsAuth: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding {
+public class OpenSubsAuth: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding,
+    ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     public let identifier = "OpenSubsAuth"
     public let jsName = "OpenSubsAuth"
-    public let pluginMethods: [CAPPluginMethod] = []
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "signInWithApple", returnType: CAPPluginReturnPromise),
+    ]
 
     /// The accounts server, as the page knows it (apps/web/src/lib/account.ts).
     static let authHost = "auth.opensubs.app"
@@ -124,6 +127,92 @@ public class OpenSubsAuth: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPrese
     }
 
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        bridge?.webView?.window ?? ASPresentationAnchor()
+    }
+
+    // MARK: Sign in with Apple
+
+    /// The call waiting for Apple's sheet, and the controller showing it.
+    /// One at a time: a second tap while the sheet is up is refused rather
+    /// than left to strand the first call.
+    private var appleCall: CAPPluginCall?
+    private var appleController: ASAuthorizationController?
+
+    /// Apple's own sign-in sheet (`ASAuthorizationAppleIDProvider`).
+    ///
+    /// The page asks the server for a challenge first and passes its nonce
+    /// here (as its SHA-256). Apple signs it into the identity token, so the
+    /// server can tell this token answers that challenge and no earlier one.
+    /// No name or email is asked for: the account needs neither, and the
+    /// sign-in label is "Apple ID". See apps/web/src/lib/appleSignIn.ts.
+    ///
+    /// Resolves `{ status: "signed-in", identityToken, authorizationCode }`,
+    /// or `{ status: "cancelled" }` when the person closes the sheet, which
+    /// is not an error.
+    @objc func signInWithApple(_ call: CAPPluginCall) {
+        guard let nonce = call.getString("nonce"), !nonce.isEmpty else {
+            call.reject("a nonce from the server's challenge is required")
+            return
+        }
+        DispatchQueue.main.async {
+            guard self.appleCall == nil else {
+                call.reject("a sign-in is already in progress")
+                return
+            }
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = []
+            request.nonce = nonce
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            self.appleCall = call
+            self.appleController = controller
+            controller.performRequests()
+        }
+    }
+
+    private func finishApple(_ result: [String: Any]?, error: String? = nil) {
+        guard let call = appleCall else { return }
+        appleCall = nil
+        appleController = nil
+        if let result {
+            call.resolve(result)
+        } else {
+            call.reject(error ?? "Sign in with Apple failed")
+        }
+    }
+
+    public func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken,
+              let token = String(data: tokenData, encoding: .utf8)
+        else {
+            finishApple(nil, error: "Apple returned no identity token")
+            return
+        }
+        var result: [String: Any] = ["status": "signed-in", "identityToken": token]
+        if let codeData = credential.authorizationCode,
+           let code = String(data: codeData, encoding: .utf8) {
+            result["authorizationCode"] = code
+        }
+        finishApple(result)
+    }
+
+    public func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        if let error = error as? ASAuthorizationError, error.code == .canceled {
+            finishApple(["status": "cancelled"])
+        } else {
+            finishApple(nil, error: error.localizedDescription)
+        }
+    }
+
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         bridge?.webView?.window ?? ASPresentationAnchor()
     }
 }

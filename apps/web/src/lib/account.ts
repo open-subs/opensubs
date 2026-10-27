@@ -32,6 +32,8 @@ import "@openapps/ui";
 import { configure, getClient, notify, onChange } from "@openapps/ui";
 import { Say } from "./say";
 import { paidTranslation, rememberPaid } from "./paidjobs";
+import { installNativeAppleSignIn } from "./appleSignIn";
+import { sessionChanged } from "./offlinesession";
 
 /** The accounts server, behind our own hostname. */
 export const AUTH_URL = "https://auth.opensubs.app";
@@ -69,7 +71,15 @@ export function account(): OpenApps {
  * when a paid translation came back 401. Telling every listener means the
  * panel changes the moment the SDK knows.
  */
-const CLIENT_OPTIONS = { baseUrl: AUTH_URL, onAuthChange: () => notify() };
+const CLIENT_OPTIONS = {
+  baseUrl: AUTH_URL,
+  onAuthChange: (session: unknown) => {
+    // A new session is the server's word that it is good, which is what
+    // lets an export go ahead offline later (offlinesession.ts).
+    sessionChanged(session);
+    notify();
+  },
+};
 
 // Configured here, at module load, rather than in a component's onMount.
 //
@@ -80,6 +90,11 @@ const CLIENT_OPTIONS = { baseUrl: AUTH_URL, onAuthChange: () => notify() };
 // on import is ordered by the module graph instead of by rendering, so the
 // client exists before any element can ask for it.
 configure(CLIENT_OPTIONS);
+
+// In the iOS app, "Continue with Apple" is Apple's own sheet rather than a
+// redirect (./appleSignIn.ts). Installed here for the same reason: before
+// any <openapps-login> connects and asks the server what it offers.
+installNativeAppleSignIn();
 
 /**
  * Kept for callers that want to be explicit. Returns the client configured
@@ -151,6 +166,20 @@ async function freshBearer(force: boolean, signal?: AbortSignal): Promise<string
     // Dropped, or the network: either way the token below is the answer.
   }
   return bearer();
+}
+
+/**
+ * The session for the "having trouble?" box (support.ts): a fresh token when
+ * signed in, so the message arrives with the account attached, and null
+ * otherwise — never an error, since the box must work for someone whose
+ * sign-in just broke.
+ */
+export async function supportToken(): Promise<string | null> {
+  try {
+    return await freshBearer(false);
+  } catch {
+    return null;
+  }
 }
 
 export async function balance(signal?: AbortSignal): Promise<number> {

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Burn Subtitles Into Video — Free, In Your Browser | OpenSubs</title>
-<meta name="description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
+<meta name="description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload and no watermark; burning takes a free sign-in." />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 <meta name="theme-color" content="#f2f2f2" />
 
@@ -26,14 +26,14 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="OpenSubs" />
 <meta property="og:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
-<meta property="og:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
+<meta property="og:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload and no watermark; burning takes a free sign-in." />
 <meta property="og:url" content="https://opensubs.app/burn-subtitles-into-video" />
 <meta property="og:image" content="https://opensubs.app/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Burn Subtitles Into Video — Free, In Your Browser | OpenSubs" />
-<meta name="twitter:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload, no watermark and no account." />
+<meta name="twitter:description" content="Burn subtitles permanently into an MP4 in your browser. Hardcoded captions that play anywhere, with no upload and no watermark; burning takes a free sign-in." />
 <meta name="twitter:image" content="https://opensubs.app/og-image.png" />
 
 <!-- Structured data. Three entities, each describing something already
@@ -74,7 +74,7 @@
   "operatingSystem": "Any browser with WebAssembly — Chrome, Edge, Safari, Firefox",
   "browserRequirements": "A browser with WebAssembly. WebGPU makes transcription faster but is not required.",
   "url": "https://opensubs.app/burn-subtitles-into-video",
-  "description": "A browser tool that transcribes speech to subtitles, translates them, styles them, and burns them into the video — all on the user's own machine. The video is never uploaded. Free with no account; optional paid translation on our own backend, priced before you run it.",
+  "description": "A browser tool that transcribes speech to subtitles, translates them, styles them, and burns them into the video — all on the user's own machine. The video is never uploaded. Free, with no account to try; burning a video takes a free sign-in. Optional paid translation runs on our own backend, priced before you run it.",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "offers": [
     {
@@ -146,6 +146,38 @@
       "acceptedAnswer": {
         "@type": "Answer",
         "text": "The picture is re-encoded, so strictly yes, but the bitrate is picked to match what the desktop build uses and the difference is not something you will see. The audio is not touched at all: its packets are copied across, so speech lands on exactly the same instants it did before."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I burn subtitles into video for free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. You can burn subtitles into video here at no cost and with no watermark. Burning a video takes a free sign-in; transcription, styling and subtitle files work without one."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my video uploaded when I burn subtitles into it?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. The video is read from your disk and encoded in your browser with WebCodecs. There is no upload step, so there is no file-size cap either."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I burn two languages into the video at once?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Translate the subtitles, keep the original on screen too, and both lines are burned into the video, with either language on top."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which video formats can I use?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MP4, MOV, WebM and MKV go in. What comes out is an MP4 with H.264, or a WebM with VP9 where the browser has no H.264 encoder."
       }
     }
   ],
@@ -888,6 +920,13 @@
     <h1>Burn subtitles into video, in your browser</h1>
     <p class="subhead">Hardcoded captions that play anywhere, with nothing uploaded.</p>
     <p class="lede">
+      To burn subtitles into video for free, open OpenSubs in your browser,
+      choose the video, generate the subtitles or open an .srt or .vtt you
+      already have, pick a style, then burn them into an MP4 from the Export
+      tab. Nothing is uploaded and there is no watermark; burning takes a
+      free sign-in.
+    </p>
+    <p class="lede">
       A subtitle file sits beside the video and every player treats it
       differently &mdash; some ignore it, some restyle it, and most social
       platforms drop it entirely. Burning the subtitles into the picture
@@ -896,14 +935,14 @@
       the same to everyone.
     </p>
     <p class="lede">
-      OpenSubs does it here, in the tab. The video is read straight off your
+      OpenSubs lets you burn subtitles into video here, in the tab. The video is read straight off your
       disk, libass draws the subtitles exactly as the preview showed them,
       and WebCodecs encodes the result to MP4 with the audio copied across
       untouched rather than re-encoded. There is no upload step, because
       there is no server to upload to &mdash; which is also why there is no
       file-size cap, no queue and no watermark.
     </p>
-    <p class="reassure">Free &middot; no account &middot; no watermark &middot; open source</p>
+    <p class="reassure">Free &middot; no watermark &middot; open source &middot; free sign-in to burn</p>
   </div>
 </section>
     </div>
@@ -932,7 +971,7 @@
           <h2 class="section-title">Video</h2>
           <label class="drop-zone">
             <p class="drop-zone-title">Drop a video here, or choose one</p>
-            <p class="oa-caption">It stays on your machine. No upload, no account.</p>
+            <p class="oa-caption">It stays on your machine. No upload; burning takes a free sign-in.</p>
             <input type="file" accept="video/*" />
           </label>
         </section>
@@ -941,8 +980,7 @@
           <h2 class="section-title">Subtitles</h2>
           <p class="oa-caption">
             Whisper runs here, in your browser, and writes the subtitles from
-            the video&rsquo;s own audio. Nothing is uploaded and no account is
-            needed.
+            the video&rsquo;s own audio. Nothing is uploaded, and writing subtitles needs no account.
           </p>
         </section>
 
@@ -994,6 +1032,52 @@
         <p>
           The encode runs on your machine with WebCodecs. A long recording is
           a long encode, not a rejected upload.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="differs">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>How it differs from online subtitle burners</h2>
+      <p>
+        Many online tools that burn subtitles into video upload the file to a
+        server first. OpenSubs does the whole job on your own machine, and
+        does a few things a burner alone does not.
+      </p>
+    </div>
+    <div class="grid grid-4">
+      <div class="site-card">
+        <h3>The video never leaves your machine</h3>
+        <p>
+          It is read off your disk and encoded in this tab: no upload, no
+          queue, no file-size cap. For very long videos there is a desktop app
+          for macOS, Windows and Linux.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>No watermark, free to burn</h3>
+        <p>
+          The MP4 holds your video and your subtitles and nothing else.
+          Burning takes a free sign-in; transcribing, styling and subtitle
+          files work without one.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>Translate, or burn two languages</h3>
+        <p>
+          <a href="/translate-subtitles">Translate the subtitles</a> into 20
+          languages, free on your device in desktop Chrome or with your own key
+          or credits, and keep the original on screen too:
+          <a href="/bilingual-subtitles">both lines are burned in</a>.
+        </p>
+      </div>
+      <div class="site-card">
+        <h3>The subtitle file as well</h3>
+        <p>
+          Besides the burned MP4, save the subtitles as .srt, .vtt or .ass, or
+          the words alone as .txt.
         </p>
       </div>
     </div>
@@ -1089,6 +1173,22 @@
     <details>
       <summary>Does burning subtitles in reduce the video quality?</summary>
       <p>The picture is re-encoded, so strictly yes, but the bitrate is picked to match what the desktop build uses and the difference is not something you will see. The audio is not touched at all: its packets are copied across, so speech lands on exactly the same instants it did before.</p>
+    </details>
+    <details>
+      <summary>Can I burn subtitles into video for free?</summary>
+      <p>Yes. You can burn subtitles into video here at no cost and with no watermark. Burning a video takes a free sign-in; transcription, styling and subtitle files work without one.</p>
+    </details>
+    <details>
+      <summary>Is my video uploaded when I burn subtitles into it?</summary>
+      <p>No. The video is read from your disk and encoded in your browser with WebCodecs. There is no upload step, so there is no file-size cap either.</p>
+    </details>
+    <details>
+      <summary>Can I burn two languages into the video at once?</summary>
+      <p>Yes. Translate the subtitles, keep the original on screen too, and both lines are burned into the video, with either language on top.</p>
+    </details>
+    <details>
+      <summary>Which video formats can I use?</summary>
+      <p>MP4, MOV, WebM and MKV go in. What comes out is an MP4 with H.264, or a WebM with VP9 where the browser has no H.264 encoder.</p>
     </details>
   </div>
 </section>

@@ -2,7 +2,7 @@ import Capacitor
 import UIKit
 
 /// The bridge view controller, subclassed for one reason: to register the
-/// plugins that live in this target, StoreKit and sign-in.
+/// plugins that live in this target: StoreKit, sign-in, and the share sheet.
 ///
 /// Capacitor 7 does not find plugins by scanning the binary. It registers
 /// what `capacitor.config.json` lists in `packageClassList`, and the CLI
@@ -23,5 +23,6 @@ class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(OpenSubsStore())
         bridge?.registerPluginInstance(OpenSubsAuth())
+        bridge?.registerPluginInstance(OpenSubsShare())
     }
 }

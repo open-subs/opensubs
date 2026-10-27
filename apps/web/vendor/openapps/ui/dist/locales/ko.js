@@ -1,0 +1,37 @@
+/** The sign-in box in ko. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "이메일로 계속하기",
+    "Continue with Google": "Google로 계속하기",
+    "Continue with Apple": "Apple로 계속하기",
+    "Continue with GitHub": "GitHub로 계속하기",
+    "Continue with a wallet": "지갑으로 계속하기",
+    "Continue with {name}": "{name}(으)로 계속하기",
+    "Continue with Nostr": "Nostr로 계속하기",
+    "No extension? Use a remote signer": "확장 프로그램이 없나요? 원격 서명기 사용",
+    "Email address": "이메일 주소",
+    "Send code": "코드 보내기",
+    "Sending…": "보내는 중…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "{email}(으)로 6자리 코드를 보냈습니다. 10분 동안 유효합니다.",
+    "Code": "코드",
+    "Sign in": "로그인",
+    "Checking…": "확인 중…",
+    "Send a new code": "새 코드 보내기",
+    "Send a new code in {s}s": "{s}초 후 다시 보낼 수 있음",
+    "Use a different email": "다른 이메일 사용",
+    "Not there? Check your spam folder.": "메일이 오지 않았다면 스팸함을 확인하세요.",
+    "Enter a valid email address.": "올바른 이메일 주소를 입력하세요.",
+    "That code is not right. 1 try left.": "코드가 올바르지 않습니다. 1번 더 시도할 수 있습니다.",
+    "That code is not right. {n} tries left.": "코드가 올바르지 않습니다. {n}번 더 시도할 수 있습니다.",
+    "This code has expired or was tried too many times. Send a new one.": "코드가 만료되었거나 시도 횟수를 초과했습니다. 새 코드를 받으세요.",
+    "The code is 6 digits.": "코드는 6자리 숫자입니다.",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "코드 요청이 너무 많습니다. {m}분 후 다시 시도하거나 다른 방법으로 로그인하세요.",
+    "Wait {s} s before asking for another code.": "새 코드를 요청하려면 {s}초 기다리세요.",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "지금은 이메일 로그인이 혼잡합니다. 다른 방법으로 로그인하거나 잠시 후 다시 시도하세요.",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "코드를 보내지 못했습니다. 1분 후 다시 시도하거나 다른 방법으로 로그인하세요.",
+    "Email sign-in is not available here.": "여기서는 이메일 로그인을 사용할 수 없습니다.",
+    "Could not reach the server. Check your connection and try again.": "서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+    "Sign out": "로그아웃",
+    "This server has no login methods configured.": "이 서버에는 로그인 방법이 설정되어 있지 않습니다."
+};
+export default catalogue;
+//# sourceMappingURL=ko.js.map

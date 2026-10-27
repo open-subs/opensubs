@@ -10,7 +10,28 @@
   // parent picks the export up from the marker it left before opening this.
   import { t } from "./i18n/index.svelte";
 
-  let { onclose }: { onclose: () => void } = $props();
+  // `offline`: the press found no connection, so signing in cannot finish
+  // until there is one; the sheet says so, and the subtitles stay.
+  let { onclose, offline = false }: { onclose: () => void; offline?: boolean } = $props();
+
+  let online = $state(typeof navigator === "undefined" ? true : navigator.onLine !== false);
+  let reported = $state(false);
+  $effect(() => {
+    reported = offline;
+  });
+  $effect(() => {
+    const on = () => {
+      online = true;
+      reported = false;
+    };
+    const off = () => (online = false);
+    addEventListener("online", on);
+    addEventListener("offline", off);
+    return () => {
+      removeEventListener("online", on);
+      removeEventListener("offline", off);
+    };
+  });
 
   let sheet: HTMLDivElement | undefined = $state();
 
@@ -36,6 +57,11 @@
       {t("Create a free account or sign in to save your video. It is free, and nothing is uploaded: the video is still made here, on your device.")}
     </p>
     <openapps-login></openapps-login>
+    {#if !online || reported}
+      <p class="gate-offline" role="status" data-export-gate-offline>
+        {t("You're offline. Signing in needs a connection; your work stays here until you're back.")}
+      </p>
+    {/if}
     <div class="gate-actions">
       <button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>{t("Not now")}</button>
     </div>
@@ -78,6 +104,12 @@
 
   .gate-sheet :global(openapps-login) {
     display: block;
+  }
+
+  .gate-offline {
+    margin: var(--space-3) 0 0;
+    font-weight: 600;
+    color: var(--text-body);
   }
 
   .gate-actions {

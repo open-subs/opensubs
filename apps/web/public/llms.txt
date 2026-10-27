@@ -25,24 +25,33 @@ https://opensubs.app
 
 - **There is no upload endpoint in the product.** This is stronger than a
   promise not to upload: there is no server to upload to, so a footage leak
-  is not something that has to be prevented. It can be checked in the
-  browser's Network tab — after the page and the model have loaded, working
-  on a video produces no requests on the default on-device route.
+  is not something that has to be prevented. It can be checked in the browser's Network tab: on the default on-device route, no request carries the video, its audio or the subtitles. What you will see is the app's own files loading from opensubs.app or the browser's cache, the speech model from Hugging Face the first time, the sign-in when you burn, and anonymous counts of page views and of how far a task gets.
 - **No file-size limit, no queue, no watermark.** All three exist on hosted
   tools because the file has to reach a server and the server has to pay for
   the encode. Neither applies here.
-- **No account for anything that runs locally.** Transcription, on-device
-  translation, all 12 subtitle styles, word-by-word highlighting, trimming,
-  burning into MP4 and every export format work signed out. An account is
-  needed only for optional cloud translation on our own backend, priced at
-  $5 for 1,000 credits, with the price of a job shown before it runs.
+- **No account to try it.** Transcription, on-device translation, all 12
+  subtitle styles, word-by-word highlighting, trimming and every subtitle
+  file export (.srt, .vtt, .ass, .txt) work signed out. On opensubs.app,
+  burning the subtitles into an MP4 takes a free sign-in, with no payment.
+  An account is also needed for optional cloud translation on our own
+  backend, priced at $5 for 1,000 credits, with the price of a job shown
+  before it runs. The video is never uploaded either way.
 - **Mixed-language audio produces one subtitle file.** The spoken language
   is detected every four seconds rather than once per file, so a video that
   switches between two languages is transcribed in both. Whisper's own
   pipeline has no language detection at all; this is implemented on top of
   it.
+- **Subtitle editing in the web app.** Each cue's start and end time can be
+  typed or set from the current playback position, and is checked: start
+  before end, no overlap with the cues beside it, not past the end of the
+  video. Cues can be added (at the playhead or after a cue), deleted, split
+  (at the cursor or at the playhead) and merged with the next, with undo and
+  redo. A .srt or .vtt you open can be edited the same way. Once there is a
+  translation, each cue shows its original under it, also editable; a split
+  cuts the other language in proportion and marks both halves "Check the
+  translation". The editor works at phone width.
 - **Exports:** .srt, .vtt and .ass; .txt, the words alone with no timings;
-  or an MP4 with the subtitles burned in.
+  or an MP4 with the subtitles burned in. All of them use the edited cues.
 - **Licence:** AGPL-3.0-or-later.
 
 ## Honest limitations
@@ -74,11 +83,13 @@ https://opensubs.app
 - Cloud translation, if chosen, sends the subtitle *text* — never the video
   — to whichever provider was picked. Cloud transcription, if chosen, sends
   the audio span you trimmed to the service whose key you supplied — again,
-  never the video. The on-device options send nothing and are the defaults.
+  never the video. The on-device options send none of the text or audio anywhere and are the defaults.
 - iOS 17 Safari cannot run the recogniser at all; iOS 26 works.
-- **The editor changes words, not timings.** Cue text is editable; the start
-  and end times are not, and cues cannot be added, deleted or merged. A file
-  that is out of sync with its video needs a different tool.
+- **No timeline.** Times are typed or set from the playback position, one cue
+  at a time; nothing is dragged on a timeline. The phone apps get the
+  subtitle editing in a later store update. The browser extension and the
+  desktop app have no subtitle editor; an .srt saved by the extension can be
+  opened in the web app.
 
 ## Where it runs
 
@@ -104,11 +115,20 @@ Contact: hello@opensubs.app
 - [Browser extension](https://opensubs.app/browser-extension): subtitles over whatever is playing in the tab; Chrome, Edge and Firefox.
 - [Transcribe video](https://opensubs.app/transcribe-video): transcribing a video to text in the browser, exported as .txt (the words alone) or as .srt, .vtt or .ass.
 - [Whisper in the browser](https://opensubs.app/whisper-in-browser): how OpenSubs runs Whisper locally in the tab, and the three model sizes.
-- [Subtitle editor](https://opensubs.app/subtitle-editor): correcting the text of an .srt or .vtt in the browser; timings are not editable.
+- [Subtitle editor](https://opensubs.app/subtitle-editor): editing an .srt or .vtt in the browser: the text, each line's start and end time, and adding, deleting, splitting and merging lines.
 - [Caption generator](https://opensubs.app/caption-generator): generating captions from a video's speech in the browser, exported as a caption file or burned into an MP4.
 - [VTT to SRT](https://opensubs.app/vtt-to-srt): converting a .vtt to .srt in the browser, and what the conversion keeps and drops.
 - [SRT file generator](https://opensubs.app/srt-file-generator): creating an .srt file from a video's speech in the browser, and what the file contains.
 - [Bilingual subtitles](https://opensubs.app/bilingual-subtitles): putting the original and a translation on screen together, burned into an MP4 or exported, for your own video files.
+- [VEED and Kapwing alternative](https://opensubs.app/veed-alternative): OpenSubs compared with VEED and Kapwing for adding subtitles (price, watermark, upload, subtitle files, translation), each fact sourced, and when either of them is the better choice.
+- [Add subtitles to video](https://opensubs.app/add-subtitles-to-video): adding subtitles to a video in the browser in five steps, burned into an MP4 or saved as .srt/.vtt/.ass, and what it will not do.
+- [SRT to TXT](https://opensubs.app/srt-to-txt): converting an .srt or .vtt to plain text in the browser, the words alone without numbers or timecodes, and what the conversion removes.
+- [Add SRT to MP4](https://opensubs.app/add-srt-to-mp4): burning an existing .srt into an MP4 in the browser (hardcoded, not a switchable track), and the options for soft subtitles.
+- [Subtitle generator with no watermark](https://opensubs.app/subtitle-generator-no-watermark): what no watermark, no account to try, no upload and free mean on OpenSubs, and how to check each one.
+- [Japanese to English subtitles](https://opensubs.app/japanese-to-english-subtitles): make English subtitles from a Japanese video: Whisper writes the Japanese in the browser, then it is translated to English, free on your device in desktop Chrome, or with your own key or credits.
+- [影片轉文字](https://opensubs.app/zh-Hant/transcribe-video): Traditional Chinese page on transcribing a video to text in the browser (.txt, .srt, .vtt, .ass), and choosing 繁體中文 so the transcript is not converted to Simplified.
+- [影片上字幕](https://opensubs.app/zh-Hant/add-subtitles-to-video): Traditional Chinese page on adding subtitles to a video in the browser, burned into an MP4 (a free sign-in) or saved as .srt/.vtt/.ass.
+- [Transcrever vídeo em texto](https://opensubs.app/pt/transcribe-video): Portuguese page on transcribing a video to text in the browser, exported as .txt, .srt, .vtt or .ass.
 - [Blog](https://opensubs.app/blog)
 - [Privacy](https://opensubs.app/privacy): what is stored, and where.
 - [Windows desktop privacy policy](https://opensubs.app/desktop-privacy): the
@@ -140,3 +160,7 @@ extension, Transcribe video, Whisper in the browser and the blog — are in
 English. One blog post, How to add captions
 to a video, also has a Portuguese version at
 https://opensubs.app/pt/blog/how-to-add-captions-to-a-video.
+Transcribe video also has a Traditional Chinese version at
+https://opensubs.app/zh-Hant/transcribe-video and a Portuguese one at
+https://opensubs.app/pt/transcribe-video; Add subtitles to video has a
+Traditional Chinese version at https://opensubs.app/zh-Hant/add-subtitles-to-video.

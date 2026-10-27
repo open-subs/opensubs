@@ -236,7 +236,7 @@ mod tests {
     /// running app does not have.
     #[test]
     fn the_registry_path_is_read_as_a_list_of_directories() {
-        let out = "\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ                %USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps;            C:\\Users\\ycan4\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\r\n\r\n";
+        let out = "\r\nHKEY_CURRENT_USER\\Environment\r\n    Path    REG_EXPAND_SZ                %USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps;            C:\\Users\\example\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\r\n\r\n";
         let dirs = parse_reg_path(out);
         assert_eq!(dirs.len(), 2, "{dirs:?}");
         assert!(
@@ -269,12 +269,12 @@ mod tests {
     #[test]
     fn variables_in_a_registry_path_are_filled_in() {
         let get = |name: &str| match name {
-            "USERPROFILE" => Some("C:\\Users\\ycan4".to_string()),
+            "USERPROFILE" => Some("C:\\Users\\example".to_string()),
             _ => None,
         };
         assert_eq!(
             expand_env("%USERPROFILE%\\bin", get),
-            "C:\\Users\\ycan4\\bin"
+            "C:\\Users\\example\\bin"
         );
         // An unknown one is left alone rather than swallowed: it then simply
         // does not exist as a directory.

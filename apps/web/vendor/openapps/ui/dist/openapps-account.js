@@ -409,13 +409,21 @@ let OpenAppsAccount = class OpenAppsAccount extends OpenAppsElement {
         border-bottom: 1px solid var(--border-hairline, var(--fb-hairline));
         padding-bottom: 0.75rem;
       }
+      .head > :first-child {
+        min-width: 0;
+      }
       .right {
         text-align: right;
+        /* The balance keeps its own width: the account id beside it gives way
+           instead. A host that lets long words break anywhere (a dialog does,
+           for file names) otherwise broke 4,000 into "4,00" over "0". */
+        flex: none;
       }
       .balance {
         font-size: 1.5rem;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
       }
       .id {
         font-size: 0.8rem;

@@ -1,5 +1,5 @@
 import { type Session, type TokenStore } from "./storage.js";
-import type { AuthMethods, Challenge, CreditPackage, DeductResult, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, RedirectProvider, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup } from "./types.js";
+import type { AuthMethods, Challenge, CreditPackage, DeductResult, EmailPowChallenge, EmailPowSolution, EmailStart, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, RedirectProvider, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup } from "./types.js";
 /** Fetch implementations differ across runtimes; only this shape is used. */
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export interface OpenAppsOptions {
@@ -42,6 +42,24 @@ export declare class OpenApps {
          * everything afterwards is authenticated automatically.
          */
         verify: (challengeId: string, proof: Proof, options?: {
+            referralCode?: string;
+            signal?: AbortSignal;
+        }) => Promise<LoginResult>;
+        /** Email sign-in, step 0: a proof-of-work challenge to solve. */
+        emailPow: (signal?: AbortSignal) => Promise<EmailPowChallenge>;
+        /**
+         * Email sign-in, step 1: send a 6-digit code to `email`. `lang` is the
+         * sign-in box's language, so the mail matches it.
+         */
+        emailStart: (email: string, pow: EmailPowSolution, options?: {
+            lang?: string;
+            signal?: AbortSignal;
+        }) => Promise<EmailStart>;
+        /**
+         * Email sign-in, step 2: the code from the mail. Establishes the
+         * session, like {@link verify}.
+         */
+        emailVerify: (flowId: string, code: string, options?: {
             referralCode?: string;
             signal?: AbortSignal;
         }) => Promise<LoginResult>;

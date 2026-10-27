@@ -140,6 +140,11 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
         asked.add(JSON.parse(`"${m[1]}"`));
       }
     }
+    // The list's edits refuse with `fail("…")`, and the list shows the
+    // reason through t() -- so those are keys too.
+    if (path.basename(f) === "cueedit.ts") {
+      for (const m of src.matchAll(/\bfail\(\s*"((?:[^"\\]|\\.)*)"/g)) asked.add(JSON.parse(`"${m[1]}"`));
+    }
   }
   // Text that reaches t() through a variable rather than a literal: progress
   // notes, the device translator's status, and the panel's empty states.
@@ -163,6 +168,19 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
   ok("every t() string in the source is catalogued", absent.length === 0,
     `${absent.length}: ${absent.slice(0, 3).join(" | ")}`);
   if (process.env.LIST_MISSING) console.log(JSON.stringify(absent, null, 1));
+}
+
+// 7. "Save" is keeping a file, never economising. "Saves" (the export's
+//    "Saves sample.subbed.mp4 -- ...") went out as 節省 / 节省 / 削減 / 절감 /
+//    Spart / Ahorra / Economiza in all seven: the money sense of the word.
+{
+  const thrift = /节省|節省|节约|節約|削減|절감|절약|\bspar(t|en|e)?\b|ahorr|econom/i;
+  for (const [code, table] of Object.entries(CATALOGUES)) {
+    const wrong = Object.entries(table)
+      .filter(([k, v]) => /\b(save|saves|saved|saving)\b/i.test(k) && thrift.test(v))
+      .map(([k, v]) => `${k} = ${v}`);
+    ok(`${code} says "save" as storing a file, not saving money`, wrong.length === 0, wrong.slice(0, 3).join(" | "));
+  }
 }
 
 console.log(`${pass} passed, ${fails.length} failed`);

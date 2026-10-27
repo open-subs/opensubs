@@ -1,0 +1,37 @@
+/** The sign-in box in es. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "Continuar con correo",
+    "Continue with Google": "Continuar con Google",
+    "Continue with Apple": "Continuar con Apple",
+    "Continue with GitHub": "Continuar con GitHub",
+    "Continue with a wallet": "Continuar con una billetera",
+    "Continue with {name}": "Continuar con {name}",
+    "Continue with Nostr": "Continuar con Nostr",
+    "No extension? Use a remote signer": "¿Sin extensión? Usa un firmante remoto",
+    "Email address": "Correo electrónico",
+    "Send code": "Enviar código",
+    "Sending…": "Enviando…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "Enviamos un código de 6 dígitos a {email}. Sirve durante 10 minutos.",
+    "Code": "Código",
+    "Sign in": "Iniciar sesión",
+    "Checking…": "Comprobando…",
+    "Send a new code": "Enviar un código nuevo",
+    "Send a new code in {s}s": "Nuevo código en {s} s",
+    "Use a different email": "Usar otro correo",
+    "Not there? Check your spam folder.": "¿No llegó? Revisa la carpeta de spam.",
+    "Enter a valid email address.": "Escribe un correo electrónico válido.",
+    "That code is not right. 1 try left.": "El código no es correcto. Te queda 1 intento.",
+    "That code is not right. {n} tries left.": "El código no es correcto. Te quedan {n} intentos.",
+    "This code has expired or was tried too many times. Send a new one.": "Este código caducó o se intentó demasiadas veces. Pide uno nuevo.",
+    "The code is 6 digits.": "El código tiene 6 dígitos.",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "Se pidieron demasiados códigos. Vuelve a intentarlo en {m} min o inicia sesión de otra forma.",
+    "Wait {s} s before asking for another code.": "Espera {s} s antes de pedir otro código.",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "El inicio de sesión por correo está saturado ahora mismo. Inicia sesión de otra forma o inténtalo más tarde.",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "No se pudo enviar el código. Vuelve a intentarlo en un minuto o inicia sesión de otra forma.",
+    "Email sign-in is not available here.": "El inicio de sesión por correo no está disponible aquí.",
+    "Could not reach the server. Check your connection and try again.": "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.",
+    "Sign out": "Cerrar sesión",
+    "This server has no login methods configured.": "Este servidor no tiene ningún método de inicio de sesión configurado."
+};
+export default catalogue;
+//# sourceMappingURL=es.js.map

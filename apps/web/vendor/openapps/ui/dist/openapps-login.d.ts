@@ -10,6 +10,7 @@
 import { type TemplateResult } from "lit";
 import { OpenAppsElement } from "./base.js";
 export declare class OpenAppsLogin extends OpenAppsElement {
+    #private;
     private me;
     /** Methods the server has configured. Null until asked. */
     private enabled;
@@ -67,7 +68,23 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     private nostrHint;
     /** A bunker asking the user to approve in a browser. */
     private authUrl;
+    /**
+     * Email sign-in: closed, asking for the address, or asking for the code
+     * that was sent to it.
+     */
+    private emailStep;
+    private emailAddress;
+    private emailFlow;
+    private emailError;
+    /** Seconds until "Send a new code" is allowed again. */
+    private resendIn;
+    /** The page's language, read fresh so a language switch is followed. */
+    private get locale();
+    private tr;
+    /** Fetch the page language's strings the first time it is seen. */
+    protected willUpdate(): void;
     connectedCallback(): void;
+    disconnectedCallback(): void;
     protected onSessionChange(): void;
     private load;
     /** See `<openapps-account>`'s own version: one wallet connects, several
@@ -83,6 +100,17 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     /** See `shareSigner`. The pubkey is read off the event that was signed,
      * which the server has just verified. */
     private shareNostrSigner;
+    private openEmail;
+    /** Start solving the next proof of work, if one is not already under way. */
+    private prepareEmailPow;
+    /** The prepared proof of work, spent: each one is good for one send. */
+    private takeEmailPow;
+    private sendEmailCode;
+    private startResendCountdown;
+    private onCodeInput;
+    private verifyEmailCode;
+    private closeEmail;
+    private describeEmailError;
     private loginWithRedirect;
     private logout;
     render(): TemplateResult;
@@ -94,6 +122,14 @@ export declare class OpenAppsLogin extends OpenAppsElement {
      * the same surface sit in a modal, a settings pane and a route.
      */
     private frame;
+    /**
+     * The email form: the address, then the code sent to it.
+     *
+     * `autocomplete="one-time-code"` lets iOS and Android offer the code
+     * straight from the mail notification, and `inputmode="numeric"` brings
+     * up the number pad; neither needs the code to leave this page.
+     */
+    private renderEmailForm;
     /**
      * The two ways to sign Nostr without a browser extension.
      *

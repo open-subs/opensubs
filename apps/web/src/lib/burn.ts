@@ -50,6 +50,7 @@ import {
 } from "mediabunny";
 
 import { SubtitleRaster } from "./raster";
+import { Say } from "./say";
 
 export interface BurnOptions {
   file: File;
@@ -137,6 +138,94 @@ function bitrateFor(width: number, height: number): number {
   return Math.round(Math.min(Math.max(perFrame * 30, 2_000_000), 40_000_000));
 }
 
+/**
+ * A failure the person can act on, with the category the burn is counted
+ * under and the name of the error behind it (never its message, which can
+ * carry a file name).
+ */
+export type BurnFailure = Say & { category: string; ename: string };
+
+function failure(say: Say, category: string, ename: string): BurnFailure {
+  return Object.assign(say, { category, ename });
+}
+
+/**
+ * The chosen file can no longer be read.
+ *
+ * A `File` from a picker is a reference to bytes on disk, checked against
+ * the file as it was when it was chosen. If it has since been moved,
+ * changed or deleted, or it is a cloud placeholder whose bytes never
+ * arrived, Chromium fails every read: the demuxer then reports "Input has an
+ * unsupported or unrecognizable format" when nothing was read at all, or a
+ * TypeError "network error" when a read stream breaks. Both said the wrong
+ * thing, and retrying the same `File` fails the same way every time. The
+ * only cure is choosing the file again.
+ */
+function unreadable(error: unknown): BurnFailure {
+  const name = (error as { name?: string } | null)?.name || "NotReadableError";
+  return failure(
+    new Say(
+      "OpenSubs can no longer read this video. It may have been moved, changed or deleted since you chose it, or it is still in the cloud or still being saved. Save a copy on this device, then choose it again.",
+    ),
+    "file-read",
+    name,
+  );
+}
+
+/**
+ * Read both ends of the file, so a file that has gone fails here, at once,
+ * with a sentence that says what to do.
+ *
+ * Three ways it goes are checked: a read that throws; a read that comes
+ * back short; and a size of zero -- Chromium re-reads a picked file's size,
+ * so one deleted after it was chosen reports 0 bytes and every slice of it
+ * reads "successfully" as nothing, which the demuxer then called an
+ * unrecognizable format. Reading the whole of an empty file is what makes
+ * the browser name the real cause (NotFoundError).
+ */
+async function checkReadable(file: File): Promise<void> {
+  if (file.size === 0) {
+    try {
+      await file.arrayBuffer();
+    } catch (error) {
+      throw unreadable(error);
+    }
+    throw unreadable({ name: "EmptyFile" });
+  }
+  const edge = 64 * 1024;
+  const ends = file.size > edge ? [[0, edge], [file.size - edge, file.size]] : [[0, file.size]];
+  for (const [from, to] of ends) {
+    let got: number;
+    try {
+      got = (await file.slice(from, to).arrayBuffer()).byteLength;
+    } catch (error) {
+      throw unreadable(error);
+    }
+    if (got !== to - from) throw unreadable({ name: "ShortRead" });
+  }
+}
+
+/** A read failure from the demuxer, said as what it is. */
+async function demuxFailure(file: File, error: unknown): Promise<unknown> {
+  const e = error as { name?: string; message?: string } | null;
+  if (e?.name === "AbortError") return error;
+  // A file that went away mid-read looks like a bad format; ask the file.
+  try {
+    await checkReadable(file);
+  } catch (gone) {
+    return gone;
+  }
+  if (e?.name === "TypeError" && /^network error$/i.test(e?.message ?? "")) return unreadable(error);
+  if (e?.name === "UnsupportedInputFormatError" || /unsupported or unrecognizable format/i.test(e?.message ?? "")) {
+    return failure(
+      new Say("This video's format cannot be read for burning here. Convert it to MP4 and choose it again."),
+      "unsupported-format",
+      e?.name || "UnsupportedInputFormatError",
+    );
+  }
+  return error;
+}
+
 function assertNotAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
 }
@@ -148,12 +237,31 @@ export async function burnInBrowser(options: BurnOptions): Promise<BurnResult> {
   if (!support.ok) throw new Error(support.reason ?? "Encoding is not supported here.");
 
   onProgress?.(0, "Reading the video");
+  await checkReadable(file);
 
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
-  const videoTrack = await input.getPrimaryVideoTrack();
-  if (!videoTrack) throw new Error("That file has no video track.");
-
-  const sourceDuration = await input.computeDuration();
+  const { videoTrack, sourceDuration } = await (async () => {
+    try {
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error("That file has no video track.");
+      return { videoTrack: track, sourceDuration: await input.computeDuration() };
+    } catch (error) {
+      input.dispose();
+      throw await demuxFailure(file, error);
+    }
+  })();
+  // Said here, before anything is set up, rather than as a decode error on
+  // the first frame.
+  if (!(await videoTrack.canDecode().catch(() => true))) {
+    input.dispose();
+    throw failure(
+      new Say("This browser cannot decode this video ({codec}). Convert it to MP4 (H.264) and choose it again.", {
+        codec: String(videoTrack.codec ?? "unknown"),
+      }),
+      "codec-unsupported",
+      "NotSupportedError",
+    );
+  }
   const clipStart = Math.max(0, start);
   const clipEnd = end != null && end > clipStart ? Math.min(end, sourceDuration) : sourceDuration;
   const clipDuration = Math.max(0, clipEnd - clipStart);
@@ -230,6 +338,9 @@ export async function burnInBrowser(options: BurnOptions): Promise<BurnResult> {
     // --- video: decode, composite, encode ------------------------------
     const sampleSink = new VideoSampleSink(videoTrack);
     let frames = 0;
+    // Said before the first frame, not after the fifth, so a failure on
+    // frame one is reported as the burn and not as the audio copy.
+    onProgress?.(0, "Burning 0%");
 
     for await (const sample of sampleSink.samples(clipStart, clipEnd)) {
       assertNotAborted(signal);
@@ -279,6 +390,10 @@ export async function burnInBrowser(options: BurnOptions): Promise<BurnResult> {
     // Leave no half-written muxer behind; a cancelled export must not
     // wedge the next one.
     await output.cancel().catch(() => {});
+    // The file is read again for every frame, so it can go away mid-burn.
+    const e = error as { name?: string; message?: string } | null;
+    if (e?.name === "TypeError" && /^network error$/i.test(e?.message ?? "")) throw await demuxFailure(file, error);
+    if (e?.name === "NotReadableError" || e?.name === "NotFoundError") throw unreadable(error);
     throw error;
   } finally {
     raster.destroy();

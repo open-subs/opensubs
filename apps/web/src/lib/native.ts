@@ -115,3 +115,110 @@ export function appleStore(): NativeStore | null {
 export function mustUseInAppPurchase(): boolean {
   return onApple();
 }
+
+/**
+ * What Apple's own sign-in sheet hands back (apps/mobile/ios/App/App/
+ * OpenSubsAuth.swift, `signInWithApple`).
+ *
+ * The identity token is a JWT Apple signed, addressed to this app's bundle
+ * id and carrying the nonce it was asked for; the server checks all three.
+ * The authorization code is spent by the server on Apple's refresh token,
+ * which exists so that deleting the account can revoke the grant.
+ */
+export type NativeAppleResult =
+  | { status: "signed-in"; identityToken: string; authorizationCode?: string }
+  // Not an error, for the same reason a cancelled purchase is not.
+  | { status: "cancelled" };
+
+export interface NativeAuth {
+  signInWithApple(options: { nonce: string }): Promise<NativeAppleResult>;
+}
+
+const authPlugin = registerPlugin<NativeAuth>("OpenSubsAuth");
+
+/**
+ * The shell's Sign in with Apple, or `null` where there is none: every
+ * browser, and an iOS build from before the method existed. The plugin has
+ * been in the shell since the Google sign-in fix, so its presence alone
+ * says nothing; the method is asked for by name.
+ */
+export function nativeAppleSignIn(): NativeAuth | null {
+  if (!onApple() || !Capacitor.isPluginAvailable("OpenSubsAuth")) return null;
+  const methods = (
+    (globalThis as { Capacitor?: { PluginHeaders?: { name: string; methods: { name: string }[] }[] } })
+      .Capacitor?.PluginHeaders ?? []
+  ).find((p) => p.name === "OpenSubsAuth")?.methods;
+  if (methods && !methods.some((m) => m.name === "signInWithApple")) return null;
+  return authPlugin;
+}
+
+/**
+ * The shell's share sheet (apps/mobile/ios/App/App/OpenSubsShare.swift).
+ *
+ * Exists because a WKWebView drops `<a download>`: the export buttons
+ * save by clicking a blob link, which in a browser is a download and in
+ * the shell is nothing at all. `write` puts bytes into a temporary file,
+ * in base64 chunks, and `share` opens the system sheet on it -- "Save to
+ * Files" for anything, "Save Video" for a burned video.
+ */
+export interface NativeShare {
+  write(options: { name: string; data: string; append: boolean }): Promise<void>;
+  share(options: { name: string }): Promise<{ completed: boolean; activity: string }>;
+}
+
+const sharePlugin = registerPlugin<NativeShare>("OpenSubsShare");
+
+/**
+ * The share sheet, or `null` in every browser -- and in an iOS build from
+ * before the plugin, where the export buttons stay what they were.
+ */
+export function nativeShare(): NativeShare | null {
+  if (!onApple() || !Capacitor.isPluginAvailable("OpenSubsShare")) return null;
+  return sharePlugin;
+}
+
+/** Bytes per bridge call: 1.5 MiB, a multiple of 3, so every chunk
+ *  encodes to base64 with no padding and the chunks concatenate into the
+ *  file. Small enough that the web view never holds much of a long video
+ *  as a string at once. */
+const SHARE_CHUNK = 3 * 512 * 1024;
+
+function chunkToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result);
+      resolve(url.slice(url.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+let sharing = false;
+
+/**
+ * Hands an export to the share sheet. Returns `false` where there is no
+ * sheet to hand it to, so the caller does what a browser does instead.
+ *
+ * A second tap while a large video is still crossing the bridge is
+ * ignored rather than starting a second copy over the first.
+ */
+export async function shareFile(blob: Blob, name: string): Promise<boolean> {
+  const shell = nativeShare();
+  if (!shell) return false;
+  if (sharing) return true;
+  sharing = true;
+  try {
+    let at = 0;
+    do {
+      const data = await chunkToBase64(blob.slice(at, at + SHARE_CHUNK));
+      await shell.write({ name, data, append: at > 0 });
+      at += SHARE_CHUNK;
+    } while (at < blob.size);
+    await shell.share({ name });
+  } finally {
+    sharing = false;
+  }
+  return true;
+}

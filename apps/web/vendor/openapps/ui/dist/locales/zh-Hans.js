@@ -1,0 +1,37 @@
+/** The sign-in box in zh-Hans. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "使用邮箱继续",
+    "Continue with Google": "使用 Google 继续",
+    "Continue with Apple": "使用 Apple 继续",
+    "Continue with GitHub": "使用 GitHub 继续",
+    "Continue with a wallet": "使用钱包继续",
+    "Continue with {name}": "使用 {name} 继续",
+    "Continue with Nostr": "使用 Nostr 继续",
+    "No extension? Use a remote signer": "没有扩展？使用远程签名器",
+    "Email address": "邮箱地址",
+    "Send code": "发送验证码",
+    "Sending…": "正在发送…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "我们已向 {email} 发送了 6 位验证码，10 分钟内有效。",
+    "Code": "验证码",
+    "Sign in": "登录",
+    "Checking…": "正在验证…",
+    "Send a new code": "重新发送验证码",
+    "Send a new code in {s}s": "{s} 秒后可重新发送",
+    "Use a different email": "换一个邮箱",
+    "Not there? Check your spam folder.": "没收到？请检查垃圾邮件文件夹。",
+    "Enter a valid email address.": "请输入有效的邮箱地址。",
+    "That code is not right. 1 try left.": "验证码不正确，还可以再试 1 次。",
+    "That code is not right. {n} tries left.": "验证码不正确，还可以再试 {n} 次。",
+    "This code has expired or was tried too many times. Send a new one.": "验证码已过期或尝试次数过多，请重新发送。",
+    "The code is 6 digits.": "验证码为 6 位数字。",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "请求验证码的次数过多。请在 {m} 分钟后重试，或改用其他方式登录。",
+    "Wait {s} s before asking for another code.": "请等待 {s} 秒后再请求新的验证码。",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "邮箱登录当前繁忙，请改用其他方式登录，或稍后再试。",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "验证码发送失败。请一分钟后重试，或改用其他方式登录。",
+    "Email sign-in is not available here.": "此处暂不支持邮箱登录。",
+    "Could not reach the server. Check your connection and try again.": "无法连接服务器，请检查网络后重试。",
+    "Sign out": "退出登录",
+    "This server has no login methods configured.": "此服务器未配置任何登录方式。"
+};
+export default catalogue;
+//# sourceMappingURL=zh-Hans.js.map

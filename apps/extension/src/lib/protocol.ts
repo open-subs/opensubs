@@ -47,6 +47,12 @@ export interface Settings {
    * engine.ts `startsOnCpu`); "gpu" and "cpu" are the user's.
    */
   backend: "auto" | "gpu" | "cpu";
+  /**
+   * The language the extension speaks: "auto" follows the browser's interface
+   * language, otherwise one of the shipped locales (lib/i18n.ts). Not the
+   * language of the video -- that is `language`.
+   */
+  locale?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -56,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   overlay: true,
   fontScale: DEFAULT_SIZE,
   backend: "auto",
+  locale: "auto",
 };
 
 /** Sent by the popup; handled by the background. */
@@ -147,7 +154,7 @@ export type ToPage =
 
 /** Background <-> engine host. */
 export type ToEngine =
-  | { kind: "warm"; model: string; backend: Settings["backend"] }
+  | { kind: "warm"; model: string; backend: Settings["backend"]; locale?: string }
   | { kind: "transcribe"; audio: WireAudio; mime: string; offset: number; settings: Settings; take?: number }
   | { kind: "release" };
 

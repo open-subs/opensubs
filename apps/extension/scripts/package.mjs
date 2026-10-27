@@ -5,7 +5,7 @@
 // submitted from here -- upload is the last automated step, and the
 // publish button belongs to a person.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,10 +22,12 @@ for (const [dir, name] of [["dist", "chrome"], ["dist-firefox", "firefox"]]) {
     process.exit(1);
   }
   const zip = join(out, `opensubs-${name}-${version}.zip`);
-  rmSync(zip, { force: true });
-  // -r from inside the directory, so the manifest is at the archive root.
-  // A zip of the folder is rejected by every store with a message about a
-  // missing manifest, which is true and unhelpful.
-  execFileSync("zip", ["-qr", zip, "."], { cwd: from });
+  // store-zip.mjs zips from inside the directory, so the manifest is at the
+  // archive root (a zip of the folder is rejected by every store with a
+  // message about a missing manifest, which is true and unhelpful). It also
+  // leaves any manifest `key` out of the zip and reads the zip back: the
+  // Chrome Web Store refuses a key that does not match the listing, and Edge
+  // Add-ons refuses any key, both only after the upload.
+  execFileSync("node", [join(here, "store-zip.mjs"), from, zip], { stdio: "inherit" });
   console.log(`packages/opensubs-${name}-${version}.zip`);
 }

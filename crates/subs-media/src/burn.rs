@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 /// Unescaped, every absolute path on Windows breaks the burn:
 /// `C:\Users\...\subs.ass` split at the drive colon, the rest read as the
 /// filter's next option, and the backslashes consumed as escapes --
-/// "Unable to parse option value \"Usersycan4subs.ass\"". The same bytes
+/// "Unable to parse option value \"Usersexamplesubs.ass\"". The same bytes
 /// in a path on macOS or Linux are legal file names, which is how the tests
 /// below reproduce it without Windows.
 pub fn filter_path(path: &Path) -> String {
@@ -313,8 +313,8 @@ mod tests {
     #[test]
     fn a_windows_path_is_escaped_for_both_filter_parsers() {
         assert_eq!(
-            filter_path(Path::new(r"C:\Users\ycan4\AppData\Local\Temp\subs.ass")),
-            r"C\\:\\\\Users\\\\ycan4\\\\AppData\\\\Local\\\\Temp\\\\subs.ass"
+            filter_path(Path::new(r"C:\Users\example\AppData\Local\Temp\subs.ass")),
+            r"C\\:\\\\Users\\\\example\\\\AppData\\\\Local\\\\Temp\\\\subs.ass"
         );
     }
 

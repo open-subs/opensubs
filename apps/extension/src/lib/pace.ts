@@ -4,6 +4,8 @@
  * engine, which pulls in the whole of Whisper.
  */
 
+import { t, tn } from "./i18n.ts";
+
 /** The part of `AsrSupport` (../../../web/src/lib/asr) the choice reads. */
 export interface Support {
   integrated?: boolean;
@@ -45,9 +47,14 @@ export function enqueue<T>(waiting: T[], item: T, max: number): boolean {
  * keep up for good -- unless that is already the model in use.
  */
 export function behindNote(waiting: number, model: string): string {
-  const n = `${waiting} window${waiting === 1 ? "" : "s"}`;
-  if (waiting < 2 || /tiny/i.test(model)) return `Transcribing (catching up: ${n} waiting)`;
-  return `Transcribing (${n} behind -- the Tiny model keeps up on slower machines)`;
+  if (waiting < 2 || /tiny/i.test(model)) {
+    return tn(
+      "Transcribing (catching up: {n} window waiting)",
+      "Transcribing (catching up: {n} windows waiting)",
+      waiting,
+    );
+  }
+  return t("Transcribing ({n} windows behind -- the Tiny model keeps up on slower machines)", { n: waiting });
 }
 
 /**

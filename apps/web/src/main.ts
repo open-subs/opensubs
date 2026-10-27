@@ -2,6 +2,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import AccountBadge from "./AccountBadge.svelte";
 import LanguagePicker from "./lib/LanguagePicker.svelte";
+import { inNativeShell } from "./lib/native";
 import "./app.css";
 
 const target = document.getElementById("app");
@@ -36,5 +37,12 @@ if (badge) mount(AccountBadge, { target: badge });
 // it to find the one control that fixes that.
 const picker = document.getElementById("language");
 if (picker) mount(LanguagePicker, { target: picker });
+
+// The "having trouble?" box (lib/support.ts), in a browser tab only: in the
+// phone shells every <openapps-support> stays an unknown element that renders
+// nothing. Loaded after the app, since nothing on the first screen needs it.
+if (/^https?:$/.test(location.protocol) && !inNativeShell()) {
+  import("./lib/support").catch(() => {});
+}
 
 export default app;

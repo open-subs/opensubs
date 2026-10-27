@@ -11,6 +11,7 @@
 import { api, blobToWire, tell, type BeginAnswer, type Cue, type FromPage, type Settings, type ToPage } from "../lib/protocol";
 import { findMedia, openAudio, playingMedia, recordWindows, waitForPlaying, whyNoMedia } from "../lib/capture";
 import { BEHIND_S, liveLine, type Catchup } from "../lib/pace";
+import { t, tError, useLocale } from "../lib/i18n";
 
 const HOST_ID = "opensubs-overlay-host";
 
@@ -92,7 +93,7 @@ function paint() {
   line.style.fontSize = `calc((1.6vw + 12px) * ${settings?.fontScale ?? 1})`;
 
   if (note) {
-    const behind = shown && shown.lag > BEHIND_S ? `${Math.round(shown.lag)}s behind` : "";
+    const behind = shown && shown.lag > BEHIND_S ? t("{n}s behind", { n: Math.round(shown.lag) }) : "";
     if (behind) {
       note.textContent = behind;
       sayingBehind = true;
@@ -211,6 +212,7 @@ async function adopt(found: { el: HTMLMediaElement; stream: MediaStream }, annou
  */
 async function begin(next: Settings): Promise<BeginAnswer> {
   settings = next;
+  useLocale(next.locale);
   const el = findMedia();
   if (!el) return { found: false, reason: whyNoMedia() };
   const opened = openAudio(el);
@@ -236,13 +238,13 @@ async function begin(next: Settings): Promise<BeginAnswer> {
     if (found && "el" in found) { await adopt(found, true); return; }
     await tell<FromPage>({
       kind: "media", found: false, duration: 0,
-      reason: found?.reason ?? "The clip that was playing ended, and nothing played after it. Start the video and press Start again.",
+      reason: found?.reason ?? t("The clip that was playing ended, and nothing played after it. Start the video and press Start again."),
     });
     halt();
   })();
   return {
     found: true, duration: 0, url: location.href, video: fingerprint(el),
-    waiting: "Waiting for the ad to finish -- its audio cannot be read",
+    waiting: t("Waiting for the ad to finish -- its audio cannot be read"),
   };
 }
 
@@ -304,7 +306,7 @@ async function record() {
     if (!stillMine()) return;
     await tell<FromPage>({
       kind: "media", found: false, duration: 0,
-      reason: e instanceof Error ? e.message : String(e),
+      reason: tError(e instanceof Error ? e.message : String(e)),
     });
     halt();
     return;
@@ -365,7 +367,7 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
       // Answered when the video has been found and opened, not before: see
       // BeginAnswer.
       void begin(message.settings).then(respond, (e) =>
-        respond({ found: false, reason: e instanceof Error ? e.message : String(e) } satisfies BeginAnswer));
+        respond({ found: false, reason: tError(e instanceof Error ? e.message : String(e)) } satisfies BeginAnswer));
       return true;
     case "halt": halt(); break;
     case "cues":
@@ -377,6 +379,7 @@ api.runtime.onMessage.addListener((message: ToPage, _sender, respond) => {
       break;
     case "settings":
       settings = message.settings;
+      useLocale(settings.locale);
       if (settings.overlay) ensureOverlay();
       else removeOverlay();
       paint();

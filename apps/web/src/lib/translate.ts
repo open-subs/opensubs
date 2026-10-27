@@ -130,7 +130,7 @@ interface TranslatorApi {
 
 interface DetectorApi {
   availability(): Promise<string>;
-  create(): Promise<{ detect(text: string): Promise<{ detectedLanguage: string }[]> }>;
+  create(): Promise<{ detect(text: string): Promise<{ detectedLanguage: string; confidence?: number }[]> }>;
 }
 
 function translatorApi(): TranslatorApi | null {
@@ -199,6 +199,35 @@ export async function detectLanguage(text: string): Promise<string | null> {
     const detector = await api.create();
     const results = await detector.detect(text.slice(0, 2000));
     return results[0]?.detectedLanguage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The language of the text, only when the detector is sure of it.
+ *
+ * Used to refuse a paid job before it is sent, so a wrong answer would
+ * block a real translation; anything short of `min` confidence is no
+ * answer at all. Only a model already on the machine is asked, and only
+ * for `waitMs`: `create()` on a "downloadable" model starts a download and
+ * waits for it, which would hold the Translate button for as long as that
+ * takes -- forever, in a headless browser.
+ */
+export async function detectLanguageConfidently(text: string, min = 0.9, waitMs = 2000): Promise<string | null> {
+  const api = detectorApi();
+  if (!api) return null;
+  const ask = async () => {
+    if ((await api.availability()) !== "available") return null;
+    const detector = await api.create();
+    const top = (await detector.detect(text.slice(0, 2000)))[0];
+    return top && (top.confidence ?? 0) >= min ? top.detectedLanguage : null;
+  };
+  try {
+    return await Promise.race([
+      ask(),
+      new Promise<null>((done) => setTimeout(() => done(null), waitMs)),
+    ]);
   } catch {
     return null;
   }

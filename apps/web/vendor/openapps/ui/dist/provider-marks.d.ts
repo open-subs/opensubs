@@ -63,4 +63,10 @@ export declare const githubMark: SVGTemplateResult;
  * neutral as the others in the row. Path: Font Awesome Free, CC BY 4.0.
  */
 export declare const appleMark: SVGTemplateResult;
+/**
+ * An envelope, for "Continue with email". Lucide's `mail` (ISC), drawn in
+ * `currentColor`: email is not a brand, so it takes the button's own text
+ * colour like any other icon.
+ */
+export declare const emailMark: SVGTemplateResult;
 //# sourceMappingURL=provider-marks.d.ts.map

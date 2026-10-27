@@ -1,0 +1,37 @@
+/** The sign-in box in de. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "Weiter mit E-Mail",
+    "Continue with Google": "Weiter mit Google",
+    "Continue with Apple": "Weiter mit Apple",
+    "Continue with GitHub": "Weiter mit GitHub",
+    "Continue with a wallet": "Weiter mit einer Wallet",
+    "Continue with {name}": "Weiter mit {name}",
+    "Continue with Nostr": "Weiter mit Nostr",
+    "No extension? Use a remote signer": "Keine Erweiterung? Remote-Signer verwenden",
+    "Email address": "E-Mail-Adresse",
+    "Send code": "Code senden",
+    "Sending…": "Wird gesendet…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "Wir haben einen 6-stelligen Code an {email} gesendet. Er gilt 10 Minuten.",
+    "Code": "Code",
+    "Sign in": "Anmelden",
+    "Checking…": "Wird geprüft…",
+    "Send a new code": "Neuen Code senden",
+    "Send a new code in {s}s": "Neuer Code in {s} s",
+    "Use a different email": "Andere E-Mail-Adresse verwenden",
+    "Not there? Check your spam folder.": "Nicht angekommen? Sehen Sie im Spam-Ordner nach.",
+    "Enter a valid email address.": "Geben Sie eine gültige E-Mail-Adresse ein.",
+    "That code is not right. 1 try left.": "Der Code ist nicht richtig. Noch 1 Versuch.",
+    "That code is not right. {n} tries left.": "Der Code ist nicht richtig. Noch {n} Versuche.",
+    "This code has expired or was tried too many times. Send a new one.": "Dieser Code ist abgelaufen oder wurde zu oft versucht. Fordern Sie einen neuen an.",
+    "The code is 6 digits.": "Der Code hat 6 Ziffern.",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "Es wurden zu viele Codes angefordert. Versuchen Sie es in {m} Minuten erneut oder melden Sie sich anders an.",
+    "Wait {s} s before asking for another code.": "Warten Sie {s} Sekunden, bevor Sie einen neuen Code anfordern.",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "Die Anmeldung per E-Mail ist gerade ausgelastet. Melden Sie sich anders an oder versuchen Sie es später erneut.",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "Der Code konnte nicht gesendet werden. Versuchen Sie es in einer Minute erneut oder melden Sie sich anders an.",
+    "Email sign-in is not available here.": "Die Anmeldung per E-Mail ist hier nicht verfügbar.",
+    "Could not reach the server. Check your connection and try again.": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "Sign out": "Abmelden",
+    "This server has no login methods configured.": "Auf diesem Server ist keine Anmeldemethode eingerichtet."
+};
+export default catalogue;
+//# sourceMappingURL=de.js.map

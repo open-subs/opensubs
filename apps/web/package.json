@@ -29,13 +29,18 @@
     "test:remote": "node --experimental-strip-types e2e/remote.mjs",
     "build:locales": "python3 scripts/build-locale-pages.py --strict",
     "test:iap": "node --experimental-strip-types e2e/iap.mjs",
+    "test:apple-native": "node e2e/apple-native.mjs",
+    "test:audio-fallback": "node e2e/audio-fallback.mjs",
     "test:engine": "node e2e/enginecheck/serve.mjs",
     "test:refill": "node --experimental-strip-types e2e/refill.mjs",
     "test:device": "node --experimental-strip-types e2e/device.mjs",
     "test:windows": "node --experimental-strip-types e2e/windows.mjs",
     "test:shortfall": "node --experimental-strip-types e2e/shortfall.mjs",
     "test:restore": "node e2e/restore.mjs",
-    "test:export-gate": "node e2e/export-gate.mjs"
+    "test:export-gate": "node e2e/export-gate.mjs",
+    "test:export-gate-offline": "node e2e/export-gate-offline.mjs",
+    "test:cueedit": "node --experimental-strip-types e2e/cueedit.mjs",
+    "test:cue-edit": "node e2e/cue-edit.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {

@@ -11,7 +11,7 @@ export type ErrorCode = "bad_request" | "unauthorized" | "insufficient_balance" 
 /** The request never reached the server (offline, DNS, CORS, abort). */
  | "network"
 /** A poll helper gave up before the top-up reached a terminal state. */
- | "timeout";
+ | "timeout" | "email_invalid" | "email_unavailable" | "email_too_soon" | "email_limited" | "email_busy" | "email_send_failed" | "pow_invalid" | "code_wrong" | "code_expired" | "code_format";
 export declare class OpenAppsError extends Error {
     readonly code: ErrorCode;
     /** HTTP status, or 0 when the request never got a response. */

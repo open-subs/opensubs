@@ -28,6 +28,7 @@ import { isSignOff } from "../../../web/src/lib/cleanup";
 import { isChinese, toSimplified, wantsTraditional } from "../../../web/src/lib/script";
 import { addEvidence, chooseLanguages, settledLanguage, type Evidence } from "../lib/autolang";
 import { AUTO_BEHIND, AUTO_FAST, behindNote, enqueue, maxWaiting, pickModel, startsOnCpu } from "../lib/pace";
+import { t, tError, tn, useLocale } from "../lib/i18n";
 import { fromWire, type Cue, type FromEngine, type Settings, type Status, type ToEngine, type WireAudio } from "../lib/protocol";
 
 export type Emit = (message: FromEngine) => void;
@@ -193,7 +194,7 @@ export function createEngine(emit: Emit): Engine {
         say({
           stage: "model",
           fraction: null,
-          note: "Using the Tiny model, which keeps up on this machine",
+          note: t("Using the Tiny model, which keeps up on this machine"),
           device,
         });
       }
@@ -223,7 +224,7 @@ export function createEngine(emit: Emit): Engine {
           say({
             stage: p.stage === "model" ? "model" : "transcribing",
             fraction: p.fraction,
-            note: p.note,
+            note: t(p.note),
             device,
           });
         },
@@ -255,7 +256,7 @@ export function createEngine(emit: Emit): Engine {
         emit({ kind: "segments", cues: [], offset, take });
         return;
       }
-      emit({ kind: "failed", message: why });
+      emit({ kind: "failed", message: tError(why) });
     }
   }
 
@@ -273,7 +274,7 @@ export function createEngine(emit: Emit): Engine {
       const wanted = pickModel(model, device, behind);
       if (model === "auto" && wanted === AUTO_FAST && said !== wanted) {
         said = wanted;
-        say({ stage: "model", fraction: null, note: "Using the Tiny model, which keeps up on this machine", device });
+        say({ stage: "model", fraction: null, note: t("Using the Tiny model, which keeps up on this machine"), device });
       }
       await loadLocalModel({
         model: wanted,
@@ -281,7 +282,7 @@ export function createEngine(emit: Emit): Engine {
         wasmProxy: true,
         onProgress: (p) => {
           if (loaded === `${model}|${device}`) return;
-          say({ stage: p.stage === "model" ? "model" : "transcribing", fraction: p.fraction, note: p.note, device });
+          say({ stage: p.stage === "model" ? "model" : "transcribing", fraction: p.fraction, note: t(p.note), device });
         },
       });
       loaded = `${wanted}|${device}`;
@@ -312,12 +313,17 @@ export function createEngine(emit: Emit): Engine {
   return {
     handle(message) {
       if (message.kind === "transcribe") {
+        useLocale(message.settings.locale);
         if (enqueue(waiting, message, maxWaiting(message.settings.window))) {
           dropped += 1;
           say({
             stage: "transcribing",
             fraction: null,
-            note: `Transcribing (${dropped} window${dropped === 1 ? "" : "s"} skipped to keep up)`,
+            note: tn(
+              "Transcribing ({n} window skipped to keep up)",
+              "Transcribing ({n} windows skipped to keep up)",
+              dropped,
+            ),
             device,
           });
         } else if (running) {
@@ -328,6 +334,7 @@ export function createEngine(emit: Emit): Engine {
         return;
       }
       if (message.kind === "warm") {
+        useLocale(message.locale);
         // A Start. Whatever the last capture learned belongs to that video,
         // and its count of dropped windows belongs to that run -- carried
         // over, the second video would open "(5 windows skipped)".
@@ -337,7 +344,7 @@ export function createEngine(emit: Emit): Engine {
         behind = false;
         said = null;
         waiting.length = 0;
-        say({ stage: "model", fraction: null, note: "Loading the speech model", device });
+        say({ stage: "model", fraction: null, note: t("Loading the speech model"), device });
         // And fetch it now, rather than when the first window arrives: the
         // page records for twenty seconds before there is any audio to read,
         // and nothing used that time. The first subtitle was a whole window

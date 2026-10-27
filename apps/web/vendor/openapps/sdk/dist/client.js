@@ -189,6 +189,33 @@ export class OpenApps {
             });
             return result;
         },
+        /** Email sign-in, step 0: a proof-of-work challenge to solve. */
+        emailPow: (signal) => this.#request("/v1/auth/email/pow", { signal }),
+        /**
+         * Email sign-in, step 1: send a 6-digit code to `email`. `lang` is the
+         * sign-in box's language, so the mail matches it.
+         */
+        emailStart: (email, pow, options = {}) => this.#request("/v1/auth/email/start", {
+            method: "POST",
+            body: { email, pow, lang: options.lang },
+            signal: options.signal,
+        }),
+        /**
+         * Email sign-in, step 2: the code from the mail. Establishes the
+         * session, like {@link verify}.
+         */
+        emailVerify: async (flowId, code, options = {}) => {
+            const result = await this.#request("/v1/auth/email/verify", {
+                method: "POST",
+                body: { flow_id: flowId, code, referral_code: options.referralCode },
+                signal: options.signal,
+            });
+            this.#setSession({
+                accessToken: result.access_token,
+                refreshToken: result.refresh_token,
+            });
+            return result;
+        },
         /**
          * Where to send the browser to sign in with Google or GitHub.
          *

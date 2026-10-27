@@ -1,0 +1,37 @@
+/** The sign-in box in zh-Hant. Keys are the English text; see ../i18n.ts. */
+const catalogue = {
+    "Continue with email": "使用電子郵件繼續",
+    "Continue with Google": "使用 Google 繼續",
+    "Continue with Apple": "使用 Apple 繼續",
+    "Continue with GitHub": "使用 GitHub 繼續",
+    "Continue with a wallet": "使用錢包繼續",
+    "Continue with {name}": "使用 {name} 繼續",
+    "Continue with Nostr": "使用 Nostr 繼續",
+    "No extension? Use a remote signer": "沒有擴充功能？使用遠端簽署器",
+    "Email address": "電子郵件地址",
+    "Send code": "傳送驗證碼",
+    "Sending…": "傳送中…",
+    "We sent a 6-digit code to {email}. It works for 10 minutes.": "我們已將 6 位數驗證碼寄到 {email}，10 分鐘內有效。",
+    "Code": "驗證碼",
+    "Sign in": "登入",
+    "Checking…": "驗證中…",
+    "Send a new code": "重新傳送驗證碼",
+    "Send a new code in {s}s": "{s} 秒後可重新傳送",
+    "Use a different email": "改用其他電子郵件",
+    "Not there? Check your spam folder.": "沒收到嗎？請檢查垃圾郵件資料夾。",
+    "Enter a valid email address.": "請輸入有效的電子郵件地址。",
+    "That code is not right. 1 try left.": "驗證碼不正確，還可以再試 1 次。",
+    "That code is not right. {n} tries left.": "驗證碼不正確，還可以再試 {n} 次。",
+    "This code has expired or was tried too many times. Send a new one.": "驗證碼已過期或嘗試次數過多，請重新傳送。",
+    "The code is 6 digits.": "驗證碼為 6 位數字。",
+    "Too many codes were requested. Try again in {m} min, or sign in another way.": "要求驗證碼的次數過多。請在 {m} 分鐘後再試，或改用其他方式登入。",
+    "Wait {s} s before asking for another code.": "請等待 {s} 秒後再要求新的驗證碼。",
+    "Email sign-in is busy right now. Sign in another way, or try again later.": "電子郵件登入目前忙碌中，請改用其他方式登入，或稍後再試。",
+    "The code could not be sent. Try again in a minute, or sign in another way.": "驗證碼傳送失敗。請一分鐘後再試，或改用其他方式登入。",
+    "Email sign-in is not available here.": "這裡暫不支援電子郵件登入。",
+    "Could not reach the server. Check your connection and try again.": "無法連線到伺服器，請檢查網路後再試。",
+    "Sign out": "登出",
+    "This server has no login methods configured.": "此伺服器未設定任何登入方式。"
+};
+export default catalogue;
+//# sourceMappingURL=zh-Hant.js.map

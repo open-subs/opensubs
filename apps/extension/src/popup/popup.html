@@ -1,66 +1,90 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenSubs</title>
 <link rel="stylesheet" href="./popup.css">
+<!-- Every visible word here is English, and is also the key popup.ts looks it
+     up by: an element marked `data-t` has its text translated when the popup
+     opens. Written out rather than left empty, so the page still says
+     something sensible before its script has run. -->
 <div class="pad">
   <header>
     <h1>OpenSubs</h1>
-    <p class="sub" id="device">Subtitles for whatever is playing, made on this machine.</p>
+    <p class="sub" id="device" data-t>Subtitles for whatever is playing, made on this machine.</p>
   </header>
 
+  <!-- The one choice worth making before a first Start. "Detect
+       automatically" is right almost always; naming the language is the
+       remedy when it is not, and is the setting a newcomer understands.
+       "Spoken", because the panel now has a second language setting -- its
+       own -- and the two must not be mistaken for each other. -->
   <div class="row">
-    <label for="model">Speech model</label>
-    <select id="model"></select>
-    <p class="hint" id="model-note"></p>
-  </div>
-
-  <div class="row">
-    <label for="language">Language</label>
+    <label for="language" data-t>Spoken language</label>
     <select id="language"></select>
   </div>
 
-  <div class="row">
-    <label for="backend">Runs on</label>
-    <select id="backend">
-      <option value="auto">Automatic</option>
-      <option value="gpu">Graphics card (GPU)</option>
-      <option value="cpu">Processor (CPU)</option>
-    </select>
-    <p class="hint" id="backend-note"></p>
-  </div>
-
-  <div class="row">
-    <label for="window">Seconds per pass <output id="window-out"></output></label>
-    <input type="range" id="window" min="10" max="30" step="5">
-    <p class="hint">Longer passes read better and appear later.</p>
-  </div>
-
-  <div class="row">
-    <label for="size">Subtitle size</label>
-    <select id="size">
-      <option value="0.6">Small</option>
-      <option value="0.8">Medium</option>
-      <option value="1">Large</option>
-    </select>
-    <p class="hint">Applies straight away, and is remembered.</p>
-  </div>
-
-  <div class="row check">
-    <input type="checkbox" id="overlay">
-    <label for="overlay">Show subtitles over the video</label>
-  </div>
-
-  <div id="status" class="status" hidden></div>
+  <div id="status" class="status" role="status" hidden></div>
 
   <div class="actions">
-    <button id="go" class="primary">Start</button>
-    <button id="save" disabled>Save .srt</button>
+    <button id="go" class="primary" data-t>Start</button>
+    <button id="save" disabled data-t>Save .srt</button>
     <!-- The subtitles are kept across Stop and across a second
          Start, so there has to be a way to put them down. -->
-    <button id="clear" disabled>Clear</button>
+    <button id="clear" disabled data-t>Clear</button>
   </div>
 
-  <p class="foot">Audio never leaves this machine. The model is downloaded once, from Hugging Face.</p>
+  <!-- Everything else works on its defaults, so it waits below the action,
+       folded. A setting moved off its default is counted on the header, so
+       a folded section never hides that something here was changed. -->
+  <details id="advanced" class="advanced">
+    <summary><span data-t>Advanced settings</span> <span class="changed" id="changed" hidden></span></summary>
+
+    <!-- The panel's own language. Each language is named in itself, so the
+         list can be read by someone who cannot read the one the panel is in. -->
+    <div class="row">
+      <label for="locale" data-t>Interface language</label>
+      <select id="locale"></select>
+    </div>
+
+    <div class="row">
+      <label for="size" data-t>Subtitle size</label>
+      <select id="size">
+        <option value="0.6" data-t>Small</option>
+        <option value="0.8" data-t>Medium</option>
+        <option value="1" data-t>Large</option>
+      </select>
+    </div>
+
+    <div class="row check">
+      <input type="checkbox" id="overlay">
+      <label for="overlay" data-t>Show subtitles over the video</label>
+    </div>
+    <p class="hint group-hint" data-t>These two apply straight away, and are remembered.</p>
+
+    <div class="row">
+      <label for="model" data-t>Speech model</label>
+      <select id="model"></select>
+      <p class="hint" id="model-note"></p>
+    </div>
+
+    <div class="row">
+      <label for="backend" data-t>Runs on</label>
+      <select id="backend">
+        <option value="auto" data-t>Automatic</option>
+        <option value="gpu" data-t>Graphics card (GPU)</option>
+        <option value="cpu" data-t>Processor (CPU)</option>
+      </select>
+      <p class="hint" id="backend-note"></p>
+    </div>
+
+    <div class="row">
+      <label for="window"><span data-t>Seconds per pass</span> <output id="window-out"></output></label>
+      <input type="range" id="window" min="10" max="30" step="5">
+      <p class="hint" data-t>Longer passes read better and appear later.</p>
+    </div>
+  </details>
+
+  <p class="foot" data-t>Audio never leaves this machine. The model is downloaded once, from Hugging Face.</p>
 </div>
 <script type="module" src="./popup.js"></script>

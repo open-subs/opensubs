@@ -100,7 +100,11 @@ export function saveWork(work: Omit<SavedWork, "at">): void {
   }
 }
 
-export function loadWork(): SavedWork | null {
+/**
+ * The saved work, or null. `onExpired` hears about a record that was found
+ * past MAX_AGE_MS and deleted just now.
+ */
+export function loadWork(onExpired?: () => void): SavedWork | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
@@ -108,6 +112,7 @@ export function loadWork(): SavedWork | null {
     if (!Array.isArray(work.cues) || work.cues.length === 0) return null;
     if (!Number.isFinite(work.at) || Date.now() - work.at > MAX_AGE_MS) {
       clearWork();
+      onExpired?.();
       return null;
     }
     return work;

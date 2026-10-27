@@ -25,6 +25,7 @@
 // With the extension, because the unit tests run this file in node, which
 // resolves no extension for it.
 import { FIRST_WINDOW_S } from "./pace.ts";
+import { t } from "./i18n.ts";
 
 /**
  * Each window begins this long before the previous one ends.
@@ -90,7 +91,7 @@ export function whyNoMedia(doc: Document = document): string {
     const r = f.getBoundingClientRect();
     return r.width >= 200 && r.height >= 120;
   });
-  if (!frames.length) return "No video or audio is playing on this page. Start the video, then press Start.";
+  if (!frames.length) return t("No video or audio is playing on this page. Start the video, then press Start.");
   const here = siteOf(doc.location?.hostname ?? "");
   const elsewhere = frames.some((f) => {
     try {
@@ -100,9 +101,9 @@ export function whyNoMedia(doc: Document = document): string {
     }
   });
   return elsewhere
-    ? "The video is in a player embedded from another site, which the extension cannot reach. " +
-        "Open the video on that site's own page and press Start again."
-    : "This site plays its videos in a separate player frame that the extension cannot reach, so it cannot be subtitled here.";
+    ? t("The video is in a player embedded from another site, which the extension cannot reach. " +
+        "Open the video on that site's own page and press Start again.")
+    : t("This site plays its videos in a separate player frame that the extension cannot reach, so it cannot be subtitled here.");
 }
 
 /** The largest element that is actually playing now, or null. */
@@ -143,11 +144,11 @@ export function openAudio(el: HTMLMediaElement): { stream: MediaStream } | { rea
     const cross = e instanceof Error && (e.name === "SecurityError" || /cross-origin/i.test(e.message));
     return {
       reason: cross
-        ? "This site does not let other pages read its video's audio (it is served from another domain), so it cannot be subtitled here."
-        : "This video is protected, so its audio cannot be read.",
+        ? t("This site does not let other pages read its video's audio (it is served from another domain), so it cannot be subtitled here.")
+        : t("This video is protected, so its audio cannot be read."),
     };
   }
-  if (!stream.getAudioTracks().length) return { reason: "That video has no audio track." };
+  if (!stream.getAudioTracks().length) return { reason: t("That video has no audio track.") };
   return { stream };
 }
 

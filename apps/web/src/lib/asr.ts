@@ -24,7 +24,13 @@ import {
   ALL_FORMATS,
   AudioBufferSink,
   BlobSource,
+  BufferTarget,
+  EncodedAudioPacketSource,
+  EncodedPacketSink,
   Input,
+  Mp4OutputFormat,
+  Output,
+  type InputAudioTrack,
 } from "mediabunny";
 
 import { load, planVoiced, transcriptFrom, transcriptFromKept, type Piece, type Segment, type Transcript } from "./engine";
@@ -359,7 +365,7 @@ export async function asrSupport(): Promise<AsrSupport> {
  * proportional to audio length, so cutting a 30-second clip out of an hour
  * costs 30 seconds of work rather than an hour of it.
  */
-async function extractAudio(
+export async function extractAudio(
   file: File,
   start: number,
   end: number | null,
@@ -426,7 +432,9 @@ async function extractAudio(
  *
  * mediabunny decodes through WebCodecs' `AudioDecoder`, and Firefox for
  * Android has none: every clip failed with "AudioDecoder is not available in
- * this environment", so nothing could be transcribed there at all.
+ * this environment", so nothing could be transcribed there at all. Neither
+ * has WebKit before Safari 26 -- iOS 18 shipped WebCodecs for video only --
+ * which puts every iPhone on 18.x on the path below.
  */
 function hasAudioDecoder(): boolean {
   return typeof (globalThis as { AudioDecoder?: unknown }).AudioDecoder === "function";
@@ -437,10 +445,25 @@ function hasAudioDecoder(): boolean {
  *
  * Only for browsers without `AudioDecoder`; everywhere else the WebCodecs
  * path above is kept, because it streams the trimmed range and this cannot.
- * `decodeAudioData` takes the whole file into memory at once and decodes all
- * of it before the trim is applied. That is fine for what reaches it in
- * practice -- the browser extension's twenty-second recordings, and short
- * clips on a phone -- and it is the only decoder those browsers have.
+ *
+ * `decodeAudioData` is handed the audio track on its own, copied out of the
+ * video into an .m4a without decoding anything (see `audioTrackAsM4a`), not
+ * the video file. Two reasons, and the first is the one that mattered:
+ *
+ * - **WebKit's `decodeAudioData` refuses QuickTime.** Any `.mov` -- which is
+ *   every video an iPhone records -- fails with "Decoding failed", whatever
+ *   the codecs inside, while the same AAC in an `.mp4` decodes. Measured on
+ *   the iOS 26.5 simulator: an H.264 `.mp4` decoded, and H.264 and HEVC
+ *   `.mov`s from 0.3 to 300 MB all failed in under 150 ms. So on iOS 18 a
+ *   video picked from Photos or Files could be opened and played and then
+ *   never transcribed, while the bundled `.mp4` sample worked.
+ * - **Memory.** The whole file used to be read into one ArrayBuffer, so a
+ *   minute of 4K at 40 Mb/s was 300 MB in a phone's web process before a
+ *   sample was decoded. Its audio alone is about a megabyte.
+ *
+ * The whole file is still tried when the copy cannot be made -- a codec the
+ * MP4 muxer does not take, or a container mediabunny cannot read -- since
+ * `decodeAudioData` may know a format the demuxer does not.
  *
  * It decodes straight to Whisper's rate: `decodeAudioData` resamples to the
  * sample rate of the context it belongs to, so no second pass is needed.
@@ -453,37 +476,149 @@ async function extractAudioWithWebAudio(
   signal?: AbortSignal,
 ): Promise<Float32Array> {
   if (file.size === 0) throw new Error("That video has no audio track to transcribe.");
-  const bytes = await file.arrayBuffer();
+  const from = Math.max(0, start);
+  const wanted = end != null && end > from ? end : null;
+
+  let buffer: AudioBuffer | null = null;
+  // Where the decoded audio starts on the video's clock: the copy begins
+  // at the packet holding `from`, the whole file at zero.
+  let origin = 0;
+  const copy = await audioTrackAsM4a(file, from, wanted, signal);
   if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-  let buffer: AudioBuffer;
-  try {
-    buffer = await new OfflineAudioContext(1, 1, TARGET_SAMPLE_RATE).decodeAudioData(bytes);
-  } catch {
-    throw new Error("No audio could be decoded from that clip.");
+  if (copy) {
+    buffer = await decodeWithWebAudio(copy.bytes);
+    if (buffer) {
+      // An AAC decoder drops the encoder's priming from the front, and
+      // how much depends on the decoder, since the copy carries no edit
+      // list to say. WebKit drops 2112 samples (48 ms at 44.1 kHz),
+      // Firefox none. Whatever came back short of the packets copied is
+      // taken to be missing from the front, which is right to within the
+      // last frame's padding (about 11 ms measured). Without it every
+      // subtitle on WebKit landed about 45 ms early.
+      const missing = Math.max(0, copy.end - copy.origin - buffer.length / buffer.sampleRate);
+      origin = copy.origin + missing;
+    }
+  }
+  if (!buffer) {
+    buffer = await decodeWithWebAudio(await file.arrayBuffer());
+    origin = 0;
   }
   if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+  if (!buffer) throw new Error("No audio could be decoded from that clip.");
 
   const rate = buffer.sampleRate;
-  const duration = buffer.length / rate;
-  const from = Math.max(0, start);
-  const to = end != null && end > from ? Math.min(end, duration) : duration;
+  const duration = origin + buffer.length / rate;
+  const to = wanted != null ? Math.min(wanted, duration) : duration;
   if (to - from <= 0) throw new Error("The clip has no length.");
-  const first = Math.floor(from * rate);
-  const frames = Math.max(0, Math.min(buffer.length, Math.ceil(to * rate)) - first);
+  // `first` is negative when the decoded audio starts after `from` -- the
+  // priming a decoder dropped from a copy that began at zero -- and those
+  // few milliseconds are left silent rather than shifting every sample
+  // after them early.
+  const first = Math.floor((from - origin) * rate);
+  const frames = Math.max(0, Math.min(buffer.length, Math.ceil((to - origin) * rate)) - first);
   if (frames === 0) throw new Error("No audio could be decoded from that clip.");
+  const lead = Math.max(0, -first);
 
   // Downmixed by averaging, as above.
   const mono = new Float32Array(frames);
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
     const data = buffer.getChannelData(c);
-    for (let i = 0; i < frames; i += 1) mono[i] += data[first + i];
+    for (let i = lead; i < frames; i += 1) mono[i] += data[first + i];
   }
   if (buffer.numberOfChannels > 1) {
-    for (let i = 0; i < frames; i += 1) mono[i] /= buffer.numberOfChannels;
+    for (let i = lead; i < frames; i += 1) mono[i] /= buffer.numberOfChannels;
   }
   onProgress?.(1);
   if (Math.abs(rate - TARGET_SAMPLE_RATE) < 1) return mono;
   return await resample(mono, rate, TARGET_SAMPLE_RATE);
+}
+
+/** `decodeAudioData` at Whisper's rate, or null when it will not. */
+async function decodeWithWebAudio(bytes: ArrayBuffer): Promise<AudioBuffer | null> {
+  try {
+    return await new OfflineAudioContext(1, 1, TARGET_SAMPLE_RATE).decodeAudioData(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The audio track between `from` and `to`, remuxed into an .m4a.
+ *
+ * Packets are copied, not decoded, so this needs no WebCodecs at all --
+ * which is the point of it: it runs exactly where `AudioDecoder` is
+ * missing. `origin` and `end` are the video times the copied packets
+ * span, since the copy starts at the packet that holds `from` rather than
+ * at `from`.
+ *
+ * Null when there is nothing this can copy; the caller then tries the
+ * whole file. An absent audio track is an answer rather than a failure,
+ * and is thrown as one.
+ */
+async function audioTrackAsM4a(
+  file: Blob,
+  from: number,
+  to: number | null,
+  signal?: AbortSignal,
+): Promise<{ bytes: ArrayBuffer; origin: number; end: number } | null> {
+  let input: Input | null = null;
+  try {
+    input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+    const tracks = await input.getAudioTracks();
+    if (tracks.length === 0) throw new NoAudioTrack();
+    const format = new Mp4OutputFormat();
+    const muxable = format.getSupportedAudioCodecs();
+    // The first track the muxer can carry. A file may hold more than one,
+    // and the first is not always in a codec an .m4a can take.
+    let track: InputAudioTrack | null = null;
+    for (const candidate of tracks) {
+      if (candidate.codec && muxable.includes(candidate.codec)) {
+        track = candidate;
+        break;
+      }
+    }
+    if (!track?.codec) return null;
+    const decoderConfig = await track.getDecoderConfig();
+    if (!decoderConfig) return null;
+
+    const sink = new EncodedPacketSink(track);
+    const first = (await sink.getPacket(from)) ?? (await sink.getFirstPacket());
+    if (!first) return null;
+
+    const target = new BufferTarget();
+    const output = new Output({ format, target });
+    const source = new EncodedAudioPacketSource(track.codec);
+    output.addAudioTrack(source);
+    await output.start();
+    const origin = first.timestamp;
+    let copied = 0;
+    let end = origin;
+    for await (const packet of sink.packets(first)) {
+      if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+      if (to != null && packet.timestamp >= to) break;
+      await source.add(
+        packet.clone({ timestamp: Math.max(0, packet.timestamp - origin) }),
+        copied === 0 ? { decoderConfig } : undefined,
+      );
+      copied += 1;
+      end = packet.timestamp + packet.duration;
+    }
+    if (copied === 0) return null;
+    await output.finalize();
+    return target.buffer ? { bytes: target.buffer, origin, end } : null;
+  } catch (e) {
+    if (e instanceof NoAudioTrack || (e instanceof DOMException && e.name === "AbortError")) throw e;
+    console.warn("could not copy the audio track out; decoding the whole file", e);
+    return null;
+  } finally {
+    input?.dispose();
+  }
+}
+
+class NoAudioTrack extends Error {
+  constructor() {
+    super("That video has no audio track to transcribe.");
+  }
 }
 
 /** Resample via OfflineAudioContext, which does it properly. */

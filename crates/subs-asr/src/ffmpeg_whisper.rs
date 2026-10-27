@@ -124,7 +124,7 @@ impl Transcriber for FfmpegWhisperTranscriber {
 /// `C:\Users\<name>\.cache\opensubs-models` and the output in the temp
 /// directory, and unescaped the drive colon ended the option while the
 /// backslashes were eaten as escapes: "No option name near
-/// 'Usersycan4.cacheopensubs-models...'" on every Windows machine. The same
+/// 'Usersexample.cacheopensubs-models...'" on every Windows machine. The same
 /// function lives in subs-media for the burn's `ass=` paths; the two crates
 /// share no dependency to put it in.
 fn filter_path(path: &Path) -> String {
@@ -288,14 +288,14 @@ mod tests {
 
     /// The model and output paths from the report, as ffmpeg must
     /// be handed them. Unescaped, this was "No option name near
-    /// 'Usersycan4.cacheopensubs-models...'" on every Windows machine.
+    /// 'Usersexample.cacheopensubs-models...'" on every Windows machine.
     #[test]
     fn windows_paths_are_escaped_for_the_filter() {
         assert_eq!(
             filter_path(Path::new(
-                r"C:\Users\ycan4\.cache\opensubs-models\ggml-base.en.bin"
+                r"C:\Users\example\.cache\opensubs-models\ggml-base.en.bin"
             )),
-            r"C\\:\\\\Users\\\\ycan4\\\\.cache\\\\opensubs-models\\\\ggml-base.en.bin"
+            r"C\\:\\\\Users\\\\example\\\\.cache\\\\opensubs-models\\\\ggml-base.en.bin"
         );
         assert_eq!(
             filter_path(Path::new("/tmp/plain/model.bin")),

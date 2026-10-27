@@ -604,6 +604,138 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   eq("nonsense evidence is ignored", total, { ko: 5 });
 }
 
+// --- the panel's languages ---------------------------------------------------
+//
+// A missing translation is invisible at runtime by design -- `t()` falls back
+// to English -- so these are what make a gap loud.
+{
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const { join, dirname } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const i18n = await import("../src/lib/i18n.ts");
+  const { resolveLocale, LOCALES } = await import("../../web/src/lib/i18n/locales.ts");
+  const src = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
+  const files = (dir) => readdirSync(dir).flatMap((f) => {
+    const p = join(dir, f);
+    return statSync(p).isDirectory() ? (f === "i18n" ? [] : files(p)) : [p];
+  });
+
+  // Every literal handed to t() / tn() / tError(): the whole argument list is
+  // read to its closing parenthesis, literals joined by `+` are one string,
+  // and only sentences count -- a ternary's `=== "auto"` is not one.
+  const used = new Set();
+  const call = /\bt(?:n|Error)?\(/g;
+  for (const file of files(src).filter((f) => f.endsWith(".ts"))) {
+    const code = readFileSync(file, "utf8");
+    for (const m of code.matchAll(call)) {
+      let depth = 1, i = m.index + m[0].length, inString = false;
+      const start = i;
+      for (; i < code.length && depth; i += 1) {
+        const c = code[i];
+        if (inString) { if (c === "\\") i += 1; else if (c === '"') inString = false; continue; }
+        if (c === '"') inString = true;
+        else if (c === "(") depth += 1;
+        else if (c === ")") depth -= 1;
+      }
+      const args = code.slice(start, i - 1);
+      for (const group of args.matchAll(/(?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+/g)) {
+        const text = [...group[0].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => JSON.parse(`"${x[1]}"`)).join("");
+        if (/^[A-Z{0-9]/.test(text)) used.add(text);
+      }
+    }
+  }
+  // The popup's static words.
+  const html = readFileSync(join(src, "popup", "popup.html"), "utf8");
+  for (const m of html.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<[^>]*\bdata-t\b[^>]*>([^<]+)</g)) {
+    used.add(m[1].trim());
+  }
+  // Keys that reach t() through a variable: the model list and its notes
+  // (../web/src/lib/asr.ts), the backend notes, the "Detect automatically"
+  // entry, asr.ts's progress and failures, and the store-page message.
+  const viaVariable = [
+    "Tiny (English)", "Fastest. Fine for clear speech.", "A good default. Handles 99 languages.",
+    "Most accurate here, and the slowest.",
+    "Uses the processor on Firefox and on Intel built-in graphics, where it was measured faster; the graphics card elsewhere.",
+    "Fastest on a dedicated graphics card or Apple silicon. Can fall behind on built-in graphics.",
+    "Works everywhere. The first run downloads a model about four times larger.",
+    "Detect automatically", "Loading the speech model", "Downloading the speech model", "Reading the audio",
+    "Listening for a voice", "Listening for the language", "Listening to the audio",
+    "No audio could be decoded from that clip.",
+    "No speech was recognised in that clip. If it is not silent, try a larger model.",
+    "This browser has no Web Audio support.", "Transcription is not supported here.",
+    "This browser cannot capture audio from a video element.",
+    "That video has no audio track this extension can read.",
+    "No sound is reaching the extension from this video. Check that it is not muted, and press Start again.",
+    "The recorded audio could not be read.",
+    (await import("../src/lib/pages.ts")).NOT_A_WEB_PAGE,
+  ];
+  for (const k of viaVariable) used.add(k);
+  ok("the extractor found the panel's words", used.size > 60, String(used.size));
+
+  const cats = i18n.catalogues();
+  const shipped = LOCALES.map((l) => l.code);
+  eq("every shipped language has a catalogue", shipped.filter((c) => !(c in cats)), []);
+  for (const code of shipped.filter((c) => c !== "en")) {
+    eq(`${code}: every word on screen is translated`, i18n.missing(code, [...used]), []);
+    eq(`${code}: nothing translated that is not on screen`, Object.keys(cats[code]).filter((k) => !used.has(k)), []);
+    eq(`${code}: no value is left in English`,
+      Object.entries(cats[code]).filter(([k, v]) => k === v).map(([k]) => k), []);
+    const holes = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
+    eq(`${code}: every placeholder survives`,
+      Object.entries(cats[code]).filter(([k, v]) => holes(k) !== holes(v)).map(([k]) => k), []);
+  }
+
+  // The browser's language, widened onto the eight.
+  eq("zh-CN reads Simplified", resolveLocale(["zh-CN"]), "zh-Hans");
+  eq("zh-TW and zh-HK read Traditional", [resolveLocale(["zh-TW"]), resolveLocale(["zh-HK"])], ["zh-Hant", "zh-Hant"]);
+  eq("pt-PT and pt-BR read Portuguese", [resolveLocale(["pt-PT"]), resolveLocale(["pt-BR"])], ["pt", "pt"]);
+  eq("a language not shipped reads English", resolveLocale(["fr-FR"]), "en");
+
+  i18n.setLocale("zh-Hans");
+  eq("a word on screen comes out in Chinese", i18n.t("Save .srt"), "保存字幕");
+  eq("placeholders are filled", i18n.tn("{n} line", "{n} lines", 3), "已生成 3 行字幕");
+  eq("a sentence nobody translated stays English, never a key", i18n.t("Not in any catalogue"), "Not in any catalogue");
+  ok("a browser's own error is never shown alone",
+    /^出了点问题.*（Failed to fetch）$/.test(i18n.tError("Failed to fetch")), i18n.tError("Failed to fetch"));
+  eq("one of ours is translated, not wrapped", i18n.tError("That video has no audio track this extension can read."),
+    "这个视频没有扩展能读取的音轨。");
+  i18n.setLocale("en");
+  eq("English stays English", i18n.t("Save .srt"), "Save .srt");
+
+  // The interface language chosen in the panel, over the browser's.
+  i18n.useLocale("ja");
+  eq("a chosen interface language wins", i18n.getLocale(), "ja");
+  i18n.useLocale("fr");
+  eq("one not shipped falls back to the browser's", i18n.getLocale(), resolveLocale(i18n.browserLanguages()));
+  i18n.useLocale("auto");
+  eq("auto follows the browser", i18n.getLocale(), resolveLocale(i18n.browserLanguages()));
+  i18n.useLocale(undefined);
+  eq("a setting saved before the choice existed follows the browser", i18n.getLocale(), resolveLocale(i18n.browserLanguages()));
+  eq("every shipped language runs left to right", shipped.map((c) => i18n.direction(c)), shipped.map(() => "ltr"));
+  eq("and a right-to-left one would be known as such", ["ar", "he-IL", "fa"].map((c) => i18n.direction(c)), ["rtl", "rtl", "rtl"]);
+  eq("zh-MO and zh-Hant-HK read Traditional, zh-SG Simplified",
+    [resolveLocale(["zh-MO"]), resolveLocale(["zh-Hant-HK"]), resolveLocale(["zh-SG"])], ["zh-Hant", "zh-Hant", "zh-Hans"]);
+  eq("the browser's first shipped language wins over a later one", resolveLocale(["fr-FR", "de-DE", "en"]), "de");
+  const { DEFAULT_SETTINGS } = await import("../src/lib/protocol.ts");
+  eq("the default interface language follows the browser", DEFAULT_SETTINGS.locale, "auto");
+}
+
+// --- pages no extension may script -----------------------------------------
+{
+  const { cannotScript } = await import("../src/lib/pages.ts");
+  for (const url of [
+    "chrome://extensions/", "chrome://newtab/", "edge://newtab/", "edge://settings", "about:blank", "about:addons",
+    "view-source:https://example.com/", "chrome-extension://abc/popup.html", "moz-extension://abc/popup.html",
+    "https://chromewebstore.google.com/detail/opensubs/abc", "https://chrome.google.com/webstore/detail/abc",
+    "https://microsoftedge.microsoft.com/addons/detail/abc", "https://addons.mozilla.org/en-US/firefox/addon/x/",
+    "https://ntp.msn.com/edge/ntp?locale=zh-CN", "https://example.com/paper.pdf",
+  ]) ok(`cannot script ${url}`, cannotScript(url));
+  for (const url of [
+    "https://www.youtube.com/watch?v=x", "https://example.com/", "http://127.0.0.1:8080/video.html",
+    "https://microsoftedge.microsoft.com/", "https://example.com/pdf-guide.html", undefined, "not a url",
+  ]) ok(`may script ${url}`, !cannotScript(url));
+}
+
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);
 process.exit(fails.length ? 1 : 0);
