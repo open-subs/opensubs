@@ -40,6 +40,13 @@ permissions:
 env:
   # The version llama.cpp's own Windows Vulkan build installs.
   VULKAN_VERSION: 1.4.313.2
+  # A short build folder. The Vulkan backend builds its shader compiler as a
+  # project inside a project, and under the workspace's own target folder one
+  # of MSBuild's tracking logs came to 261 characters, one more than Windows
+  # paths may have: "FTK1011: could not create the new file tracking log".
+  CARGO_TARGET_DIR: D:\t
+  # The same folder as bash spells it.
+  T: /d/t
   # As the release build: the static C runtime, and ggml compiled for any
   # x86-64 CPU with AVX2 rather than for this runner's (see release.yml,
   # where each of these is explained).
@@ -110,12 +117,12 @@ jobs:
         working-directory: apps/desktop
         run: npx tauri build --bundles nsis --features vulkan --config src-tauri/tauri.vulkan.conf.json
         env:
-          OPENSUBS_LINKER_MAP: ${{ format('{0}\target\opensubs-desktop.map', github.workspace) }}
+          OPENSUBS_LINKER_MAP: D:\t\opensubs-desktop.map
 
       - name: whisper.cpp built with Vulkan, for any CPU
         shell: bash
         run: |
-          cache="$(ls target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)"
+          cache="$(ls "$T"/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)"
           echo "$cache"
           grep -E '^GGML_(VULKAN|NATIVE|AVX2|AVX512[A-Z_0-9]*):BOOL=' "$cache"
           grep -q '^GGML_VULKAN:BOOL=ON' "$cache" || { echo "ggml was built without Vulkan" >&2; exit 1; }
@@ -127,14 +134,14 @@ jobs:
         run: |
           python -m pip install --quiet iced-x86==1.21.0
           status=0
-          python scripts/check-isa.py target/release/opensubs-desktop.exe --map target/opensubs-desktop.map --report isa-check-windows.md || status=$?
+          python scripts/check-isa.py "$T/release/opensubs-desktop.exe" --map "$T/opensubs-desktop.map" --report isa-check-windows.md || status=$?
           cat isa-check-windows.md >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
       - name: The loader is beside the exe in the installer
         shell: bash
         run: |
-          exe="$(ls target/release/bundle/nsis/*-setup.exe | head -1)"
+          exe="$(ls "$T"/release/bundle/nsis/*-setup.exe | head -1)"
           7z l "$exe" | tee "$RUNNER_TEMP/listing.txt" | grep -iE 'vulkan-1\.dll|opensubs-desktop\.exe'
           # A name with no folder in front of it is at the top of the install
           # folder, which is where the exe is.
@@ -148,13 +155,13 @@ jobs:
         shell: pwsh
         run: |
           cargo build --release -p subs-whisper --features vulkan --examples
-          Copy-Item apps\desktop\src-tauri\bundled\vendor\vulkan-1.dll target\release\examples\
+          Copy-Item apps\desktop\src-tauri\bundled\vendor\vulkan-1.dll "$env:CARGO_TARGET_DIR\release\examples\"
           "--- graphics chips on this runner"
-          & target\release\examples\chips.exe
+          & "$env:CARGO_TARGET_DIR\release\examples\chips.exe"
           if ($LASTEXITCODE -ne 0) { throw "chips exited $LASTEXITCODE" }
           Invoke-WebRequest "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav" -OutFile "$env:RUNNER_TEMP\jfk.wav"
           "--- transcription"
-          $out = & target\release\examples\transcribe.exe apps\desktop\src-tauri\bundled\models\ggml-base.bin "$env:RUNNER_TEMP\jfk.wav" en 2>"$env:RUNNER_TEMP\whisper.log"
+          $out = & "$env:CARGO_TARGET_DIR\release\examples\transcribe.exe" apps\desktop\src-tauri\bundled\models\ggml-base.bin "$env:RUNNER_TEMP\jfk.wav" en 2>"$env:RUNNER_TEMP\whisper.log"
           $code = $LASTEXITCODE
           Get-Content "$env:RUNNER_TEMP\whisper.log" | Select-String -Pattern "vulkan|use gpu|backend|language|opensubs:" | Select-Object -First 40
           $out
@@ -167,7 +174,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ inputs.number || github.run_number }}
         run: |
-          src="$(ls target/release/bundle/nsis/*-setup.exe | head -1)"
+          src="$(ls "$T"/release/bundle/nsis/*-setup.exe | head -1)"
           version="$(basename "$src" | sed -E 's/^OpenSubs_([0-9.]+)_x64-setup\.exe$/\1/')"
           out="OpenSubs_${version}_x64-gpu-test-${NUMBER}-setup.exe"
           cp "$src" "$out"
