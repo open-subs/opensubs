@@ -55,6 +55,18 @@ BASELINE = {
     "AES", "PCLMULQDQ", "RDRAND", "PREFETCHW", "CET_IBT",
 }
 
+# Instructions no program can run, on any CPU: reading and writing
+# model-specific registers (RDMSR, WRMSR) is the kernel's alone, and GETSEC
+# (SMX) needs a mode the operating system has to switch on first. A compiled
+# function does not contain them. Where the decoder reports one it is reading
+# bytes that are not code -- MSVC keeps a switch statement's jump table after
+# the function, in the same section -- and whichever it is, it says nothing
+# about which CPUs the program runs on. A build with the Vulkan backend showed
+# one of each, inside two functions made of large switches (sentencepiece's
+# protobuf parser, ggml-vulkan's operator dispatch). Counted and printed,
+# never a failure.
+NOT_FOR_PROGRAMS = {"MSR", "SMX"}
+
 # Libraries that choose their instruction set at run time (CPUID checks).
 RUNTIME_DISPATCHED = re.compile(r"ct2rs|ctranslate2|ruy|cpu_features|aws[-_]lc", re.I)
 
@@ -272,6 +284,7 @@ def main():
     carried = "unattributed"
     per_lib = collections.defaultdict(collections.Counter)
     violations = []
+    not_code = collections.Counter()
     for beg, end in bn.ranges:
         o = bn.offset(beg)
         if o is None:
@@ -295,7 +308,9 @@ def main():
             found = label_from_strings(strings)
             carried = found or carried
             lib, name = carried, ("" if found else "(carried forward)")
-        hi = {f: n for f, n in feats.items() if f not in BASELINE}
+        for f in NOT_FOR_PROGRAMS & feats.keys():
+            not_code[f] += feats[f]
+        hi = {f: n for f, n in feats.items() if f not in BASELINE and f not in NOT_FOR_PROGRAMS}
         if not hi:
             continue
         per_lib[lib].update(hi)
@@ -325,6 +340,9 @@ def main():
     else:
         verdict = "PASS: nothing outside runtime-dispatched code needs more than AVX2."
         out.append(verdict)
+    if not_code:
+        out.append("  not counted (kernel-only instructions, decoded from data inside a function): "
+                   + ", ".join(f"{f}={n}" for f, n in not_code.most_common()))
     print("\n".join(out))
 
     if args.report:
