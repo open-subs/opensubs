@@ -42,3 +42,11 @@ tauri = { version = "2", features = ["test"] }
 [[bin]]
 name = "opensubs-desktop"
 path = "src/main.rs"
+
+[features]
+# Whisper on a separate graphics card through Vulkan, on Windows and Linux
+# (crates/subs-whisper, `device`). Off by default: only the graphics-card test
+# build (.github/workflows/windows-gpu.yml) turns it on, and that build carries
+# the Vulkan loader beside the exe (tauri.vulkan.conf.json), without which a
+# program linked to Vulkan does not start.
+vulkan = ["subs-whisper/vulkan"]

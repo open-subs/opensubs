@@ -1,0 +1,179 @@
+name: windows graphics-card test build
+
+# Whisper on a separate graphics card, through Vulkan, as a Windows installer
+# to try on real computers. Nothing else builds this: no tag starts it, no
+# release carries it, and the app's `vulkan` feature is off everywhere but
+# here. It exists because the question it answers -- is transcription faster
+# on a graphics card, and does the app still work on a computer without one
+# -- cannot be answered on a build machine, which has no graphics card.
+#
+# What it does that the release build does not:
+#   - installs the Vulkan SDK, which the Vulkan backend needs to compile;
+#   - builds the app with `--features vulkan`;
+#   - puts the Vulkan loader (vulkan-1.dll) beside the exe. A program linked
+#     to Vulkan does not start without one, and a computer with no graphics
+#     driver -- a virtual machine, a bare Windows install -- has none;
+#   - runs the transcriber on the runner, which has no graphics card, so the
+#     log shows the build starting and falling back to the processor;
+#   - publishes the installer as a pre-release tagged gpu-test-<number>, a
+#     name no other workflow listens for.
+#
+# Before any of this becomes part of a release: NOTICE has to name the
+# Vulkan loader (Apache-2.0) the installer would carry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      number:
+        description: "Test build number: the pre-release is tagged gpu-test-<number>"
+        required: true
+        default: "1"
+  # A workflow can only be started by hand once it is on the default branch.
+  # A push to a branch of this name runs it wherever it is, numbered by the
+  # run.
+  push:
+    branches: [gpu-test]
+
+permissions:
+  contents: write
+
+env:
+  # The version llama.cpp's own Windows Vulkan build installs.
+  VULKAN_VERSION: 1.4.313.2
+  # As the release build: the static C runtime, and ggml compiled for any
+  # x86-64 CPU with AVX2 rather than for this runner's (see release.yml,
+  # where each of these is explained).
+  RUSTFLAGS: -C target-feature=+crt-static
+  GGML_NATIVE: "OFF"
+  GGML_SSE42: "ON"
+  GGML_AVX: "ON"
+  GGML_AVX2: "ON"
+  GGML_FMA: "ON"
+  GGML_F16C: "ON"
+  GGML_BMI2: "ON"
+  GGML_AVX_VNNI: "OFF"
+  GGML_AVX512: "OFF"
+  GGML_AVX512_VBMI: "OFF"
+  GGML_AVX512_VNNI: "OFF"
+  GGML_AVX512_BF16: "OFF"
+  GGML_AMX_TILE: "OFF"
+  GGML_AMX_INT8: "OFF"
+  GGML_AMX_BF16: "OFF"
+
+jobs:
+  build:
+    name: installer with Vulkan
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        # A key of its own: whisper-rs-sys built with Vulkan must never seed
+        # a release build, nor the other way round.
+        with: { key: "ggml-vulkan-${{ env.VULKAN_VERSION }}" }
+
+      - name: Vulkan SDK
+        shell: pwsh
+        run: |
+          $exe = "$env:RUNNER_TEMP\vulkan-sdk.exe"
+          curl.exe -fsSL -o $exe "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & $exe --accept-licenses --default-answer --confirm-command install | Out-Host
+          $sdk = "C:\VulkanSDK\$env:VULKAN_VERSION"
+          if (-not (Test-Path "$sdk\Lib\vulkan-1.lib")) { throw "no Vulkan SDK at $sdk" }
+          "VULKAN_SDK=$sdk" | Out-File -Append $env:GITHUB_ENV
+          "$sdk\Bin" | Out-File -Append $env:GITHUB_PATH
+
+      - run: npm install
+        working-directory: apps/desktop
+      - name: Bundled model and ffmpeg
+        shell: bash
+        run: bash apps/desktop/scripts/fetch-bundled.sh
+
+      # The loader the installer carries, from the SDK just installed or,
+      # failing that, from the runner's own Windows.
+      - name: Vulkan loader for the installer
+        shell: pwsh
+        run: |
+          $found = @(Get-ChildItem -Path $env:VULKAN_SDK -Recurse -Filter vulkan-1.dll -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '32|x86|arm' } | Select-Object -ExpandProperty FullName)
+          $found += "$env:WINDIR\System32\vulkan-1.dll"
+          $dll = $found | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $dll) { throw "no 64-bit vulkan-1.dll in the SDK or in System32" }
+          "loader: $dll"
+          Copy-Item $dll apps\desktop\src-tauri\bundled\vendor\vulkan-1.dll
+          Get-Item apps\desktop\src-tauri\bundled\vendor\vulkan-1.dll | Format-List Name, Length, @{n='Version';e={$_.VersionInfo.FileVersion}}
+
+      - name: Build the installer
+        id: build
+        working-directory: apps/desktop
+        run: npx tauri build --bundles nsis --features vulkan --config src-tauri/tauri.vulkan.conf.json
+        env:
+          OPENSUBS_LINKER_MAP: ${{ format('{0}\target\opensubs-desktop.map', github.workspace) }}
+
+      - name: whisper.cpp built with Vulkan, for any CPU
+        shell: bash
+        run: |
+          cache="$(ls target/release/build/whisper-rs-sys-*/out/build/CMakeCache.txt | head -1)"
+          echo "$cache"
+          grep -E '^GGML_(VULKAN|NATIVE|AVX2|AVX512[A-Z_0-9]*):BOOL=' "$cache"
+          grep -q '^GGML_VULKAN:BOOL=ON' "$cache" || { echo "ggml was built without Vulkan" >&2; exit 1; }
+          grep -q '^GGML_NATIVE:BOOL=OFF' "$cache" || { echo "ggml was built for this runner's CPU" >&2; exit 1; }
+          ! grep -qE '^GGML_(AVX512[A-Z_0-9]*|AVX_VNNI|AMX_[A-Z0-9]+):BOOL=ON' "$cache" || { echo "ggml was built with an instruction set above AVX2" >&2; exit 1; }
+
+      - name: "instruction check: Windows exe"
+        shell: bash
+        run: |
+          python -m pip install --quiet iced-x86==1.21.0
+          status=0
+          python scripts/check-isa.py target/release/opensubs-desktop.exe --map target/opensubs-desktop.map --report isa-check-windows.md || status=$?
+          cat isa-check-windows.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: The loader is beside the exe in the installer
+        shell: bash
+        run: |
+          exe="$(ls target/release/bundle/nsis/*-setup.exe | head -1)"
+          7z l "$exe" | tee "$RUNNER_TEMP/listing.txt" | grep -iE 'vulkan-1\.dll|opensubs-desktop\.exe'
+          # A name with no folder in front of it is at the top of the install
+          # folder, which is where the exe is.
+          awk '{print $NF}' "$RUNNER_TEMP/listing.txt" | grep -qix 'vulkan-1\.dll' || { echo "vulkan-1.dll is not at the top of the installer, next to the exe" >&2; exit 1; }
+          awk '{print $NF}' "$RUNNER_TEMP/listing.txt" | grep -qix 'opensubs-desktop\.exe' || { echo "the exe is not at the top of the installer" >&2; exit 1; }
+
+      # The runner has no graphics card. The same code as the app, started
+      # the way the installed app starts -- with only the loader beside it --
+      # has to list no usable chip and transcribe on the processor.
+      - name: The transcriber starts and works with no graphics card
+        shell: pwsh
+        run: |
+          cargo build --release -p subs-whisper --features vulkan --examples
+          Copy-Item apps\desktop\src-tauri\bundled\vendor\vulkan-1.dll target\release\examples\
+          "--- graphics chips on this runner"
+          & target\release\examples\chips.exe
+          if ($LASTEXITCODE -ne 0) { throw "chips exited $LASTEXITCODE" }
+          Invoke-WebRequest "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav" -OutFile "$env:RUNNER_TEMP\jfk.wav"
+          "--- transcription"
+          $out = & target\release\examples\transcribe.exe apps\desktop\src-tauri\bundled\models\ggml-base.bin "$env:RUNNER_TEMP\jfk.wav" en 2>"$env:RUNNER_TEMP\whisper.log"
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP\whisper.log" | Select-String -Pattern "vulkan|use gpu|backend|language|opensubs:" | Select-Object -First 40
+          $out
+          if ($code -ne 0) { throw "transcribe exited $code" }
+          if (-not ($out -match "country")) { throw "the transcript does not hold the sample's words" }
+
+      - name: Name and publish the test build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ inputs.number || github.run_number }}
+        run: |
+          src="$(ls target/release/bundle/nsis/*-setup.exe | head -1)"
+          version="$(basename "$src" | sed -E 's/^OpenSubs_([0-9.]+)_x64-setup\.exe$/\1/')"
+          out="OpenSubs_${version}_x64-gpu-test-${NUMBER}-setup.exe"
+          cp "$src" "$out"
+          sha256sum "$out" | tee SHA256SUMS.txt
+          ls -l "$out"
+          gh release create "gpu-test-${NUMBER}" "$out" SHA256SUMS.txt isa-check-windows.md \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Windows graphics-card test build ${NUMBER}" \
+            --notes "A test build of OpenSubs ${version} for Windows that transcribes on a separate graphics card (Vulkan) when the computer has one, and on the processor otherwise. For testing only: it is not a release, is not signed, and replaces an installed OpenSubs."

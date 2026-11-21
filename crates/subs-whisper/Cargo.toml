@@ -7,9 +7,18 @@ description = "Speech recognition with whisper.cpp linked into the binary, behin
 
 [dependencies]
 subs-asr = { workspace = true }
-whisper-rs = "0.16"
+# raw-api: the list of graphics chips whisper.cpp can see (src/device.rs).
+whisper-rs = { version = "0.16", features = ["raw-api"] }
 hound = "3"
 dunce = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-whisper-rs = { version = "0.16", features = ["metal"] }
+whisper-rs = { version = "0.16", features = ["raw-api", "metal"] }
+
+[features]
+# Whisper on a graphics card through Vulkan, for Windows and Linux. Off unless
+# asked for: building it needs the Vulkan SDK, and the program it makes needs
+# the Vulkan loader (vulkan-1.dll, libvulkan.so.1) to start at all, so an
+# installer built with it has to carry or require one. A Mac uses Metal and
+# never needs this.
+vulkan = ["whisper-rs/vulkan"]

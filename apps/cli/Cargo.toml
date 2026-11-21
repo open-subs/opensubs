@@ -18,3 +18,8 @@ subs-pipeline = { workspace = true }
 subs-tier = { workspace = true }
 subs-translate = { workspace = true, features = ["http"] }
 serde_json = { workspace = true }
+
+[features]
+# Whisper on a separate graphics card through Vulkan (crates/subs-whisper,
+# `device`). Needs the Vulkan SDK to build and the Vulkan loader to run.
+vulkan = ["subs-whisper/vulkan"]

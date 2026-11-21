@@ -25,6 +25,7 @@ use whisper_rs::{
     DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters,
 };
 
+pub mod device;
 pub mod vad;
 
 pub struct WhisperTranscriber {
@@ -90,11 +91,32 @@ fn language_for(model_is_multilingual: bool, requested: Option<&str>) -> Option<
 impl Transcriber for WhisperTranscriber {
     fn transcribe(&self, audio: &AudioRef, opts: &AsrOptions) -> Result<Transcript, AsrError> {
         let samples = read_samples(&audio.path)?;
+        // Ask whether anyone is speaking before asking what they said. A
+        // detector that cannot run is not a reason to refuse: without it the
+        // transcript is what it was before the detector existed.
+        let speech = match vad::speech_spans(&samples) {
+            Ok(spans) => Some(spans),
+            Err(e) => {
+                eprintln!("opensubs: {e}; transcribing without it");
+                None
+            }
+        };
+        // On a graphics chip where this computer has one worth using, and on
+        // the processor if it lets the first transcription down: see `device`.
+        device::DEVICE.run(|chip| self.transcribe_on(&samples, speech.as_deref(), opts, chip))
+    }
+}
+
+impl WhisperTranscriber {
+    /// One transcription, on graphics chip `chip` or on the processor.
+    fn transcribe_on(&self, samples: &[f32], speech: Option<&[Span]>, opts: &AsrOptions, chip: Option<i32>) -> Result<Transcript, AsrError> {
         // Word times from the alignment of each token to the audio, for the
         // model families whisper.cpp knows the alignment heads of. Segment
         // times alone are too coarse to time a subtitle by: see
         // `subs_asr::TimedSegment`.
         let mut ctx_params = WhisperContextParameters::default();
+        ctx_params.use_gpu(chip.is_some());
+        ctx_params.gpu_device(chip.unwrap_or(0));
         if let Some(preset) = dtw_preset(&self.model_path) {
             ctx_params.dtw_parameters(DtwParameters {
                 mode: DtwMode::ModelPreset { model_preset: preset },
@@ -109,19 +131,9 @@ impl Transcriber for WhisperTranscriber {
             opts.language.as_deref().or(self.language.as_deref()),
         );
 
-        // Ask whether anyone is speaking before asking what they said. A
-        // clip of silence or music needs no transcription, and transcribing
-        // it is exactly what produced "[BLANK_AUDIO]" and invented lines. A
-        // detector that cannot run is not a reason to refuse: without it the
-        // transcript is what it was before the detector existed.
-        let speech = match vad::speech_spans(&samples) {
-            Ok(spans) => Some(spans),
-            Err(e) => {
-                eprintln!("opensubs: {e}; transcribing without it");
-                None
-            }
-        };
-        if speech.as_deref().is_some_and(|s| !has_speech(s)) {
+        // A clip of silence or music needs no transcription, and transcribing
+        // it is exactly what produced "[BLANK_AUDIO]" and invented lines.
+        if speech.is_some_and(|s| !has_speech(s)) {
             return Ok(Transcript {
                 language: wanted.unwrap_or("auto").to_string(),
                 duration: samples.len() as f64 / 16_000.0,
@@ -146,7 +158,7 @@ impl Transcriber for WhisperTranscriber {
         let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
         params.set_n_threads(threads as i32);
 
-        state.full(params, &samples).map_err(|e| AsrError::Backend(format!("whisper failed: {e}")))?;
+        state.full(params, samples).map_err(|e| AsrError::Backend(format!("whisper failed: {e}")))?;
 
         let language = wanted
             .map(str::to_string)
@@ -192,7 +204,7 @@ impl Transcriber for WhisperTranscriber {
                 char_times: char_times.map(|t| t[lead..lead + count].to_vec()),
             });
         }
-        Ok(finish(segments, speech.as_deref(), &samples, &language))
+        Ok(finish(segments, speech, samples, &language))
     }
 }
 
@@ -246,17 +258,24 @@ pub fn spoken_language(model: &Path, audio: &AudioRef) -> Result<Option<(String,
     if voiced.len() < 16_000 {
         return Ok(None);
     }
-    let ctx = WhisperContext::new_with_params(model, WhisperContextParameters::default())
-        .map_err(|e| AsrError::Backend(format!("loading {}: {e}", model.display())))?;
-    if !ctx.is_multilingual() {
-        return Err(AsrError::Backend("language detection needs a multilingual model".into()));
-    }
-    let mut state = ctx.create_state().map_err(|e| AsrError::Backend(e.to_string()))?;
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
-    state.pcm_to_mel(&voiced, threads).map_err(|e| AsrError::Backend(format!("reading the audio: {e}")))?;
-    let (id, probs) = state.lang_detect(0, threads).map_err(|e| AsrError::Backend(format!("language detection failed: {e}")))?;
-    let p = probs.get(id as usize).copied().unwrap_or(0.0);
-    Ok(whisper_rs::get_lang_str(id).map(|l| (l.to_string(), p)))
+    // The same device as transcription, with the same way back to the
+    // processor: see `device`.
+    device::DEVICE.run(|chip| {
+        let mut ctx_params = WhisperContextParameters::default();
+        ctx_params.use_gpu(chip.is_some());
+        ctx_params.gpu_device(chip.unwrap_or(0));
+        let ctx = WhisperContext::new_with_params(model, ctx_params)
+            .map_err(|e| AsrError::Backend(format!("loading {}: {e}", model.display())))?;
+        if !ctx.is_multilingual() {
+            return Err(AsrError::Backend("language detection needs a multilingual model".into()));
+        }
+        let mut state = ctx.create_state().map_err(|e| AsrError::Backend(e.to_string()))?;
+        let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
+        state.pcm_to_mel(&voiced, threads).map_err(|e| AsrError::Backend(format!("reading the audio: {e}")))?;
+        let (id, probs) = state.lang_detect(0, threads).map_err(|e| AsrError::Backend(format!("language detection failed: {e}")))?;
+        let p = probs.get(id as usize).copied().unwrap_or(0.0);
+        Ok(whisper_rs::get_lang_str(id).map(|l| (l.to_string(), p)))
+    })
 }
 
 /// A Whisper language code's English name ("zh" -> "Chinese"), for a
