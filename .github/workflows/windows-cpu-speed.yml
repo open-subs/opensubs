@@ -1,17 +1,15 @@
 name: windows processor speed check
 
-# How long whisper.cpp takes to transcribe on a Windows processor, built
-# three ways. Nothing ships from here. A Windows build machine took 33 s for
-# the 11 s sample with the base model, where the same code on an ARM Mac's
-# processor takes 0.4 s, and Windows computers without a separate graphics
-# card are reported to take about an hour for a few minutes of speech. This
-# compares the release settings with two candidates:
-#   release  -- as release.yml: MSVC, ggml's own thread pool (no OpenMP)
-#   openmp   -- the same, with ggml's threads from OpenMP
-#   native   -- ggml compiled for this runner's processor, to show what the
-#               processor itself can do
-# Each variant transcribes the sample three times; the first run includes
-# reading the model from disk.
+# How long whisper.cpp takes to transcribe on a processor, by compiler.
+# Nothing ships from here. The Windows release build spends about 13 s in
+# Whisper for an 11 s sample on a 4-core build machine, where an ARM Mac's
+# processor takes 0.25 s; voice detection, loading and word alignment are
+# each a fraction of a second, and OpenMP threads made it slower (20 s).
+# This compares compilers on the same kind of machine:
+#   windows-msvc   -- as release.yml (MSVC, the Visual Studio generator)
+#   windows-clang  -- clang-cl with Ninja, everything else the same
+#   linux-gcc      -- gcc on Linux, the same ggml settings
+# Each prints the per-stage times of examples/stages.rs.
 
 on:
   push:
@@ -21,54 +19,65 @@ on:
 permissions:
   contents: read
 
+env:
+  GGML_NATIVE: "OFF"
+  GGML_SSE42: "ON"
+  GGML_AVX: "ON"
+  GGML_AVX2: "ON"
+  GGML_FMA: "ON"
+  GGML_F16C: "ON"
+  GGML_BMI2: "ON"
+  GGML_AVX_VNNI: "OFF"
+  GGML_AVX512: "OFF"
+  GGML_AVX512_VBMI: "OFF"
+  GGML_AVX512_VNNI: "OFF"
+  GGML_AVX512_BF16: "OFF"
+  GGML_AMX_TILE: "OFF"
+  GGML_AMX_INT8: "OFF"
+  GGML_AMX_BF16: "OFF"
+
 jobs:
   speed:
     name: ${{ matrix.variant }}
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        variant: [release, openmp]
-    env:
-      CARGO_TARGET_DIR: D:\t
-      RUSTFLAGS: -C target-feature=+crt-static
+        include:
+          - { variant: windows-msvc, os: windows-latest }
+          - { variant: windows-clang, os: windows-latest }
+          - { variant: linux-gcc, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: ggml settings
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.variant == 'windows-clang'
+      - name: clang-cl and Ninja
+        if: matrix.variant == 'windows-clang'
         shell: bash
         run: |
-          if [ "${{ matrix.variant }}" = native ]; then
-            echo "GGML_NATIVE=ON" >> "$GITHUB_ENV"
-          else
-            for kv in GGML_NATIVE=OFF GGML_SSE42=ON GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON \
-                      GGML_AVX_VNNI=OFF GGML_AVX512=OFF GGML_AVX512_VBMI=OFF GGML_AVX512_VNNI=OFF GGML_AVX512_BF16=OFF \
-                      GGML_AMX_TILE=OFF GGML_AMX_INT8=OFF GGML_AMX_BF16=OFF; do echo "$kv" >> "$GITHUB_ENV"; done
-          fi
+          echo "CC=clang-cl" >> "$GITHUB_ENV"
+          echo "CXX=clang-cl" >> "$GITHUB_ENV"
+          echo "CMAKE_GENERATOR=Ninja" >> "$GITHUB_ENV"
+          clang-cl --version
+      - name: Windows settings
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo 'CARGO_TARGET_DIR=D:\t' >> "$GITHUB_ENV"
+          echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
       - name: Build
         shell: bash
-        run: |
-          features=""
-          [ "${{ matrix.variant }}" = openmp ] && features="--features openmp"
-          cargo build --release -p subs-whisper --example transcribe --example stages $features
+        run: cargo build --release -p subs-whisper --example stages
       - name: Model and sample
-        shell: pwsh
+        shell: bash
         run: |
-          curl.exe -fsSL -o "$env:RUNNER_TEMP\ggml-base.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
-          curl.exe -fsSL -o "$env:RUNNER_TEMP\jfk.wav" "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav"
-      - name: Transcribe three times
-        shell: pwsh
-        run: |
-          "processors: $([Environment]::ProcessorCount)"
-          Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name
-          foreach ($i in 1..3) {
-            $out = & "$env:CARGO_TARGET_DIR\release\examples\transcribe.exe" "$env:RUNNER_TEMP\ggml-base.bin" "$env:RUNNER_TEMP\jfk.wav" en 2>"$env:RUNNER_TEMP\w.log"
-            if ($LASTEXITCODE -ne 0) { Get-Content "$env:RUNNER_TEMP\w.log" | Select-Object -Last 20; throw "transcribe exited $LASTEXITCODE" }
-            Get-Content "$env:RUNNER_TEMP\w.log" | Select-String -Pattern "^[0-9.]+s, language|system_info|n_threads" | ForEach-Object { "${{ matrix.variant }} run ${i}: $_" }
-          }
-          $out
+          curl -fsSL -o "$RUNNER_TEMP/ggml-base.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+          curl -fsSL -o "$RUNNER_TEMP/jfk.wav" "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav"
       - name: Each stage
-        shell: pwsh
+        shell: bash
         run: |
-          & "$env:CARGO_TARGET_DIR\release\examples\stages.exe" "$env:RUNNER_TEMP\ggml-base.bin" "$env:RUNNER_TEMP\jfk.wav" 2>&1 | Select-String -Pattern "^stage|system_info" | ForEach-Object { "${{ matrix.variant }} $_" }
+          nproc 2>/dev/null || echo "$NUMBER_OF_PROCESSORS"
+          dir="${CARGO_TARGET_DIR:-target}"
+          "$dir/release/examples/stages" "$RUNNER_TEMP/ggml-base.bin" "$RUNNER_TEMP/jfk.wav" 2>&1 | grep -E "^stage|system_info|CPU" | sed "s/^/${{ matrix.variant }} /"
