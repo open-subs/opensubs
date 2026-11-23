@@ -48,20 +48,23 @@ jobs:
           - { variant: windows-msvc, os: windows-latest }
           - { variant: windows-clang, os: windows-latest }
           - { variant: linux-gcc, os: ubuntu-latest }
-          - { variant: windows-clang-only, os: windows-latest }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: ilammy/msvc-dev-cmd@v1
-        if: startsWith(matrix.variant, 'windows-clang')
+        if: matrix.variant == 'windows-clang'
+      # Visual Studio's own clang-cl: the standalone LLVM on the runner is
+      # older than the Visual Studio C++ library accepts.
       - name: clang-cl and Ninja
-        if: startsWith(matrix.variant, 'windows-clang')
-        shell: bash
+        if: matrix.variant == 'windows-clang'
+        shell: pwsh
         run: |
-          echo "CC=clang-cl" >> "$GITHUB_ENV"
-          echo "CXX=clang-cl" >> "$GITHUB_ENV"
-          echo "CMAKE_GENERATOR=Ninja" >> "$GITHUB_ENV"
-          clang-cl --version
+          $clang = Get-ChildItem "$env:VCINSTALLDIR\Tools\Llvm\x64\bin\clang-cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $clang) { throw "Visual Studio has no clang-cl here: $env:VCINSTALLDIR" }
+          & $clang.FullName --version
+          "CC=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
+          "CXX=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_GENERATOR=Ninja" | Out-File -Append $env:GITHUB_ENV
       - name: Windows settings
         if: runner.os == 'Windows'
         shell: bash
