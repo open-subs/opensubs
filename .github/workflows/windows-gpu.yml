@@ -80,7 +80,35 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         # A key of its own: whisper-rs-sys built with Vulkan must never seed
         # a release build, nor the other way round.
-        with: { key: "ggml-vulkan-${{ env.VULKAN_VERSION }}" }
+        # "clang": whisper-rs-sys does not rebuild when the compiler changes,
+        # so a cache from the MSVC build must never be restored into this one.
+        with: { key: "ggml-vulkan-clang-${{ env.VULKAN_VERSION }}" }
+
+      # whisper.cpp compiled by clang-cl, not MSVC. Measured on the same
+      # 4-core build machine, the 11 s sample with the base model took 20.8 s
+      # in Whisper when MSVC compiled ggml and 2.1 s when clang-cl did (gcc on
+      # Linux: 1.2 s); voice detection, loading and word alignment were each
+      # a fraction of a second either way, and OpenMP threads were slower.
+      # That is the whole difference between a few minutes of speech taking
+      # about an hour on a laptop's processor and taking a few minutes.
+      # Visual Studio's own clang-cl, because the runner's standalone LLVM is
+      # older than the Visual Studio C++ library accepts; Ninja, because the
+      # Visual Studio generator ignores the compiler; exceptions on and the
+      # static C runtime, which that generator would otherwise have set.
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: clang-cl and Ninja for whisper.cpp
+        shell: pwsh
+        run: |
+          $clang = Get-ChildItem "$env:VCINSTALLDIR\Tools\Llvm\x64\bin\clang-cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $clang) { throw "Visual Studio has no clang-cl here: $env:VCINSTALLDIR" }
+          & $clang.FullName --version
+          "CC=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
+          "CXX=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_GENERATOR=Ninja" | Out-File -Append $env:GITHUB_ENV
+          "CXXFLAGS=/EHsc /MT" | Out-File -Append $env:GITHUB_ENV
+          "CFLAGS=/MT" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_POLICY_DEFAULT_CMP0091=NEW" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" | Out-File -Append $env:GITHUB_ENV
 
       - name: Vulkan SDK
         shell: pwsh
@@ -126,6 +154,8 @@ jobs:
           echo "$cache"
           grep -E '^GGML_(VULKAN|NATIVE|AVX2|AVX512[A-Z_0-9]*):BOOL=' "$cache"
           grep -q '^GGML_VULKAN:BOOL=ON' "$cache" || { echo "ggml was built without Vulkan" >&2; exit 1; }
+          grep -E '^CMAKE_CXX_COMPILER:' "$cache"
+          grep -qiE '^CMAKE_CXX_COMPILER:[A-Z]*=.*clang-cl' "$cache" || { echo "whisper.cpp was not compiled by clang-cl" >&2; exit 1; }
           grep -q '^GGML_NATIVE:BOOL=OFF' "$cache" || { echo "ggml was built for this runner's CPU" >&2; exit 1; }
           ! grep -qE '^GGML_(AVX512[A-Z_0-9]*|AVX_VNNI|AMX_[A-Z0-9]+):BOOL=ON' "$cache" || { echo "ggml was built with an instruction set above AVX2" >&2; exit 1; }
 
@@ -183,4 +213,4 @@ jobs:
           gh release create "gpu-test-${NUMBER}" "$out" SHA256SUMS.txt isa-check-windows.md \
             --target "$GITHUB_SHA" --prerelease \
             --title "Windows graphics-card test build ${NUMBER}" \
-            --notes "A test build of OpenSubs ${version} for Windows that transcribes on a separate graphics card (Vulkan) when the computer has one, and on the processor otherwise. For testing only: it is not a release, is not signed, and replaces an installed OpenSubs."
+            --notes "A test build of OpenSubs ${version} for Windows that transcribes on a separate graphics card (Vulkan) when the computer has one, and on the processor otherwise, with whisper.cpp compiled by clang-cl (about ten times faster on the processor than the MSVC build). For testing only: it is not a release, is not signed, and replaces an installed OpenSubs."
