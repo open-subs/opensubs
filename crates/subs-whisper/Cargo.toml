@@ -22,3 +22,6 @@ whisper-rs = { version = "0.16", features = ["raw-api", "metal"] }
 # installer built with it has to carry or require one. A Mac uses Metal and
 # never needs this.
 vulkan = ["whisper-rs/vulkan"]
+# ggml's threads from OpenMP rather than its own pool. Off by default; the
+# processor-speed check builds with and without it to compare.
+openmp = ["whisper-rs/openmp"]

@@ -1,0 +1,70 @@
+name: windows processor speed check
+
+# How long whisper.cpp takes to transcribe on a Windows processor, built
+# three ways. Nothing ships from here. A Windows build machine took 33 s for
+# the 11 s sample with the base model, where the same code on an ARM Mac's
+# processor takes 0.4 s, and Windows computers without a separate graphics
+# card are reported to take about an hour for a few minutes of speech. This
+# compares the release settings with two candidates:
+#   release  -- as release.yml: MSVC, ggml's own thread pool (no OpenMP)
+#   openmp   -- the same, with ggml's threads from OpenMP
+#   native   -- ggml compiled for this runner's processor, to show what the
+#               processor itself can do
+# Each variant transcribes the sample three times; the first run includes
+# reading the model from disk.
+
+on:
+  push:
+    branches: [cpu-speed-check]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  speed:
+    name: ${{ matrix.variant }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [release, openmp, native]
+    env:
+      CARGO_TARGET_DIR: D:\t
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: ggml settings
+        shell: bash
+        run: |
+          if [ "${{ matrix.variant }}" = native ]; then
+            echo "GGML_NATIVE=ON" >> "$GITHUB_ENV"
+          else
+            for kv in GGML_NATIVE=OFF GGML_SSE42=ON GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON \
+                      GGML_AVX_VNNI=OFF GGML_AVX512=OFF GGML_AVX512_VBMI=OFF GGML_AVX512_VNNI=OFF GGML_AVX512_BF16=OFF \
+                      GGML_AMX_TILE=OFF GGML_AMX_INT8=OFF GGML_AMX_BF16=OFF; do echo "$kv" >> "$GITHUB_ENV"; done
+          fi
+      - name: Build
+        shell: bash
+        run: |
+          features=""
+          [ "${{ matrix.variant }}" = openmp ] && features="--features openmp"
+          cargo build --release -p subs-whisper --example transcribe $features
+      - name: Model and sample
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\ggml-base.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\jfk.wav" "https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/samples/jfk.wav"
+      - name: Transcribe three times
+        shell: pwsh
+        run: |
+          "processors: $([Environment]::ProcessorCount)"
+          Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name
+          foreach ($i in 1..3) {
+            $out = & "$env:CARGO_TARGET_DIR\release\examples\transcribe.exe" "$env:RUNNER_TEMP\ggml-base.bin" "$env:RUNNER_TEMP\jfk.wav" en 2>"$env:RUNNER_TEMP\w.log"
+            if ($LASTEXITCODE -ne 0) { Get-Content "$env:RUNNER_TEMP\w.log" | Select-Object -Last 20; throw "transcribe exited $LASTEXITCODE" }
+            Get-Content "$env:RUNNER_TEMP\w.log" | Select-String -Pattern "^[0-9.]+s, language|system_info|n_threads" | ForEach-Object { "${{ matrix.variant }} run ${i}: $_" }
+          }
+          $out
