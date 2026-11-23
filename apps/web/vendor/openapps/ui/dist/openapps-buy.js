@@ -16,6 +16,13 @@ import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
 import { notify } from "./context.js";
+import { formatNumber, t } from "./catalogue.js";
+/**
+ * Shown wherever USD₮ is offered, if the server sent no wording of its own.
+ * Kept short: the point is that the payer learns it before paying, not a
+ * disclosure they scroll past.
+ */
+const USDT0_FREEZABLE_FALLBACK = "USD₮0 is issued by Tether, which can freeze any address holding it.";
 let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
     constructor() {
         super(...arguments);
@@ -78,14 +85,25 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
     get offeredRails() {
         if (!this.packages)
             return [];
-        const enabled = ["stripe", "ethereum", "lightning"].filter((rail) => this.packages?.rails?.[rail]);
+        const enabled = ["stripe", "ethereum", "lightning", "usdt0"].filter((rail) => this.packages?.rails?.[rail] === true)
+            // USD₮0 is offered per network; with none listed there is nothing to
+            // press, so the rail is as good as off.
+            .filter((rail) => rail !== "usdt0" || this.usdt0Networks.length > 0);
         const allowed = this.rails
             .split(",")
             .map((r) => r.trim())
             .filter(Boolean);
         return allowed.length ? enabled.filter((r) => allowed.includes(r)) : enabled;
     }
-    async start(rail) {
+    /** The USD₮0 networks the server lists. Empty unless it enabled them. */
+    get usdt0Networks() {
+        const networks = this.packages?.usdt0?.networks;
+        return Array.isArray(networks) ? networks : [];
+    }
+    get usdt0Notice() {
+        return this.packages?.usdt0?.notice || USDT0_FREEZABLE_FALLBACK;
+    }
+    async start(rail, network) {
         const pkg = this.selected;
         if (!pkg)
             return;
@@ -124,6 +142,24 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
                         chain: deposit.chain,
                         address: deposit.address,
                         amount: deposit.expected_amount,
+                    };
+                    break;
+                }
+                case "usdt0": {
+                    if (!network)
+                        return;
+                    const deposit = await this.sdk.payments.usdt0DepositAddress(pkg.id, network.id);
+                    topupId = deposit.topup_id;
+                    this.instruction = {
+                        kind: "address",
+                        chain: deposit.chain,
+                        address: deposit.address,
+                        amount: deposit.expected_amount,
+                        usdt0: {
+                            token: deposit.token?.symbol || "USD₮0",
+                            networkName: deposit.network_name || network.name,
+                            notice: deposit.notice || this.usdt0Notice,
+                        },
                     };
                     break;
                 }
@@ -181,12 +217,12 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
     render() {
         // No client configured yet; configure() will notify and re-render.
         if (!this.sdkOrNull)
-            return html `<p class="muted">Loading…</p>`;
+            return html `<p class="muted">${t("Loading…")}</p>`;
         if (!this.sdk.isLoggedIn) {
-            return html `<p class="muted">Sign in to buy credits.</p>`;
+            return html `<p class="muted">${t("Sign in to buy credits.")}</p>`;
         }
         if (!this.packages) {
-            return html `<p class="muted">${this.error ?? "Loading packages…"}</p>`;
+            return html `<p class="muted">${this.error ?? t("Loading packages…")}</p>`;
         }
         if (this.instruction)
             return this.renderInstruction(this.instruction);
@@ -198,14 +234,14 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
     }
     renderPackages(packages) {
         if (packages.length === 0) {
-            return html `<p class="muted">No credit packages are configured.</p>`;
+            return html `<p class="muted">${t("No credit packages are configured.")}</p>`;
         }
         return html `
       <div class="grid">
         ${packages.map((pkg) => html `
             <button class="package" @click=${() => (this.selected = pkg)}>
               <span class="credits">
-                ${pkg.credits.toLocaleString()} credits
+                ${t("{n} credits", { n: pkg.credits })}
               </span>
               <span class="perunit caption">${perCreditCost(pkg)}</span>
               <span class="price">${formatUsd(pkg.usd_price)}</span>
@@ -219,64 +255,103 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
         const rails = this.offeredRails;
         return html `
       <p>
-        <strong>${pkg.credits.toLocaleString()} credits</strong> —
+        <strong>${t("{n} credits", { n: pkg.credits })}</strong> —
         ${formatUsd(pkg.usd_price)}
       </p>
       <div class="stack">
-        ${rails.map((rail) => html `
-            <button class="primary" ?disabled=${this.busy} @click=${() => this.start(rail)}>
-              ${RAIL_LABELS[rail]}
-            </button>
-          `)}
+        ${rails.map((rail) => rail === "usdt0"
+            ? this.renderUsdt0Options()
+            : html `
+                <button class="primary" ?disabled=${this.busy} @click=${() => this.start(rail)}>
+                  ${t(RAIL_LABELS[rail])}
+                </button>
+              `)}
         ${rails.length === 0
-            ? html `<p class="muted">No payment methods are enabled.</p>`
+            ? html `<p class="muted">${t("No payment methods are enabled.")}</p>`
             : nothing}
-        <button @click=${this.reset}>Back</button>
+        <button @click=${this.reset}>${t("Back")}</button>
       </div>
       ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
+    `;
+    }
+    /**
+     * One "Pay with USD₮" button per network, and the freeze notice once
+     * beneath them. Per network rather than one button and a picker after:
+     * sending on the wrong chain is the expensive mistake here, so the chain
+     * is chosen in the same act as the rail.
+     */
+    renderUsdt0Options() {
+        return html `
+      <div class="usdt0" role="group" aria-label="Pay with USD₮">
+        ${this.usdt0Networks.map((network) => html `
+            <button
+              class="primary"
+              ?disabled=${this.busy}
+              @click=${() => this.start("usdt0", network)}
+            >
+              ${RAIL_LABELS.usdt0} on ${network.name}
+            </button>
+          `)}
+        <p class="caption freezable">
+          <strong>Issuer-freezable.</strong> ${this.usdt0Notice}
+        </p>
+      </div>
     `;
     }
     renderInstruction(instruction) {
         const status = this.topup?.status ?? "pending";
         if (status === "confirmed") {
             return html `
-        <span class="badge success"><span class="dot"></span>Confirmed</span>
-        <p class="ok">Payment confirmed — credits added.</p>
-        <button @click=${this.reset}>Buy more</button>
+        <span class="badge success"><span class="dot"></span>${t("Confirmed")}</span>
+        <p class="ok">${t("Payment confirmed — credits added.")}</p>
+        <button @click=${this.reset}>${t("Buy more")}</button>
       `;
         }
         if (status === "failed" || status === "expired") {
             return html `
-        <span class="badge danger"><span class="dot"></span>${status === "failed" ? "Failed" : "Expired"}</span>
-        <p class="error" role="alert">This top-up ${status}. Nothing was charged.</p>
-        <button @click=${this.reset}>Try again</button>
+        <span class="badge danger"><span class="dot"></span>${status === "failed" ? t("Failed") : t("Expired")}</span>
+        <p class="error" role="alert">${status === "failed" ? t("This top-up failed. Nothing was charged.") : t("This top-up expired. Nothing was charged.")}</p>
+        <button @click=${this.reset}>${t("Try again")}</button>
       `;
         }
         return html `
       ${instruction.kind === "redirect"
-            ? html `<p class="muted">Redirecting to checkout…</p>`
+            ? html `<p class="muted">${t("Redirecting to checkout…")}</p>`
             : nothing}
-      ${instruction.kind === "address"
+      ${instruction.kind === "address" && instruction.usdt0
             ? html `
-            <p>Send exactly <strong>${formatUnits(instruction.amount, 6)}</strong> USDC or
-            USDT on <strong class="network">${networkName(instruction.chain)}</strong>
-            (<code>${instruction.chain}</code>) to:</p>
+            <p>Send exactly <strong>${formatUnits(instruction.amount, 6)}</strong>
+            ${instruction.usdt0.token} on <strong>${instruction.usdt0.networkName}</strong>
+            to:</p>
             <code class="payload">${instruction.address}</code>
-            <p class="caption">On any other network it is not credited.</p>
+            <p class="caption">
+              Only ${instruction.usdt0.token} on ${instruction.usdt0.networkName} is credited
+              to this address; other tokens or networks are not.
+            </p>
+            <p class="caption freezable">
+              <strong>Issuer-freezable.</strong> ${instruction.usdt0.notice}
+            </p>
+          `
+            : nothing}
+      ${instruction.kind === "address" && !instruction.usdt0
+            ? html `
+            <p>${t("Send exactly")} <strong>${formatUnits(instruction.amount, 6)}</strong> ${t("USDC or USDT on")}
+            <code>${instruction.chain}</code> ${t("to:")}</p>
+            <code class="payload">${instruction.address}</code>
           `
             : nothing}
       ${instruction.kind === "invoice"
             ? html `
-            <p>Pay this Lightning invoice
-            (<strong>${Math.ceil(instruction.amountMsat / 1000).toLocaleString()} sats</strong>):</p>
+            <p>${t("Pay this Lightning invoice")}
+            (<strong>${t("{n} sats", { n: Math.ceil(instruction.amountMsat / 1000) })}</strong>):</p>
             <code class="payload">${instruction.bolt11}</code>
           `
             : nothing}
       ${instruction.kind !== "redirect"
             ? html `
             <div class="row">
-              <button @click=${() => this.copy(payloadOf(instruction))}>Copy</button>
-              <button @click=${this.reset}>Cancel</button>
+              <button @click=${() => this.copy(payloadOf(instruction))}>${t("Copy")}</button>
+              <button @click=${this.reset}>${t("Cancel")}</button>
             </div>
             ${this.renderWaiting()}
           `
@@ -296,13 +371,13 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
      */
     renderWaiting() {
         if (!this.waiting) {
-            return html `<p class="muted" aria-live="polite">Not watching for payment.</p>`;
+            return html `<p class="muted" aria-live="polite">${t("Not watching for payment.")}</p>`;
         }
         const seen = this.topup?.confirmations;
         // Nothing matching has appeared on chain yet — including the whole
         // Stripe and Lightning case, where confirmations never apply.
         if (seen === undefined) {
-            return html `<p class="muted" aria-live="polite">Waiting for payment…</p>`;
+            return html `<p class="muted" aria-live="polite">${t("Waiting for payment…")}</p>`;
         }
         const required = this.topup?.confirmations_required;
         // Finality is not a block count, so there is no honest fraction to
@@ -310,7 +385,7 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
         if (required == null) {
             return html `
         <p class="muted" aria-live="polite">
-          Payment received — waiting for the network to finalise it.
+          ${t("Payment received — waiting for the network to finalise it.")}
         </p>
       `;
         }
@@ -319,13 +394,16 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
         const done = Math.min(seen, required);
         return html `
       <p class="muted" aria-live="polite">
-        Payment received — confirming (${done} of ${required}).
+        ${t("Payment received — confirming ({done} of {required}).", {
+            done: String(done),
+            required: String(required),
+        })}
       </p>
       <progress
         class="confirms"
         max=${required}
         value=${done}
-        aria-label="Confirmations"
+        aria-label=${t("Confirmations")}
       ></progress>
     `;
     }
@@ -334,7 +412,7 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
             await navigator.clipboard.writeText(text);
         }
         catch {
-            this.error = "Could not copy — select the text and copy it manually.";
+            this.error = t("Could not copy — select the text and copy it manually.");
         }
     }
     static { this.styles = [
@@ -390,6 +468,15 @@ let OpenAppsBuy = class OpenAppsBuy extends OpenAppsElement {
       .ok {
         font-weight: 600;
       }
+      .usdt0 {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+      }
+      .freezable {
+        margin: 0;
+        color: var(--text-muted, var(--fb-muted));
+      }
       .confirms {
         display: block;
         width: 100%;
@@ -440,6 +527,7 @@ const RAIL_LABELS = {
     stripe: "Pay by card",
     ethereum: "Pay with USDC / USDT",
     lightning: "Pay with Lightning",
+    usdt0: "Pay with USD₮",
 };
 /**
  * How long to keep watching a top-up, per rail. `undefined` keeps the SDK's
@@ -457,6 +545,9 @@ const WAIT_TIMEOUT_MS = {
     stripe: undefined,
     lightning: undefined,
     ethereum: 30 * 60 * 1000,
+    // Arbitrum credits at L1 finality, ~15–25 minutes after the transfer;
+    // Plasma and Stable in seconds. One budget covers the slowest.
+    usdt0: 40 * 60 * 1000,
 };
 function payloadOf(instruction) {
     if (instruction.kind === "address")
@@ -465,9 +556,9 @@ function payloadOf(instruction) {
         return instruction.bolt11;
     return "";
 }
-/** USD minor units → "$10.00". */
+/** USD minor units → "$10.00" (in Russian "10,00 $", in German "10,00 $"). */
 export function formatUsd(cents) {
-    return `$${(cents / 100).toFixed(2)}`;
+    return formatNumber(cents / 100, { style: "currency", currency: "USD" });
 }
 /**
  * Unit price, as "0.45¢ each".
@@ -481,41 +572,29 @@ export function perCreditCost(pkg) {
     if (pkg.credits <= 0)
         return "";
     const cents = pkg.usd_price / pkg.credits;
-    return `${cents < 1 ? cents.toFixed(2) : cents.toFixed(1)}¢ each`;
+    const digits = cents < 1 ? 2 : 1;
+    // Written here rather than by t(): t() would write a number with as many
+    // decimals as it has, and "0.5¢" next to "0.45¢" does not compare.
+    return t("{cents}¢ each", {
+        cents: formatNumber(cents, { minimumFractionDigits: digits, maximumFractionDigits: digits }),
+    });
 }
 /**
- * The networks a deposit can be asked for on, by CAIP-2 id, named the way a
- * wallet's network picker names them.
- *
- * The server says which chain an address is on as a CAIP-2 id, and that is
- * what this showed: "eip155:1". It is exact and it is not something a payer
- * can check against their wallet, and sending on the wrong chain is the one
- * mistake here that loses money. So the name leads and the id follows it.
+ * Token minor units → a decimal number, trailing zeros trimmed, in the
+ * interface's language ("0.5" in English, "0,5" in Russian). Not grouped:
+ * it is the exact amount to send, read off and typed into a wallet.
  */
-const NETWORK_NAMES = {
-    "eip155:1": "Ethereum Mainnet",
-    "eip155:10": "OP Mainnet",
-    "eip155:56": "BNB Smart Chain",
-    "eip155:137": "Polygon PoS",
-    "eip155:8453": "Base",
-    "eip155:42161": "Arbitrum One",
-    "eip155:11155111": "Sepolia testnet",
-};
-/** A CAIP-2 chain id as a person would recognise it; the id itself if unknown. */
-export function networkName(chain) {
-    return NETWORK_NAMES[chain.trim().toLowerCase()] ?? chain;
-}
-/** Token minor units → a decimal string, trailing zeros trimmed. */
 export function formatUnits(amount, decimals) {
-    const scale = 10 ** decimals;
-    const value = amount / scale;
-    return value.toFixed(decimals).replace(/\.?0+$/, "");
+    return formatNumber(amount / 10 ** decimals, {
+        maximumFractionDigits: decimals,
+        useGrouping: false,
+    });
 }
 /** A timed-out wait is not a failed payment, and must not read like one. */
 function describeWait(cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     return message.includes("still pending")
-        ? "Still waiting on the network. Your credits will appear once the payment settles."
+        ? t("Still waiting on the network. Your credits will appear once the payment settles.")
         : message;
 }
 //# sourceMappingURL=openapps-buy.js.map

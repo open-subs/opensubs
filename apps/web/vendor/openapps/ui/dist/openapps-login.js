@@ -18,6 +18,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsError } from "@openapps/sdk";
 import { OpenAppsElement } from "./base.js";
 import { appleMark, emailMark, ethereumMark, githubMark, googleMark, nostrMark, } from "./provider-marks.js";
+import { ONWALLET_SOON, ONWALLET_SOON_HINT, OPENWALLET_HINT, openwalletMark, openwalletStyles, openwalletWordmark, } from "./openwallet-mark.js";
 import { notify } from "./context.js";
 import { loadLocale, localeFor, t } from "./i18n.js";
 import { clearReferral, referralInUrl, storedReferral } from "./referral-code.js";
@@ -82,6 +83,10 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         this.nostrHint = null;
         /** A bunker asking the user to approve in a browser. */
         this.authUrl = null;
+        /** Waiting on the OnWallet extension's approval window (M6.1). */
+        this.owPending = false;
+        /** Why the last OnWallet sign-in stopped without leaving the page. */
+        this.owNotice = null;
         /**
          * Email sign-in: closed, asking for the address, or asking for the code
          * that was sent to it.
@@ -446,7 +451,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
                 return this.tr("Could not reach the server. Check your connection and try again.");
         }
     }
-    loginWithRedirect(provider) {
+    async loginWithRedirect(provider) {
         // A full-page redirect, not a popup: popups are blocked by default in
         // extensions and on mobile Safari. Come back to this exact page —
         // minus any fragment, which the server refuses because it needs to put
@@ -455,8 +460,60 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         // The referral code has to be handed over now. The account is created
         // inside the callback, which never sees this page's query string, so a
         // code left only in `return_to` arrives one step too late to attribute
-        // the signup.
-        window.location.href = this.sdk.auth.redirectStartUrl(provider, here, referralFromUrl());
+        // the signup. PKCE binds the code that comes back to this tab, so a
+        // code planted in someone else's page cannot sign them in.
+        window.location.href = await this.sdk.auth.redirectStart(provider, here, referralFromUrl());
+    }
+    /**
+     * Sign in with OnWallet without visiting the wallet's page, where the
+     * extension offers it (M6.1).
+     *
+     * The extension injects `window.openwallet.signIn` only on sites the
+     * person has connected. There, the server is asked for the authorize URL
+     * as JSON — the same start as the redirect: this tab's PKCE verifier, the
+     * same browser-binding cookie — and the URL is handed to the extension,
+     * which opens its approval window over this page and, on approval,
+     * navigates this tab to the callback itself. The code never passes
+     * through this page: it comes back as `#code=` at `here`, exactly as after
+     * the redirect, and {@link load} redeems it.
+     *
+     * Anything that means "this way is not available here" — no provider, a
+     * server that will not answer as JSON, `not_connected`, `invalid_url`,
+     * `unavailable`, or an answer this page does not know — falls back to the
+     * ordinary redirect. `declined` and `expired` are the person's answer, so
+     * the page stays and says so.
+     */
+    async loginWithOpenWallet() {
+        const provider = openwalletProvider();
+        if (!provider)
+            return this.loginWithRedirect("openwallet");
+        const here = `${location.origin}${location.pathname}${location.search}`;
+        this.error = null;
+        this.owNotice = null;
+        this.busy = true;
+        this.owPending = true;
+        let outcome;
+        try {
+            const authorizeUrl = await this.sdk.auth.redirectAuthorizeUrl("openwallet", here, referralFromUrl());
+            outcome = await askOpenWallet(provider, authorizeUrl);
+        }
+        catch {
+            outcome = "fallback";
+        }
+        if (outcome === "approved") {
+            // The extension is navigating this tab. Stay busy until it does; if
+            // it somehow never does, give the buttons back rather than hang.
+            setTimeout(() => {
+                this.busy = false;
+                this.owPending = false;
+            }, OPENWALLET_NAVIGATION_GRACE_MS);
+            return;
+        }
+        this.busy = false;
+        this.owPending = false;
+        if (outcome === "fallback")
+            return this.loginWithRedirect("openwallet");
+        this.owNotice = OPENWALLET_NOTICES[outcome];
     }
     async logout() {
         await this.run(() => this.sdk.auth.logout());
@@ -475,9 +532,10 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
         const apple = this.enabled?.apple ?? false;
         const google = this.enabled?.google ?? false;
         const github = this.enabled?.github ?? false;
+        const openwallet = this.enabled?.openwallet ?? false;
         const wallet = this.enabled?.eip155 ?? false;
         const nostr = this.enabled?.nostr ?? false;
-        if (this.enabled && !email && !apple && !google && !github && !wallet && !nostr) {
+        if (this.enabled && !email && !apple && !google && !github && !openwallet && !wallet && !nostr) {
             return this.frame(html `
         <p class="muted">${this.tr("This server has no login methods configured.")}</p>
         ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
@@ -535,6 +593,35 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
               ${githubMark}<span>${this.tr("Continue with GitHub")}</span>
             </button>`
             : nothing}
+        ${ONWALLET_SOON
+            ? // Not out yet: shown, greyed out, so people know it is coming.
+                html `<button
+                class="provider ${block} ow-soon"
+                disabled
+                aria-describedby="ow-hint"
+              >
+                ${openwalletMark}<span>${this.tr("Sign in with")} ${openwalletWordmark}</span>
+              </button>
+              <p class="ow-hint" id="ow-hint">${this.tr(ONWALLET_SOON_HINT)}</p>`
+            : openwallet
+                ? // The person approves in the extension, never by typing into a
+                    // page — the line underneath says where to look.
+                    html `<button
+                class="provider ${block}"
+                ?disabled=${this.busy}
+                aria-describedby="ow-hint"
+                aria-busy=${this.owPending ? "true" : "false"}
+                @click=${() => this.loginWithOpenWallet()}
+              >
+                ${openwalletMark}${this.owPending
+                        ? html `<span>${this.tr("Continue in OnWallet…")}</span>`
+                        : html `<span>${this.tr("Sign in with")} ${openwalletWordmark}</span>`}
+              </button>
+              <p class="ow-hint" id="ow-hint">${this.tr(OPENWALLET_HINT)}</p>
+              ${this.owNotice
+                        ? html `<p class="ow-hint ow-notice" role="status">${this.tr(this.owNotice)}</p>`
+                        : nothing}`
+                : nothing}
         ${wallet && this.wallets
             ? // Several installed: one button each, named, in place of the
                 // generic one — see <openapps-account> for why.
@@ -819,6 +906,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
     }
     static { this.styles = [
         OpenAppsElement.baseStyles,
+        openwalletStyles,
         css `
       /* Mark on the left, label centred in the space that remains — so the
          three labels line up with each other rather than each sitting a
@@ -832,7 +920,7 @@ let OpenAppsLogin = class OpenAppsLogin extends OpenAppsElement {
       button.provider svg {
         flex: none;
       }
-      button.provider.block span {
+      button.provider.block > span {
         flex: 1;
         text-align: center;
         /* Balance the mark so the label is centred on the button, not on
@@ -977,6 +1065,12 @@ __decorate([
 ], OpenAppsLogin.prototype, "authUrl", void 0);
 __decorate([
     state()
+], OpenAppsLogin.prototype, "owPending", void 0);
+__decorate([
+    state()
+], OpenAppsLogin.prototype, "owNotice", void 0);
+__decorate([
+    state()
 ], OpenAppsLogin.prototype, "emailStep", void 0);
 __decorate([
     state()
@@ -1001,6 +1095,46 @@ export { OpenAppsLogin };
 async function solve(challenge) {
     const { solvePow } = await import("./pow.js");
     return solvePow(challenge);
+}
+/** What the page says when the person's answer keeps them here. */
+const OPENWALLET_NOTICES = {
+    declined: "Sign-in was declined in OnWallet.",
+    expired: "The OnWallet request timed out. Try again.",
+};
+/** How long to wait for the extension to navigate after an approval. */
+const OPENWALLET_NAVIGATION_GRACE_MS = 20_000;
+/** The extension's provider, if it is on this page; never a bare property read that could throw. */
+function openwalletProvider() {
+    try {
+        const ow = globalThis.openwallet;
+        return ow && typeof ow.signIn === "function" ? ow : null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Hand the authorize URL to the extension and classify its answer. The
+ * extension's providers reject with an `Error` carrying `code`; an answer
+ * shaped `{ error }` (a string or `{ code }`) is read the same way.
+ */
+async function askOpenWallet(provider, authorizeUrl) {
+    let code;
+    try {
+        const result = await provider.signIn({ authorizeUrl });
+        const error = result?.error;
+        if (error === undefined || error === null)
+            return "approved";
+        code = typeof error === "object" ? error.code : error;
+    }
+    catch (cause) {
+        code = cause?.code;
+    }
+    if (code === "declined" || code === "expired")
+        return code;
+    // not_connected, invalid_url, unavailable, and anything this page does
+    // not know: the wallet's own page still works.
+    return "fallback";
 }
 /** Middle-truncate long identifiers (addresses, npubs) for display. */
 export function shorten(value, head = 10, tail = 6) {

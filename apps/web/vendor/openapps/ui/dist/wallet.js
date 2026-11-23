@@ -338,6 +338,48 @@ export async function signNostr(templateJson) {
     }
 }
 /**
+ * Ask the page's Nostr signer which key it would sign with, without asking
+ * it to sign anything.
+ *
+ * This is what lets an account page show "this key will sign" before a
+ * link. With two Nostr extensions installed, whichever injected first owns
+ * `window.nostr`, and OnWallet's provider steps aside for one that got
+ * there earlier — so the key that answers is not always the one the person
+ * has in mind, and a link made blind attaches the wrong key for good.
+ *
+ * The bech32 encoder is loaded on demand, like the rest of `nostr-tools`.
+ */
+export async function nostrPublicKey() {
+    const provider = await waitForNostrProvider();
+    if (!provider) {
+        throw new WalletError(`no Nostr signer answered (looked at ${nostrProviderNames().join(", ")})`);
+    }
+    let hex;
+    try {
+        hex = String(await provider.getPublicKey()).toLowerCase();
+    }
+    catch (cause) {
+        throw new WalletError(rejectionMessage(cause, "the signer would not say which key it holds"));
+    }
+    if (!/^[0-9a-f]{64}$/.test(hex)) {
+        throw new WalletError("the Nostr signer answered with something that is not a public key");
+    }
+    const { npubEncode } = await import("nostr-tools/nip19");
+    return { hex, npub: npubEncode(hex) };
+}
+/** The public key a signed Nostr proof was made with, or null. */
+export function proofPublicKey(proof) {
+    if (proof.type !== "nostr_event")
+        return null;
+    try {
+        const pubkey = JSON.parse(proof.event).pubkey;
+        return typeof pubkey === "string" ? pubkey.toLowerCase() : null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
  * How long to wait on a remote signer before giving up.
  *
  * NIP-46 signing is a round trip through a relay to an app that may be

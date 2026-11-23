@@ -14,6 +14,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
+import { formatNumber, t } from "./catalogue.js";
 let OpenAppsCredits = class OpenAppsCredits extends OpenAppsElement {
     constructor() {
         super(...arguments);
@@ -60,12 +61,12 @@ let OpenAppsCredits = class OpenAppsCredits extends OpenAppsElement {
         if (!this.sdkOrNull)
             return html `<span class="muted">…</span>`;
         if (!this.sdk.isLoggedIn)
-            return html `<span class="muted">Not signed in</span>`;
+            return html `<span class="muted">${t("Not signed in")}</span>`;
         return html `
       <span class="wrap">
-        <span class="label muted">${this.label}</span>
+        <span class="label muted">${t(this.label)}</span>
         <span class="value" aria-live="polite"
-          >${this.balance === null ? "…" : this.balance.toLocaleString()}</span
+          >${this.balance === null ? "…" : formatNumber(this.balance)}</span
         >
       </span>
       ${this.error ? html `<span class="error" role="alert">${this.error}</span>` : nothing}

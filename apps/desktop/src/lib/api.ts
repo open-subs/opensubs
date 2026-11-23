@@ -190,6 +190,11 @@ export interface ModelOptionDto {
   filename: string;
   url: string;
   sizeBytes: number;
+  /**
+   * About how much memory transcribing with it takes -- measured peak, see
+   * src-tauri/src/models.rs. Approximate: shown as "about", never promised.
+   */
+  memoryBytes: number;
   description: string;
   alreadyDownloaded: boolean;
   localPath: string | null;

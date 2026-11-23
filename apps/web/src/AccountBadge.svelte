@@ -27,7 +27,7 @@
   {#if session.signedIn}
     <span class="nav-balance" title={t("Credits, shared across your account")}>
       <strong>{session.balance}</strong>
-      {t(session.balance === 1 ? "credit" : "credits")}
+      {t(session.balance === 1 ? "credit" : "credits", { n: session.balance })}
     </span>
     <!--
       The same button opens the panel signed in as signed out, because the
@@ -40,7 +40,7 @@
       aria-haspopup="menu"
       onclick={() => (open = !open)}
     >
-      {t("Account")}
+      <svg class="nav-signin-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span class="nav-signin-label">{t("Account")}</span>
     </button>
     <div class="nav-panel" class:open role="menu">
       <!--
@@ -64,7 +64,7 @@
       aria-haspopup="menu"
       onclick={() => (open = !open)}
     >
-      {t("Sign in")}
+      <svg class="nav-signin-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span class="nav-signin-label">{t("Sign in")}</span>
     </button>
     <!-- Kept in the DOM rather than created on open: the element sets up
          its SDK client on connect, and mounting it at the moment of the
@@ -103,6 +103,12 @@
     padding: var(--space-2) var(--space-4);
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  /* The glyph is for a narrow site header, which hides the label
+     (website/public/opensubs-refresh.css); everywhere else it is the word. */
+  .nav-signin-icon {
+    display: none;
   }
 
   .nav-signin:hover {

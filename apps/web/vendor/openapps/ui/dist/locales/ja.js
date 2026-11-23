@@ -7,6 +7,7 @@ const catalogue = {
     "Continue with a wallet": "ウォレットで続ける",
     "Continue with {name}": "{name} で続ける",
     "Continue with Nostr": "Nostr で続ける",
+    "Coming soon": "近日公開",
     "No extension? Use a remote signer": "拡張機能がない場合はリモート署名を使う",
     "Email address": "メールアドレス",
     "Send code": "コードを送信",
@@ -31,7 +32,13 @@ const catalogue = {
     "Email sign-in is not available here.": "ここではメールでのサインインを利用できません。",
     "Could not reach the server. Check your connection and try again.": "サーバーに接続できません。接続を確認して、もう一度お試しください。",
     "Sign out": "サインアウト",
-    "This server has no login methods configured.": "このサーバーにはサインイン方法が設定されていません。"
+    "This server has no login methods configured.": "このサーバーにはサインイン方法が設定されていません。",
+    // OnWallet: the button reads these words, then the wordmark.
+    "Sign in with": "サインイン：",
+    "Continue in OnWallet…": "OnWallet で続行…",
+    "Approve in your OnWallet browser extension": "OnWallet ブラウザ拡張機能で承認してください",
+    "Sign-in was declined in OnWallet.": "OnWallet でサインインが拒否されました。",
+    "The OnWallet request timed out. Try again.": "OnWallet のリクエストがタイムアウトしました。もう一度お試しください。"
 };
 export default catalogue;
 //# sourceMappingURL=ja.js.map

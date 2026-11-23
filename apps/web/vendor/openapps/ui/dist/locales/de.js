@@ -7,6 +7,7 @@ const catalogue = {
     "Continue with a wallet": "Weiter mit einer Wallet",
     "Continue with {name}": "Weiter mit {name}",
     "Continue with Nostr": "Weiter mit Nostr",
+    "Coming soon": "Demnächst",
     "No extension? Use a remote signer": "Keine Erweiterung? Remote-Signer verwenden",
     "Email address": "E-Mail-Adresse",
     "Send code": "Code senden",
@@ -31,7 +32,13 @@ const catalogue = {
     "Email sign-in is not available here.": "Die Anmeldung per E-Mail ist hier nicht verfügbar.",
     "Could not reach the server. Check your connection and try again.": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "Sign out": "Abmelden",
-    "This server has no login methods configured.": "Auf diesem Server ist keine Anmeldemethode eingerichtet."
+    "This server has no login methods configured.": "Auf diesem Server ist keine Anmeldemethode eingerichtet.",
+    // OnWallet: the button reads these words, then the wordmark.
+    "Sign in with": "Anmelden mit",
+    "Continue in OnWallet…": "Weiter in OnWallet…",
+    "Approve in your OnWallet browser extension": "In Ihrer OnWallet-Browsererweiterung bestätigen",
+    "Sign-in was declined in OnWallet.": "Die Anmeldung wurde in OnWallet abgelehnt.",
+    "The OnWallet request timed out. Try again.": "Die OnWallet-Anfrage ist abgelaufen. Versuchen Sie es erneut."
 };
 export default catalogue;
 //# sourceMappingURL=de.js.map

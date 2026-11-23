@@ -1,74 +1,167 @@
-import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6RX7FT.js";import{a as C,b as t,c as p,d as n,e as w,f as c,g as d,i as $,j as x,k as m,l as u,m as y}from"./chunk-D7VGXHRZ.js";import{a}from"./chunk-LCQWCHVU.js";var P=p`<svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.909c1.702-1.567 2.683-3.874 2.683-6.614z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.181l-2.909-2.258c-.806.54-1.837.859-3.047.859-2.344 0-4.328-1.583-5.036-3.71H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.346l2.582-2.582C13.463.892 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>`,k=p`<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><g fill="#627EEA"><path d="M12 1.5 5.75 12.02 12 15.73V1.5z" opacity=".55"/><path d="M12 1.5v14.23l6.25-3.71L12 1.5z" opacity=".85"/><path d="M12 17.06 5.75 13.35 12 22.5v-5.44z" opacity=".55"/><path d="M12 22.5v-5.44l6.25-3.71L12 22.5z" opacity=".85"/></g></svg>`,z=p`<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="#9C59FF" d="M3 23.9C2.7 23.6 2.8 22.7 3.3 22.1C3.4 21.9 3.4 21.9 3.2 21.9C3 22 2.9 21.9 2.9 21.6C3 21.3 3.4 21 3.9 20.9C4.4 20.8 4.4 20.8 5.2 19.5C5.7 18.9 6.3 18.1 6.5 17.7C6.9 17.2 7 17 7.1 16.8C7.2 16.3 7.4 16 7.9 15.8C8.5 15.6 10.4 13.8 10.2 13.6C10.2 13.6 10 13.6 9.7 13.5C8.7 13.3 7.5 12.8 6.9 12.4C6.6 12.2 6.6 12.2 6.4 12.2C5.6 12.3 4.9 12.5 4.4 12.8C3.8 13.1 3.8 13.2 3.7 13.1C3.6 13 3.6 12.4 3.8 12C3.8 11.9 3.8 11.9 3.7 11.9C3.6 11.9 3.4 12 3.1 12.3C2.7 12.8 2.6 12.8 2.5 12.6C2.3 12.4 2.4 12.1 2.5 11.7C2.6 11.2 2.6 11.2 2.5 11.2C2.4 11.3 2.2 11.4 2 11.4C1.6 11.6 1.5 11.6 1.5 11.4C1.5 10.7 2.3 9.7 3 9.3C3.7 8.9 4.9 8.8 5.2 9C5.3 9.1 5.6 9.2 5.6 9.2C5.6 9.2 5.6 9.1 5.5 9C5.4 8.8 5.4 8.6 5.5 8.6C5.5 8.6 5.9 8.6 6.3 8.6C7.6 8.6 8.1 8.4 9.4 7.8C10.9 7.1 11.1 7 11.7 6.8C12.5 6.5 12.9 6.4 13.9 6.4C15.4 6.3 16 6.5 17.4 7.3C18 7.7 18.1 7.7 18.4 7.6C18.7 7.6 18.8 7.6 19.1 7.6C19.7 7.7 20 7.7 20.4 7.5C21.1 7.1 21.4 6.5 21.3 5.7C21.3 5 21.1 4.7 20.2 4.1C19.1 3.2 18.7 2.5 18.7 1.5C18.7 0.9 18.8 0.6 19.1 0.3C19.5 -0.1 19.9 -0.1 20.6 0.4C21 0.6 21.2 0.7 21.8 0.9C22.6 1.2 22.7 1.2 22.2 1.3C21.8 1.3 21.8 1.3 22.1 1.4C22.7 1.6 22.6 1.7 21.7 1.7C21.1 1.7 20.9 1.7 20.6 1.8C20.1 1.9 20 2 20.1 2.2C20.1 2.5 20.2 2.6 20.9 3.1C22.1 4.1 22.5 4.8 22.5 6C22.4 7.5 21.5 8.7 19.8 9.8C19.2 10.1 19.2 10.1 19.2 10.7C19.2 11.9 19 12.5 18.3 13.1C17.5 13.7 16.6 13.9 15.1 14L14.3 14L14.2 14.2C14.1 14.2 14.1 14.3 14.1 14.4C14.1 14.4 13.8 14.6 13.5 14.8C13.2 15 12.6 15.8 12.9 15.7C12.9 15.7 13.4 15.5 14 15.3C17 14.4 16.7 14.5 17.2 14.5C17.8 14.5 17.8 14.5 18.4 15.4C19 16.3 19.1 16.5 19 16.6C19 16.8 18.5 16.6 18 16.1C17.7 15.8 17.6 15.8 17.7 16.1C17.7 16.4 17.6 16.5 17.4 16.4C17.3 16.3 17.2 16.2 17.1 15.8L17.1 15.5L16.9 15.5C16.6 15.5 16.6 15.5 14.5 16.2C13.3 16.6 12.9 16.7 12.7 16.9C12 17.2 11.5 17 11.5 16.3C11.5 16.1 11.9 14.9 12.1 14.8C12.1 14.8 12.3 14.4 12.2 14.4C12.2 14.4 11.9 14.5 11.6 14.6L11 14.8L10 15.6C9 16.4 9 16.4 8.9 16.6C8.8 17 8.5 17.3 8.1 17.4C7.9 17.5 7.8 17.7 6.9 18.8C5.9 20.1 5.3 20.9 4.9 21.6C4.8 21.8 4.5 22.1 4.3 22.4C3.7 22.9 3.6 23.1 3.3 23.6C3.1 24 3.1 24 3 23.9Z"/></svg>`,H=p`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>`,B=p`<svg viewBox="0 0 384 512" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>`;var s=class extends y{constructor(){super(...arguments);this.me=null;this.enabled=null;this.signerTimeout=2e3;this.variant="inline";this.heading="Sign in to OpenApps";this.description="One account for every app in the suite. Optional \u2014 the apps work without it.";this.mark="O";this.shareSigner=!1;this.wallets=null;this.nostrFallback="none";this.nostrHint=null;this.authUrl=null}connectedCallback(){super.connectedCallback(),this.load()}onSessionChange(){this.load()}async load(){let e=await this.run(()=>this.sdk.auth.completeRedirect());if(e&&(m(),this.emit("openapps-login",e),u()),this.enabled||(this.enabled=await this.run(()=>this.sdk.auth.methods())??null),!this.sdk.isLoggedIn){this.me=null;return}this.me=await this.run(()=>this.sdk.auth.me())??null}async beginWalletLogin(){let e=await R();if(e.length>1){this.wallets=e;return}await this.loginWithWallet(e[0])}async loginWithWallet(e){this.wallets=null,await this.run(async()=>{let i=await W(e?.provider),r=await this.sdk.auth.challenge("eip155",i),o=await F(r.message,i,e?.provider),h=await this.sdk.auth.verify(r.challenge_id,o,{referralCode:b()});m(),this.emit("openapps-login",h),u()})}async loginWithNostr(){if(!await M(this.signerTimeout)){this.nostrFallback="bunker",this.nostrHint=`No signer extension answered. Checked ${S().join(" and ")}. On a phone, or without an extension, connect a remote signer below.`;return}await this.run(async()=>{let e=await this.sdk.auth.challenge("nostr"),i=await T(e.message),r=await this.sdk.auth.verify(e.challenge_id,i,{referralCode:b()});m(),this.emit("openapps-login",r),this.shareNostrSigner(i,{method:"nip07"}),u()})}async loginWithBunker(e){e.preventDefault();let r=this.renderRoot.querySelector("#bunker")?.value.trim()??"";r&&(this.authUrl=null,await this.run(async()=>{let o=crypto.getRandomValues(new Uint8Array(32)),h=await this.sdk.auth.challenge("nostr"),l=await E(h.message,r,{clientSecret:o,onAuthUrl:U=>{this.authUrl=U}}),f=await this.sdk.auth.verify(h.challenge_id,l,{referralCode:b()});this.nostrFallback="none",this.authUrl=null,m(),this.emit("openapps-login",f),this.shareNostrSigner(l,{method:"bunker",bunker:r,clientSecret:o}),u()}))}async loginWithNsec(e){e.preventDefault();let i=this.renderRoot.querySelector("#nsec"),r=i?.value.trim()??"";r&&await this.run(async()=>{try{let o=await this.sdk.auth.challenge("nostr"),h=await N(o.message,r),l=await this.sdk.auth.verify(o.challenge_id,h,{referralCode:b()});this.nostrFallback="none",m(),this.emit("openapps-login",l),this.shareNostrSigner(h,{method:"nsec",nsec:r}),u()}finally{i&&(i.value="")}})}shareNostrSigner(e,i){this.shareSigner&&this.emit("openapps-nostr-signer",{...i,pubkey:JSON.parse(e.event).pubkey})}loginWithRedirect(e){let i=`${location.origin}${location.pathname}${location.search}`;window.location.href=this.sdk.auth.redirectStartUrl(e,i,b())}async logout(){await this.run(()=>this.sdk.auth.logout()),this.me=null,this.emit("openapps-logout",null),u()}render(){if(this.me)return this.renderSignedIn(this.me);let e=this.enabled?.apple??!1,i=this.enabled?.google??!1,r=this.enabled?.github??!1,o=this.enabled?.eip155??!1,h=this.enabled?.nostr??!1;if(this.enabled&&!e&&!i&&!r&&!o&&!h)return this.frame(t`
-        <p class="muted">This server has no login methods configured.</p>
-        ${this.error?t`<p class="error" role="alert">${this.error}</p>`:n}
-      `);let l=this.variant==="panel"?"block":"";return this.frame(t`
+import{a as M,b as W,c as q,d as G,e as V,f as j,g as D,h as Y,i as J,j as K,k as Z,l as Q,m as X,p as ee}from"./chunk-5CN5JSMR.js";import{a as O,c as r,d as b,e as d,f as U,g as v,h as c,i as P,j as B,k as A,l as w,m as f,q as T}from"./chunk-HLRRPXU7.js";import{a as l,b as m,c as E,d as C}from"./chunk-LCQWCHVU.js";var te=b`<svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.909c1.702-1.567 2.683-3.874 2.683-6.614z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.181l-2.909-2.258c-.806.54-1.837.859-3.047.859-2.344 0-4.328-1.583-5.036-3.71H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.346l2.582-2.582C13.463.892 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>`,R=b`<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><g fill="#627EEA"><path d="M12 1.5 5.75 12.02 12 15.73V1.5z" opacity=".55"/><path d="M12 1.5v14.23l6.25-3.71L12 1.5z" opacity=".85"/><path d="M12 17.06 5.75 13.35 12 22.5v-5.44z" opacity=".55"/><path d="M12 22.5v-5.44l6.25-3.71L12 22.5z" opacity=".85"/></g></svg>`,ie=b`<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="#9C59FF" d="M3 23.9C2.7 23.6 2.8 22.7 3.3 22.1C3.4 21.9 3.4 21.9 3.2 21.9C3 22 2.9 21.9 2.9 21.6C3 21.3 3.4 21 3.9 20.9C4.4 20.8 4.4 20.8 5.2 19.5C5.7 18.9 6.3 18.1 6.5 17.7C6.9 17.2 7 17 7.1 16.8C7.2 16.3 7.4 16 7.9 15.8C8.5 15.6 10.4 13.8 10.2 13.6C10.2 13.6 10 13.6 9.7 13.5C8.7 13.3 7.5 12.8 6.9 12.4C6.6 12.2 6.6 12.2 6.4 12.2C5.6 12.3 4.9 12.5 4.4 12.8C3.8 13.1 3.8 13.2 3.7 13.1C3.6 13 3.6 12.4 3.8 12C3.8 11.9 3.8 11.9 3.7 11.9C3.6 11.9 3.4 12 3.1 12.3C2.7 12.8 2.6 12.8 2.5 12.6C2.3 12.4 2.4 12.1 2.5 11.7C2.6 11.2 2.6 11.2 2.5 11.2C2.4 11.3 2.2 11.4 2 11.4C1.6 11.6 1.5 11.6 1.5 11.4C1.5 10.7 2.3 9.7 3 9.3C3.7 8.9 4.9 8.8 5.2 9C5.3 9.1 5.6 9.2 5.6 9.2C5.6 9.2 5.6 9.1 5.5 9C5.4 8.8 5.4 8.6 5.5 8.6C5.5 8.6 5.9 8.6 6.3 8.6C7.6 8.6 8.1 8.4 9.4 7.8C10.9 7.1 11.1 7 11.7 6.8C12.5 6.5 12.9 6.4 13.9 6.4C15.4 6.3 16 6.5 17.4 7.3C18 7.7 18.1 7.7 18.4 7.6C18.7 7.6 18.8 7.6 19.1 7.6C19.7 7.7 20 7.7 20.4 7.5C21.1 7.1 21.4 6.5 21.3 5.7C21.3 5 21.1 4.7 20.2 4.1C19.1 3.2 18.7 2.5 18.7 1.5C18.7 0.9 18.8 0.6 19.1 0.3C19.5 -0.1 19.9 -0.1 20.6 0.4C21 0.6 21.2 0.7 21.8 0.9C22.6 1.2 22.7 1.2 22.2 1.3C21.8 1.3 21.8 1.3 22.1 1.4C22.7 1.6 22.6 1.7 21.7 1.7C21.1 1.7 20.9 1.7 20.6 1.8C20.1 1.9 20 2 20.1 2.2C20.1 2.5 20.2 2.6 20.9 3.1C22.1 4.1 22.5 4.8 22.5 6C22.4 7.5 21.5 8.7 19.8 9.8C19.2 10.1 19.2 10.1 19.2 10.7C19.2 11.9 19 12.5 18.3 13.1C17.5 13.7 16.6 13.9 15.1 14L14.3 14L14.2 14.2C14.1 14.2 14.1 14.3 14.1 14.4C14.1 14.4 13.8 14.6 13.5 14.8C13.2 15 12.6 15.8 12.9 15.7C12.9 15.7 13.4 15.5 14 15.3C17 14.4 16.7 14.5 17.2 14.5C17.8 14.5 17.8 14.5 18.4 15.4C19 16.3 19.1 16.5 19 16.6C19 16.8 18.5 16.6 18 16.1C17.7 15.8 17.6 15.8 17.7 16.1C17.7 16.4 17.6 16.5 17.4 16.4C17.3 16.3 17.2 16.2 17.1 15.8L17.1 15.5L16.9 15.5C16.6 15.5 16.6 15.5 14.5 16.2C13.3 16.6 12.9 16.7 12.7 16.9C12 17.2 11.5 17 11.5 16.3C11.5 16.1 11.9 14.9 12.1 14.8C12.1 14.8 12.3 14.4 12.2 14.4C12.2 14.4 11.9 14.5 11.6 14.6L11 14.8L10 15.6C9 16.4 9 16.4 8.9 16.6C8.8 17 8.5 17.3 8.1 17.4C7.9 17.5 7.8 17.7 6.9 18.8C5.9 20.1 5.3 20.9 4.9 21.6C4.8 21.8 4.5 22.1 4.3 22.4C3.7 22.9 3.6 23.1 3.3 23.6C3.1 24 3.1 24 3 23.9Z"/></svg>`,re=b`<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>`,ae=b`<svg viewBox="0 0 384 512" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>`,se=b`<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`;var ne=["en","zh-Hans","zh-Hant","ja","ko","de","es","pt","ru"];function N(a){if(!a)return null;let o=a.trim().toLowerCase().replace(/_/g,"-");if(!o)return null;let e=ne.find(i=>i.toLowerCase()===o);if(e)return e;let t=o.split("-");return t[0]==="zh"?t.slice(1).some(i=>["hant","tw","hk","mo"].includes(i))?"zh-Hant":"zh-Hans":ne.find(i=>i===t[0])??null}function oe(a){let o=N(a.closest("[lang]")?.getAttribute("lang"))??N(document.documentElement.getAttribute("lang"));if(o)return o;for(let e of navigator.languages??[navigator.language]){let t=N(e);if(t)return t}return"en"}var he={"zh-Hans":()=>import("./zh-Hans-UHFUD4JK.js"),"zh-Hant":()=>import("./zh-Hant-QXU2Y5U3.js"),ja:()=>import("./ja-MFTIO3I4.js"),ko:()=>import("./ko-KA5EEGOJ.js"),de:()=>import("./de-FJEKHZNT.js"),es:()=>import("./es-77NMXUTD.js"),pt:()=>import("./pt-ZXH46MZS.js"),ru:()=>import("./ru-GVTEGSNY.js")},_=new Map,I=new Map;function le(a){if(a==="en"||_.has(a))return Promise.resolve();let o=I.get(a);return o||(o=he[a]().then(e=>{_.set(a,e.default)}).catch(()=>{}).finally(()=>I.delete(a)),I.set(a,o)),o}function de(a,o,e={}){return(a==="en"?o:_.get(a)?.[o]??o).replace(/\{(\w+)\}/g,(i,s)=>s in e?String(e[s]):i)}var g,k,$,x,n=class extends T{constructor(){super(...arguments);this.me=null;this.enabled=null;this.signerTimeout=2e3;this.variant="inline";this.heading="Sign in to OpenApps";this.description="One account for every app in the suite. Optional \u2014 the apps work without it.";this.mark="O";this.shareSigner=!1;this.wallets=null;this.nostrFallback="none";this.nostrHint=null;this.authUrl=null;this.owPending=!1;this.owNotice=null;this.emailStep="closed";this.emailAddress="";this.emailFlow=null;this.emailError=null;this.resendIn=0;E(this,g);E(this,k,null);E(this,$);E(this,x,null)}get locale(){return oe(this)}tr(e,t){return de(this.locale,e,t)}willUpdate(){let e=this.locale;e!==m(this,x)&&(C(this,x,e),le(e).then(()=>this.requestUpdate()))}connectedCallback(){super.connectedCallback(),C(this,$,new MutationObserver(()=>this.requestUpdate())),m(this,$).observe(document.documentElement,{attributes:!0,attributeFilter:["lang"]}),this.load()}disconnectedCallback(){m(this,$)?.disconnect(),clearInterval(m(this,g)),super.disconnectedCallback()}onSessionChange(){this.load()}async load(){let e=await this.run(()=>this.sdk.auth.completeRedirect());if(e&&(w(),this.emit("openapps-login",e),f()),this.enabled||(this.enabled=await this.run(()=>this.sdk.auth.methods())??null),!this.sdk.isLoggedIn){this.me=null;return}this.me=await this.run(()=>this.sdk.auth.me())??null}async beginWalletLogin(){let e=await J();if(e.length>1){this.wallets=e;return}await this.loginWithWallet(e[0])}async loginWithWallet(e){this.wallets=null,await this.run(async()=>{let t=await Z(e?.provider),i=await this.sdk.auth.challenge("eip155",t),s=await Q(i.message,t,e?.provider),h=await this.sdk.auth.verify(i.challenge_id,s,{referralCode:y()});w(),this.emit("openapps-login",h),f()})}async loginWithNostr(){if(!await D(this.signerTimeout)){this.nostrFallback="bunker",this.nostrHint=`No signer extension answered. Checked ${Y().join(" and ")}. On a phone, or without an extension, connect a remote signer below.`;return}await this.run(async()=>{let e=await this.sdk.auth.challenge("nostr"),t=await X(e.message),i=await this.sdk.auth.verify(e.challenge_id,t,{referralCode:y()});w(),this.emit("openapps-login",i),this.shareNostrSigner(t,{method:"nip07"}),f()})}async loginWithBunker(e){e.preventDefault();let i=this.renderRoot.querySelector("#bunker")?.value.trim()??"";i&&(this.authUrl=null,await this.run(async()=>{let s=crypto.getRandomValues(new Uint8Array(32)),h=await this.sdk.auth.challenge("nostr"),u=await ee(h.message,i,{clientSecret:s,onAuthUrl:p=>{this.authUrl=p}}),S=await this.sdk.auth.verify(h.challenge_id,u,{referralCode:y()});this.nostrFallback="none",this.authUrl=null,w(),this.emit("openapps-login",S),this.shareNostrSigner(u,{method:"bunker",bunker:i,clientSecret:s}),f()}))}async loginWithNsec(e){e.preventDefault();let t=this.renderRoot.querySelector("#nsec"),i=t?.value.trim()??"";i&&await this.run(async()=>{try{let s=await this.sdk.auth.challenge("nostr"),h=await K(s.message,i),u=await this.sdk.auth.verify(s.challenge_id,h,{referralCode:y()});this.nostrFallback="none",w(),this.emit("openapps-login",u),this.shareNostrSigner(h,{method:"nsec",nsec:i}),f()}finally{t&&(t.value="")}})}shareNostrSigner(e,t){this.shareSigner&&this.emit("openapps-nostr-signer",{...t,pubkey:JSON.parse(e.event).pubkey})}openEmail(){this.error=null,this.emailError=null,this.emailStep="address",this.prepareEmailPow(),this.updateComplete.then(()=>this.renderRoot.querySelector("#oa-email")?.focus())}prepareEmailPow(){if(m(this,k))return;let e=this.sdk.auth.emailPow().then(t=>F(t));e.catch(()=>{}),C(this,k,e)}async takeEmailPow(){this.prepareEmailPow();let e=m(this,k);C(this,k,null);try{return await e}catch{return F(await this.sdk.auth.emailPow())}}async sendEmailCode(e){e?.preventDefault();let t=this.renderRoot.querySelector("#oa-email"),i=(t?.value??this.emailAddress).trim();if(!i||t&&!t.checkValidity()){this.emailError=this.tr("Enter a valid email address.");return}this.emailAddress=i,this.emailError=null,this.busy=!0;try{let s=await this.takeEmailPow(),h;try{h=await this.sdk.auth.emailStart(i,s,{lang:this.locale})}catch(u){if(!(u instanceof P&&u.code==="pow_invalid"))throw u;s=await F(await this.sdk.auth.emailPow()),h=await this.sdk.auth.emailStart(i,s,{lang:this.locale})}this.emailFlow=h,this.emailStep="code",this.startResendCountdown(h.resend_after),this.prepareEmailPow(),this.updateComplete.then(()=>this.renderRoot.querySelector("#oa-code")?.focus())}catch(s){this.emailError=this.describeEmailError(s)}finally{this.busy=!1}}startResendCountdown(e){clearInterval(m(this,g)),this.resendIn=Math.max(0,Math.ceil(e)),this.resendIn!==0&&C(this,g,setInterval(()=>{this.resendIn=Math.max(0,this.resendIn-1),this.resendIn===0&&clearInterval(m(this,g))},1e3))}onCodeInput(e){let t=e.target,i=t.value.replace(/\D/g,"").slice(0,6);i!==t.value&&(t.value=i),i.length===6&&!this.busy&&this.verifyEmailCode()}async verifyEmailCode(e){e?.preventDefault();let t=this.renderRoot.querySelector("#oa-code"),i=(t?.value??"").replace(/\D/g,"");if(this.emailFlow){if(i.length!==6){this.emailError=this.tr("The code is 6 digits.");return}this.emailError=null,this.busy=!0;try{let s=await this.sdk.auth.emailVerify(this.emailFlow.flow_id,i,{referralCode:y()});this.closeEmail(),w(),this.emit("openapps-login",s),f()}catch(s){t&&(t.value=""),this.emailError=this.describeEmailError(s)}finally{this.busy=!1}}}closeEmail(){clearInterval(m(this,g)),this.emailStep="closed",this.emailFlow=null,this.emailError=null,this.resendIn=0}describeEmailError(e){if(!(e instanceof P))return this.tr("Could not reach the server. Check your connection and try again.");let t=e.detail??{},i=Number(t.retry_after??0);switch(e.code){case"email_invalid":return this.tr("Enter a valid email address.");case"code_wrong":{let s=Number(t.attempts_left??0);return s===1?this.tr("That code is not right. 1 try left."):this.tr("That code is not right. {n} tries left.",{n:s})}case"code_expired":return this.tr("This code has expired or was tried too many times. Send a new one.");case"code_format":return this.tr("The code is 6 digits.");case"email_too_soon":return this.startResendCountdown(i),this.tr("Wait {s} s before asking for another code.",{s:Math.max(1,i)});case"email_limited":case"rate_limited":return this.tr("Too many codes were requested. Try again in {m} min, or sign in another way.",{m:Math.max(1,Math.ceil(i/60))});case"email_busy":return this.tr("Email sign-in is busy right now. Sign in another way, or try again later.");case"email_send_failed":return this.tr("The code could not be sent. Try again in a minute, or sign in another way.");case"email_unavailable":case"not_found":return this.tr("Email sign-in is not available here.");default:return this.tr("Could not reach the server. Check your connection and try again.")}}async loginWithRedirect(e){let t=`${location.origin}${location.pathname}${location.search}`;window.location.href=await this.sdk.auth.redirectStart(e,t,y())}async loginWithOpenWallet(){let e=pe();if(!e)return this.loginWithRedirect("openwallet");let t=`${location.origin}${location.pathname}${location.search}`;this.error=null,this.owNotice=null,this.busy=!0,this.owPending=!0;let i;try{let s=await this.sdk.auth.redirectAuthorizeUrl("openwallet",t,y());i=await me(e,s)}catch{i="fallback"}if(i==="approved"){setTimeout(()=>{this.busy=!1,this.owPending=!1},ue);return}if(this.busy=!1,this.owPending=!1,i==="fallback")return this.loginWithRedirect("openwallet");this.owNotice=ce[i]}async logout(){await this.run(()=>this.sdk.auth.logout()),this.me=null,this.emit("openapps-logout",null),f()}render(){if(this.me)return this.renderSignedIn(this.me);let e=this.enabled?.email??!1,t=this.enabled?.apple??!1,i=this.enabled?.google??!1,s=this.enabled?.github??!1,h=this.enabled?.openwallet??!1,u=this.enabled?.eip155??!1,S=this.enabled?.nostr??!1;if(this.enabled&&!e&&!t&&!i&&!s&&!h&&!u&&!S)return this.frame(r`
+        <p class="muted">${this.tr("This server has no login methods configured.")}</p>
+        ${this.error?r`<p class="error" role="alert">${this.error}</p>`:d}
+      `);let p=this.variant==="panel"?"block":"",L=r`<button
+      class="provider ${p}"
+      ?disabled=${this.busy}
+      @click=${()=>this.loginWithRedirect("google")}
+    >
+      ${te}<span>${this.tr("Continue with Google")}</span>
+    </button>`,z=r`<button
+      class="provider ${p}"
+      ?disabled=${this.busy}
+      aria-expanded=${this.emailStep!=="closed"?"true":"false"}
+      @click=${()=>this.emailStep==="closed"?this.openEmail():this.closeEmail()}
+    >
+      ${se}<span>${this.tr("Continue with email")}</span>
+    </button>`;return this.frame(r`
       <div class="stack">
-        ${e?t`<button
-              class="provider ${l}"
+        ${e&&i?r`<div class="pair">${z}${L}</div>`:e?z:d}
+        ${e&&this.emailStep!=="closed"?this.renderEmailForm():d}
+        ${t?r`<button
+              class="provider ${p}"
               ?disabled=${this.busy}
               @click=${()=>this.loginWithRedirect("apple")}
             >
-              ${B}<span>Continue with Apple</span>
-            </button>`:n}
-        ${i?t`<button
-              class="provider ${l}"
-              ?disabled=${this.busy}
-              @click=${()=>this.loginWithRedirect("google")}
-            >
-              ${P}<span>Continue with Google</span>
-            </button>`:n}
-        ${r?t`<button
-              class="provider ${l}"
+              ${ae}<span>${this.tr("Continue with Apple")}</span>
+            </button>`:d}
+        ${i&&!e?L:d}
+        ${s?r`<button
+              class="provider ${p}"
               ?disabled=${this.busy}
               @click=${()=>this.loginWithRedirect("github")}
             >
-              ${H}<span>Continue with GitHub</span>
-            </button>`:n}
-        ${o&&this.wallets?this.wallets.map(f=>t`<button
-                class="provider ${l}"
-                ?disabled=${this.busy}
-                @click=${()=>this.loginWithWallet(f)}
+              ${re}<span>${this.tr("Continue with GitHub")}</span>
+            </button>`:d}
+        ${q?r`<button
+                class="provider ${p} ow-soon"
+                disabled
+                aria-describedby="ow-hint"
               >
-                ${k}<span>Continue with ${f.name}</span>
-              </button>`):o?t`<button
-                class="provider ${l}"
+                ${M}<span>${this.tr("Sign in with")} ${W}</span>
+              </button>
+              <p class="ow-hint" id="ow-hint">${this.tr(G)}</p>`:h?r`<button
+                class="provider ${p}"
+                ?disabled=${this.busy}
+                aria-describedby="ow-hint"
+                aria-busy=${this.owPending?"true":"false"}
+                @click=${()=>this.loginWithOpenWallet()}
+              >
+                ${M}${this.owPending?r`<span>${this.tr("Continue in OnWallet\u2026")}</span>`:r`<span>${this.tr("Sign in with")} ${W}</span>`}
+              </button>
+              <p class="ow-hint" id="ow-hint">${this.tr(V)}</p>
+              ${this.owNotice?r`<p class="ow-hint ow-notice" role="status">${this.tr(this.owNotice)}</p>`:d}`:d}
+        ${u&&this.wallets?this.wallets.map(H=>r`<button
+                class="provider ${p}"
+                ?disabled=${this.busy}
+                @click=${()=>this.loginWithWallet(H)}
+              >
+                ${R}<span>${this.tr("Continue with {name}",{name:H.name})}</span>
+              </button>`):u?r`<button
+                class="provider ${p}"
                 ?disabled=${this.busy}
                 @click=${()=>this.beginWalletLogin()}
               >
-                ${k}<span>Continue with a wallet</span>
-              </button>`:n}
-        ${h?t`
+                ${R}<span>${this.tr("Continue with a wallet")}</span>
+              </button>`:d}
+        ${S?r`
               <button
-                class="provider ${l}"
+                class="provider ${p}"
                 ?disabled=${this.busy}
                 @click=${this.loginWithNostr}
               >
-                ${z}<span>Continue with Nostr</span>
+                ${ie}<span>${this.tr("Continue with Nostr")}</span>
               </button>
               ${this.renderNostrFallback()}
-            `:n}
-        ${this.error?t`<p class="error" role="alert">${this.error}</p>`:n}
+            `:d}
+        ${this.error?r`<p class="error" role="alert">${this.error}</p>`:d}
       </div>
-    `)}frame(e){return this.variant!=="panel"?e:t`
+    `)}frame(e){return this.variant!=="panel"?e:r`
       <div class="panel">
         <div class="head">
           <span class="mark" aria-hidden="true">${this.mark}</span>
           <h1 class="title">${this.heading}</h1>
-          ${this.description?t`<p class="desc">${this.description}</p>`:n}
+          ${this.description?r`<p class="desc">${this.description}</p>`:d}
         </div>
         <div class="body">${e}</div>
       </div>
-    `}renderNostrFallback(){return this.nostrFallback==="bunker"?this.renderBunkerForm():this.nostrFallback==="nsec"?this.renderNsecForm():t`
+    `}renderEmailForm(){let e=this.emailError?r`<p class="error" role="alert">${this.emailError}</p>`:d;return this.emailStep==="address"?r`
+        <form class="email" @submit=${this.sendEmailCode} novalidate>
+          <div class="field">
+            <label for="oa-email">${this.tr("Email address")}</label>
+            <input
+              id="oa-email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              autocapitalize="off"
+              spellcheck="false"
+              required
+              maxlength="254"
+              .value=${this.emailAddress}
+              ?disabled=${this.busy}
+            />
+          </div>
+          ${e}
+          <button class="primary" type="submit" ?disabled=${this.busy}>
+            ${this.busy?this.tr("Sending\u2026"):this.tr("Send code")}
+          </button>
+        </form>
+      `:r`
+      <form class="email" @submit=${this.verifyEmailCode} novalidate>
+        <p class="muted small">
+          ${this.tr("We sent a 6-digit code to {email}. It works for 10 minutes.",{email:this.emailAddress})}
+        </p>
+        <div class="field">
+          <label for="oa-code">${this.tr("Code")}</label>
+          <input
+            id="oa-code"
+            class="code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]*"
+            maxlength="6"
+            spellcheck="false"
+            ?disabled=${this.busy}
+            @input=${this.onCodeInput}
+          />
+          <span class="hint">${this.tr("Not there? Check your spam folder.")}</span>
+        </div>
+        ${e}
+        <button class="primary" type="submit" ?disabled=${this.busy}>
+          ${this.busy?this.tr("Checking\u2026"):this.tr("Sign in")}
+        </button>
+        <div class="row wrap">
+          <button
+            class="link"
+            type="button"
+            ?disabled=${this.busy||this.resendIn>0}
+            @click=${()=>this.sendEmailCode()}
+          >
+            ${this.resendIn>0?this.tr("Send a new code in {s}s",{s:this.resendIn}):this.tr("Send a new code")}
+          </button>
+          <button
+            class="link"
+            type="button"
+            ?disabled=${this.busy}
+            @click=${()=>{this.closeEmail(),this.openEmail()}}
+          >
+            ${this.tr("Use a different email")}
+          </button>
+        </div>
+      </form>
+    `}renderNostrFallback(){return this.nostrFallback==="bunker"?this.renderBunkerForm():this.nostrFallback==="nsec"?this.renderNsecForm():r`
       <button
         class="link"
         ?disabled=${this.busy}
         @click=${()=>{this.nostrFallback="bunker",this.nostrHint=null}}
       >
-        No extension? Use a remote signer
+        ${this.tr("No extension? Use a remote signer")}
       </button>
-    `}renderBunkerForm(){return t`
+    `}renderBunkerForm(){return r`
       <form class="nsec" @submit=${this.loginWithBunker}>
-        ${this.nostrHint?t`<p class="muted small">${this.nostrHint}</p>`:n}
+        ${this.nostrHint?r`<p class="muted small">${this.nostrHint}</p>`:d}
         <p class="muted small">
           Paste the connection string from your signer — Amber, nsec.app, or your
           own bunker. It looks like <code>bunker://…</code>, or you can use a
@@ -91,12 +184,12 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
             A bunker URI, or the NIP-05 address your signer is reachable at.
           </span>
         </div>
-        ${this.authUrl?t`<p class="muted small">
+        ${this.authUrl?r`<p class="muted small">
               Your signer needs approval:
               <a href=${this.authUrl} target="_blank" rel="noreferrer noopener"
                 >open it</a
               >, then come back.
-            </p>`:n}
+            </p>`:d}
         <div class="row">
           <button class="primary" type="submit" ?disabled=${this.busy}>
             ${this.busy?"Waiting for your signer\u2026":"Connect signer"}
@@ -118,9 +211,9 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
           I only have a private key
         </button>
       </form>
-    `}renderNsecForm(){return t`
+    `}renderNsecForm(){return r`
       <form class="nsec" @submit=${this.loginWithNsec}>
-        ${this.nostrHint?t`<p class="muted small">${this.nostrHint}</p>`:n}
+        ${this.nostrHint?r`<p class="muted small">${this.nostrHint}</p>`:d}
         <p class="warn">
           <strong>Only do this on a key you can afford to lose.</strong>
           An <code>nsec</code> is your whole Nostr identity — it cannot be changed
@@ -154,13 +247,13 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
           </button>
         </div>
       </form>
-    `}renderSignedIn(e){let i=e.display_name??e.linked_accounts[0]?.caip10??e.id;return t`
+    `}renderSignedIn(e){let t=(e.display_name??e.linked_accounts[0]?.caip10??e.id).replace(/^email:/,"");return r`
       <div class="row">
-        <span class="identity" title=${i}>${I(i)}</span>
-        <button ?disabled=${this.busy} @click=${this.logout}>Sign out</button>
+        <span class="identity" title=${t}>${fe(t)}</span>
+        <button ?disabled=${this.busy} @click=${this.logout}>${this.tr("Sign out")}</button>
       </div>
-      ${this.error?t`<p class="error" role="alert">${this.error}</p>`:n}
-    `}};s.styles=[y.baseStyles,C`
+      ${this.error?r`<p class="error" role="alert">${this.error}</p>`:d}
+    `}};g=new WeakMap,k=new WeakMap,$=new WeakMap,x=new WeakMap,n.styles=[T.baseStyles,j,O`
       /* Mark on the left, label centred in the space that remains — so the
          three labels line up with each other rather than each sitting a
          different distance from its own icon. */
@@ -173,7 +266,7 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
       button.provider svg {
         flex: none;
       }
-      button.provider.block span {
+      button.provider.block > span {
         flex: 1;
         text-align: center;
         /* Balance the mark so the label is centred on the button, not on
@@ -184,6 +277,47 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
         display: flex;
         flex-direction: column;
         gap: 0.5em;
+      }
+      /* Email and Google side by side, each half the row, labels on one
+         line. When the box is too narrow for both whole labels (a phone, a
+         long translation) the pair wraps to two full-width rows rather than
+         breaking a label in two. Email stays first either way. */
+      .pair {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5em;
+      }
+      .pair > button.provider {
+        flex: 1 1 0;
+        min-width: max-content;
+        justify-content: center;
+        gap: 8px;
+        padding-inline: 10px;
+        font-size: 0.875em;
+      }
+      .pair > button.provider span,
+      .pair > button.provider.block span {
+        flex: 0 1 auto;
+        margin-right: 0;
+        white-space: nowrap;
+      }
+      .email {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6em;
+        border: 1px solid var(--border-hairline, var(--fb-hairline));
+        border-radius: var(--radius-lg, 12px);
+        padding: 0.8em;
+      }
+      .email input.code {
+        font-family: var(--font-mono, "Geist Mono", ui-monospace, monospace);
+        font-size: 1.25em;
+        letter-spacing: 0.3em;
+        text-align: center;
+      }
+      .row.wrap {
+        flex-wrap: wrap;
+        justify-content: space-between;
       }
       .row {
         display: flex;
@@ -236,5 +370,5 @@ import{a as M,b as S,c as R,d as N,e as W,f as F,g as T,h as E}from"./chunk-KB6R
         display: flex;
         gap: 0.5em;
       }
-    `],a([d()],s.prototype,"me",2),a([d()],s.prototype,"enabled",2),a([c({type:Number,attribute:"signer-timeout"})],s.prototype,"signerTimeout",2),a([c({type:String})],s.prototype,"variant",2),a([c({type:String})],s.prototype,"heading",2),a([c({type:String})],s.prototype,"description",2),a([c({type:String})],s.prototype,"mark",2),a([c({type:Boolean,attribute:"share-signer"})],s.prototype,"shareSigner",2),a([d()],s.prototype,"wallets",2),a([d()],s.prototype,"nostrFallback",2),a([d()],s.prototype,"nostrHint",2),a([d()],s.prototype,"authUrl",2),s=a([w("openapps-login")],s);function I(g,v=10,e=6){return g.length<=v+e+1?g:`${g.slice(0,v)}\u2026${g.slice(-e)}`}function b(){return $()??x()}export{s as OpenAppsLogin,b as referralFromUrl,I as shorten};
+    `],l([c()],n.prototype,"me",2),l([c()],n.prototype,"enabled",2),l([v({type:Number,attribute:"signer-timeout"})],n.prototype,"signerTimeout",2),l([v({type:String})],n.prototype,"variant",2),l([v({type:String})],n.prototype,"heading",2),l([v({type:String})],n.prototype,"description",2),l([v({type:String})],n.prototype,"mark",2),l([v({type:Boolean,attribute:"share-signer"})],n.prototype,"shareSigner",2),l([c()],n.prototype,"wallets",2),l([c()],n.prototype,"nostrFallback",2),l([c()],n.prototype,"nostrHint",2),l([c()],n.prototype,"authUrl",2),l([c()],n.prototype,"owPending",2),l([c()],n.prototype,"owNotice",2),l([c()],n.prototype,"emailStep",2),l([c()],n.prototype,"emailAddress",2),l([c()],n.prototype,"emailFlow",2),l([c()],n.prototype,"emailError",2),l([c()],n.prototype,"resendIn",2),n=l([U("openapps-login")],n);async function F(a){let{solvePow:o}=await import("./pow-A4TH7G2Q.js");return o(a)}var ce={declined:"Sign-in was declined in OnWallet.",expired:"The OnWallet request timed out. Try again."},ue=2e4;function pe(){try{let a=globalThis.openwallet;return a&&typeof a.signIn=="function"?a:null}catch{return null}}async function me(a,o){let e;try{let i=(await a.signIn({authorizeUrl:o}))?.error;if(i==null)return"approved";e=typeof i=="object"?i.code:i}catch(t){e=t?.code}return e==="declined"||e==="expired"?e:"fallback"}function fe(a,o=10,e=6){return a.length<=o+e+1?a:`${a.slice(0,o)}\u2026${a.slice(-e)}`}function y(){return B()??A()}export{n as OpenAppsLogin,y as referralFromUrl,fe as shorten};
 //# sourceMappingURL=openapps-login.js.map

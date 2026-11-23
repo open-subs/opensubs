@@ -192,6 +192,38 @@ jobs:
           rm isa-check-linux-deb.md isa-check-linux-appimage.md
           cat isa-check-linux.md >> "$GITHUB_STEP_SUMMARY"
           exit $status
+      # NOTICE names the GPL ffmpeg these installers carry and offers its
+      # source, so an installer without it is not shippable. Read from the
+      # finished dmg, setup.exe and msi, not from the build folder.
+      - name: "NOTICE and licences inside the installers"
+        if: matrix.os != 'ubuntu-22.04' && !cancelled() && steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          want="licences/NOTICE licences/LICENSE licences/GPL-3.0.txt licences/ffmpeg-build.txt"
+          fail=0
+          if [ "${{ matrix.os }}" = macos-latest ]; then
+            dmg="$(ls target/release/bundle/dmg/*.dmg | head -1)"
+            mnt="$(mktemp -d)"
+            hdiutil attach -readonly -nobrowse -mountpoint "$mnt" "$dmg" >/dev/null
+            for f in $want; do
+              [ -s "$mnt/OpenSubs.app/Contents/Resources/$f" ] && echo "ok  $(basename "$dmg"): $f" || { echo "MISSING from $(basename "$dmg"): $f"; fail=1; }
+            done
+            grep -q "Written offer" "$mnt/OpenSubs.app/Contents/Resources/licences/NOTICE" || { echo "the dmg's NOTICE has no written offer"; fail=1; }
+            hdiutil detach "$mnt" >/dev/null
+          else
+            exe="$(ls target/release/bundle/nsis/*-setup.exe | head -1)"
+            listing="$(7z l "$exe")"
+            for f in $want; do
+              grep -qF "$(echo "$f" | tr / '\\')" <<<"$listing" && echo "ok  $(basename "$exe"): $f" || { echo "MISSING from $(basename "$exe"): $f"; fail=1; }
+            done
+            msi="$(ls target/release/bundle/msi/*.msi | head -1)"
+            out="$(cygpath -w "$RUNNER_TEMP/msi-notice")"
+            msiexec //a "$(cygpath -w "$msi")" //qn "TARGETDIR=$out"
+            for f in $want; do
+              [ -n "$(find "$RUNNER_TEMP/msi-notice" -path "*/$f" -size +0 | head -1)" ] && echo "ok  $(basename "$msi"): $f" || { echo "MISSING from $(basename "$msi"): $f"; fail=1; }
+            done
+          fi
+          exit $fail
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}

@@ -28,6 +28,7 @@ import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
 import { notify } from "./context.js";
+import { t } from "./catalogue.js";
 let OpenAppsSignout = class OpenAppsSignout extends OpenAppsElement {
     constructor() {
         super(...arguments);
@@ -58,7 +59,7 @@ let OpenAppsSignout = class OpenAppsSignout extends OpenAppsElement {
         if (!this.signedIn)
             return nothing;
         return html `
-      <button ?disabled=${this.busy} @click=${this.signOut}>${this.label}</button>
+      <button ?disabled=${this.busy} @click=${this.signOut}>${t(this.label)}</button>
       ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
     `;
     }

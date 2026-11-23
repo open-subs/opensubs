@@ -1,0 +1,78 @@
+OpenSubs
+Copyright the OpenSubs contributors.
+
+OpenSubs is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. The licence text is in LICENSE. The parts of this repository
+under other licences are listed under "Licence" in README.md.
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+GPL parts of the desktop downloads (as of 28 October 2026)
+
+OpenSubs' own code is under the AGPL as above. From 1.0.3-rc.3 on, the
+desktop installers for macOS and Windows also carry ffmpeg and ffprobe, which
+are under the GNU General Public License. Installers before 1.0.3-rc.3 carry
+no ffmpeg. The Linux packages carry none and use the system's.
+
+  - macOS, OpenSubs_<version>_aarch64.dmg: ffmpeg and ffprobe from
+    ffmpeg.martin-riedl.de, static builds of FFmpeg configured with
+    --enable-gpl --enable-version3 and, among others, libx264 and libx265
+    (GPL-3.0-or-later).
+      1.0.3-rc.3 to 1.0.5-rc.2: the build listed first on that site when
+      each installer was built, which is its "snapshot" build of FFmpeg's
+      development branch; the ones in 1.0.3 and 1.0.5-rc.2 report
+      "8.0.git-https://www.martin-riedl.de".
+      From the next release on: the release build of FFmpeg 9.0.2, pinned
+      by apps/desktop/scripts/fetch-bundled.sh to
+      ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/
+      (ffmpeg.zip SHA-256 c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924,
+      ffprobe.zip SHA-256 fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6).
+      The versions of every library in it are in licences/ffmpeg-build.txt
+      inside the app.
+  - Windows, OpenSubs_<version>_x64-setup.exe, OpenSubs_<version>_x64_en-US.msi
+    and the MSIX package made from it: ffmpeg.exe and ffprobe.exe from the
+    FFmpeg "release essentials" build from gyan.dev, configured with
+    --enable-gpl --enable-version3 and, among others, libx264 and libx265
+    (GPL-3.0-or-later).
+      1.0.3-rc.3 to 1.0.5-rc.3: the release essentials build current when
+      each installer was built; 1.0.3 and 1.0.5-rc.3 carry
+      "9.0.2-essentials_build-www.gyan.dev".
+      From the next release on: the same 9.0.2 essentials build, pinned by
+      fetch-bundled.sh to gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip
+      (SHA-256 60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba),
+      built from FFmpeg commit 946fcce07b. Its README, with the libraries it
+      contains, is in licences\ffmpeg-build.txt in the install folder.
+
+When the bundled ffmpeg is missing or cannot burn subtitles, the desktop app
+offers to install one with the system's package manager: Homebrew's
+ffmpeg-full formula on macOS, or the Gyan.FFmpeg package (gyan.dev's full
+build) through winget on Windows. Those are downloaded from Homebrew and from
+gyan.dev by the package manager, not distributed by us, and are under the
+GPL as well.
+
+The Mac App Store build (apps/desktop/scripts/build-appstore.sh) carries none
+of the parts above: its ffmpeg and ffprobe are an LGPL build made from source
+by apps/desktop/scripts/ffmpeg-lgpl.sh, and that app carries their complete
+source and its own NOTICE (apps/desktop/src-tauri/appstore/NOTICE).
+
+Written offer: for at least three years from the last day we distribute an
+installer containing these components, we will give anyone who asks a
+complete, machine-readable copy of their corresponding source code, by
+download or on a medium customarily used for software interchange, for no
+more than our cost of providing it. Write to hello@opensubs.app and name the
+installer and its version. The source is also published upstream: FFmpeg
+(ffmpeg.org, git.ffmpeg.org/ffmpeg.git), x264 (code.videolan.org/videolan/x264),
+x265 (bitbucket.org/multicoreware/x265_git), the other libraries at the
+projects named in each build's library list, and the builds themselves
+(ffmpeg.martin-riedl.de, with its build scripts; gyan.dev/ffmpeg/builds).
+The text of the GNU General Public License, version 3, is in
+licences/GPL-3.0.txt inside the installed app, and at
+https://www.gnu.org/licenses/gpl-3.0.txt.
+
+The installers also carry the speech and translation models and the engines
+that run them, under their own permissive licences: whisper.cpp (MIT) through
+whisper-rs (Unlicense), OpenAI's Whisper Base model (MIT), CTranslate2 (MIT)
+through ct2rs (MIT) with SentencePiece (Apache-2.0), and Meta's M2M-100 418M
+(MIT), converted to CTranslate2's int8 format by this project.

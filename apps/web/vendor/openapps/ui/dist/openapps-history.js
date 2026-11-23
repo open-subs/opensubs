@@ -20,6 +20,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
+import { formatNumber, intlLocale, t } from "./catalogue.js";
 let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
     constructor() {
         super(...arguments);
@@ -62,10 +63,16 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
             this.loaded = true;
             return;
         }
+        // A refresh that starts while this page is in flight replaces
+        // `entries`; this page then belongs to a list nobody shows any more,
+        // and appending it would list every entry twice.
+        const into = this.entries;
         const page = await this.run(() => sdk.credits.history({
             cursor: this.cursor ?? undefined,
             limit: this.pageSize,
         }));
+        if (this.entries !== into)
+            return;
         this.loaded = true;
         if (!page)
             return;
@@ -106,18 +113,17 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
     }
     render() {
         if (!this.sdkOrNull)
-            return html `<p class="muted">Loading…</p>`;
+            return html `<p class="muted">${t("Loading…")}</p>`;
         if (!this.sdk.isLoggedIn) {
-            return html `<p class="muted">Sign in to see where your credits went.</p>`;
+            return html `<p class="muted">${t("Sign in to see where your credits went.")}</p>`;
         }
         if (!this.loaded)
-            return html `<p class="muted">Loading…</p>`;
+            return html `<p class="muted">${t("Loading…")}</p>`;
         const entries = this.visible;
         if (entries.length === 0) {
             return html `
         <p class="muted">
-          Nothing yet. Credits you buy and spend both appear here, with what
-          each one was for.
+          ${t("Nothing yet. Credits you buy and spend both appear here, with what each one was for.")}
         </p>
         ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
       `;
@@ -129,16 +135,16 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
             ? html `
             <div class="summary">
               <div class="eyebrow">
-                ${this.complete ? "Spent, all time" : "Spent, recent activity"}
+                ${this.complete ? t("Spent, all time") : t("Spent, recent activity")}
               </div>
               <ul class="groups">
                 ${spending.map((group) => html `
                     <li>
                       <span class="what" title=${group.label}>${group.label}</span>
                       <span class="times muted"
-                        >${group.count === 1 ? "once" : `${group.count}×`}</span
+                        >${group.count === 1 ? t("once") : `${group.count}×`}</span
                       >
-                      <span class="mono amount">${group.credits.toLocaleString()}</span>
+                      <span class="mono amount">${formatNumber(group.credits)}</span>
                       <!-- The bar is proportional to the largest row, not to
                            the total: with one dominant item every other bar
                            would round to nothing and the comparison people
@@ -151,16 +157,22 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
                   `)}
               </ul>
               <p class="caption">
-                ${spent.toLocaleString()} credits across ${entries.length}
-                ${entries.length === 1 ? "entry" : "entries"}${this.complete
-                ? ""
-                : " so far"}.
+                ${this.complete
+                ? entries.length === 1
+                    ? t("{credits} credits across 1 entry.", { credits: spent })
+                    : t("{credits} credits across {n} entries.", { credits: spent, n: entries.length })
+                : entries.length === 1
+                    ? t("{credits} credits across 1 entry so far.", { credits: spent })
+                    : t("{credits} credits across {n} entries so far.", {
+                        credits: spent,
+                        n: entries.length,
+                    })}
               </p>
             </div>
           `
             : nothing}
 
-      <div class="eyebrow rule">Activity</div>
+      <div class="eyebrow rule">${t("Activity")}</div>
       <ul class="entries">
         ${entries.map((entry) => html `
             <li>
@@ -169,10 +181,10 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
                 >${describeEntry(entry)}</span
               >
               <span class="mono amount ${entry.amount < 0 ? "debit" : "credit"}">
-                ${entry.amount > 0 ? "+" : "−"}${Math.abs(entry.amount).toLocaleString()}
+                ${entry.amount > 0 ? "+" : "−"}${formatNumber(Math.abs(entry.amount))}
               </span>
-              <span class="mono after muted" title="Balance after"
-                >${entry.balance_after.toLocaleString()}</span
+              <span class="mono after muted" title=${t("Balance after")}
+                >${formatNumber(entry.balance_after)}</span
               >
             </li>
           `)}
@@ -184,7 +196,7 @@ let OpenAppsHistory = class OpenAppsHistory extends OpenAppsElement {
             ?disabled=${this.busy}
             @click=${() => void this.loadMore()}
           >
-            ${this.busy ? "Loading…" : "Show earlier"}
+            ${this.busy ? t("Loading…") : t("Show earlier")}
           </button>`
             : nothing}
       ${this.error ? html `<p class="error" role="alert">${this.error}</p>` : nothing}
@@ -316,7 +328,7 @@ export function spendLabel(entry) {
         return app;
     if (feature)
         return feature;
-    return "Spent";
+    return t("Spent");
 }
 /** A whole entry as one line of prose, spend or otherwise. */
 export function describeEntry(entry) {
@@ -324,16 +336,18 @@ export function describeEntry(entry) {
         case "debit":
             return spendLabel(entry);
         case "topup":
-            return "Credits purchased";
+            return t("Credits purchased");
         case "referral_bonus":
-            return "Referral bonus";
+            return t("Referral bonus");
         case "adjustment":
             // The reason is an operator's remark, written for this user to read.
-            return entry.ref_id ? `Adjustment — ${entry.ref_id}` : "Adjustment";
+            return entry.ref_id
+                ? t("Adjustment — {reason}", { reason: entry.ref_id })
+                : t("Adjustment");
         case "refund":
             // Negative: a payment was reversed and its credits taken back.
             // Positive: credits given back. Same kind, opposite events.
-            return entry.amount < 0 ? "Payment reversed" : "Refund";
+            return entry.amount < 0 ? t("Payment reversed") : t("Refund");
         default:
             return spendLabel(entry);
     }
@@ -343,6 +357,6 @@ export function formatDate(seconds) {
     const date = new Date(seconds * 1000);
     if (Number.isNaN(date.getTime()))
         return "";
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return date.toLocaleDateString(intlLocale(), { month: "short", day: "numeric" });
 }
 //# sourceMappingURL=openapps-history.js.map

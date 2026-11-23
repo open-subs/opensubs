@@ -1,4 +1,4 @@
-// The "having trouble? leave us a message" box, set up for OpenSubs.
+// The "having trouble? ask us on Telegram" box, set up for OpenSubs.
 //
 // WHERE IT APPEARS
 //
@@ -6,39 +6,51 @@
 //   - where a sign-in came back without a session, or a session ended under
 //     the page;
 //   - beside the credits while a purchase is still pending;
-//   - and as one quiet line in the app's footer.
+//   - and as the Telegram and X pair in the app's footer.
 //
-// WHO MAY WRITE
+// THE TELEGRAM AND X BUTTONS
 //
-// Loading a page sends nothing. A signed-out visitor who opens the box makes
-// it ask the account server, once, whether signed-out visitors may write
-// (`support.require_signin` on /v1/auth/methods); if not, the box offers the
-// header's sign-in instead of the form, and at a failed or expired sign-in
-// the contact address as well.
+// <openapps-community> (openapps-community.js, vendored verbatim) draws the
+// same two links as outlined buttons: in the site header (variant="header"),
+// and once under a finished result -- subtitles just made, a burned video
+// ready to save (variant="success"). Configured here, from the same links.
 //
-// WHAT IT SENDS, AND WHEN
+// WHERE IT SENDS PEOPLE
 //
-// Nothing until the person presses Send. Then: what they typed, an email if
-// they give one, which of the places above they were in, the page address
-// without its query or fragment, this build's version, the interface
-// language, a short error code, and — signed in — the session, so the
-// account is attached. Never the video, the subtitles or a file name. The
-// full list is in openapps-support.js; the website's privacy page states it.
+// To the OpenSubs topic in the public Telegram group, in a new tab. Opened
+// from a failure, the panel shows the error code (or the pending top-up id)
+// with a Copy button and asks for it to be included in the message. The box
+// no longer holds a form and posts nothing; its one request is the pending
+// top-up lookup, made only when signed in. What people post on Telegram is
+// public and governed by Telegram; the website's privacy page says so.
+//
+// The old form's keys (appVersion, contactEmail, signIn) are still passed
+// below; the box accepts and ignores them.
 //
 // WEBSITE ONLY
 //
 // The phone shells and the extension reuse this source. main.ts loads this
-// module only in a browser tab, so elsewhere the element stays undefined and
-// renders nothing.
+// module only in a browser tab, so elsewhere both elements stay undefined and
+// render nothing.
 import { configureSupport, openSupport, refreshSupport } from "./openapps-support.js";
+import { configureCommunity } from "./openapps-community.js";
 import { AUTH_URL, onAccountChange, supportToken } from "./account";
 import pkg from "../../package.json";
 
 export { openSupport };
 
-configureSupport({
-  baseUrl: AUTH_URL,
+const LINKS = {
   product: "OpenSubs",
+  telegramUrl: "https://t.me/openappsnetwork/57",
+  xUrl: "https://x.com/OpenSubsApp",
+  xHandle: "@OpenSubsApp",
+};
+
+configureCommunity(LINKS);
+
+configureSupport({
+  ...LINKS,
+  baseUrl: AUTH_URL,
   appVersion: pkg.version,
   getAccessToken: supportToken,
   contactEmail: "hello@opensubs.app",

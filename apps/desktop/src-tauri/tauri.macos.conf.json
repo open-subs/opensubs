@@ -8,7 +8,11 @@
       "bundled/models/m2m100/model.bin": "models/m2m100/model.bin",
       "bundled/models/m2m100/config.json": "models/m2m100/config.json",
       "bundled/models/m2m100/shared_vocabulary.json": "models/m2m100/shared_vocabulary.json",
-      "bundled/models/m2m100/sentencepiece.bpe.model": "models/m2m100/sentencepiece.bpe.model"
+      "bundled/models/m2m100/sentencepiece.bpe.model": "models/m2m100/sentencepiece.bpe.model",
+      "../../../NOTICE": "licences/NOTICE",
+      "../../../LICENSE": "licences/LICENSE",
+      "../licences/GPL-3.0.txt": "licences/GPL-3.0.txt",
+      "bundled/vendor/ffmpeg-build.txt": "licences/ffmpeg-build.txt"
     },
     "macOS": {
       "minimumSystemVersion": "11.0"

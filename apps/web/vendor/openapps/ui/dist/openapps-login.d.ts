@@ -68,6 +68,10 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     private nostrHint;
     /** A bunker asking the user to approve in a browser. */
     private authUrl;
+    /** Waiting on the OnWallet extension's approval window (M6.1). */
+    private owPending;
+    /** Why the last OnWallet sign-in stopped without leaving the page. */
+    private owNotice;
     /**
      * Email sign-in: closed, asking for the address, or asking for the code
      * that was sent to it.
@@ -112,6 +116,26 @@ export declare class OpenAppsLogin extends OpenAppsElement {
     private closeEmail;
     private describeEmailError;
     private loginWithRedirect;
+    /**
+     * Sign in with OnWallet without visiting the wallet's page, where the
+     * extension offers it (M6.1).
+     *
+     * The extension injects `window.openwallet.signIn` only on sites the
+     * person has connected. There, the server is asked for the authorize URL
+     * as JSON — the same start as the redirect: this tab's PKCE verifier, the
+     * same browser-binding cookie — and the URL is handed to the extension,
+     * which opens its approval window over this page and, on approval,
+     * navigates this tab to the callback itself. The code never passes
+     * through this page: it comes back as `#code=` at `here`, exactly as after
+     * the redirect, and {@link load} redeems it.
+     *
+     * Anything that means "this way is not available here" — no provider, a
+     * server that will not answer as JSON, `not_connected`, `invalid_url`,
+     * `unavailable`, or an answer this page does not know — falls back to the
+     * ordinary redirect. `declined` and `expired` are the person's answer, so
+     * the page stays and says so.
+     */
+    private loginWithOpenWallet;
     private logout;
     render(): TemplateResult;
     /**

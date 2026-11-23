@@ -180,7 +180,7 @@ await ready();
 
 await section("before the reload: a video, English subtitles, one paid translation", async () => {
   if (VIDEO) {
-    await page.locator('input[type=file][accept="video/*"]').first().setInputFiles(VIDEO);
+    await page.locator('input[type=file][accept^="video/*"]').first().setInputFiles(VIDEO);
     await page.waitForFunction(() => (document.querySelector("video")?.videoWidth ?? 0) > 0, null, { timeout: 20000 });
   }
   await page.locator('input[type=file][accept*=".srt"]').first().setInputFiles({

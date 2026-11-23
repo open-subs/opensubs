@@ -64,6 +64,9 @@ const CLIP = params.get("clip") ?? "en.wav";
 // put the missed-line pass to work on a machine whose first pass drops
 // nothing: the same input a user produces by trimming the start.
 const START = Number(params.get("start") ?? "0");
+// ?device=wasm runs the CPU backend even where WebGPU is present -- the other
+// half of the memory measurement (memory.mjs), which loads different weights.
+const DEVICE = params.get("device") === "wasm" ? "wasm" : undefined;
 
 /**
  * When the bar last said it was finished, and every stage after it.
@@ -93,6 +96,7 @@ async function main() {
     start: START,
     end: null,
     language: LANGUAGE,
+    device: DEVICE,
     onProgress: (p) => {
       timeline.push({ t: performance.now(), stage: p.stage, note: p.note, fraction: p.fraction ?? null });
       progress(`  ${p.stage} ${p.note}${p.fraction == null ? "" : " " + Math.round(p.fraction * 100) + "%"}`);

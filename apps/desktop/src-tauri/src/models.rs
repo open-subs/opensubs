@@ -12,6 +12,11 @@ pub struct ModelOption {
     pub filename: &'static str,
     pub url: &'static str,
     pub size_bytes: u64,
+    /// About how much memory transcribing with it takes: the peak resident
+    /// size of one transcription, measured (see the note after
+    /// `MODEL_OPTIONS`). Shown as "about", never as a promise -- it moves a
+    /// little with the clip and the machine.
+    pub memory_bytes: u64,
     pub description: &'static str,
     /// Transcribes English and nothing else. Said in the list, because a
     /// `.en` model given Chinese writes English words nobody said, and the
@@ -28,6 +33,7 @@ pub static MODEL_OPTIONS: [ModelOption; 5] = [
         filename: "ggml-tiny.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
         size_bytes: 77_691_713,
+        memory_bytes: 269_600_000,
         description: "fastest, roughest",
         english_only: false,
     },
@@ -36,6 +42,7 @@ pub static MODEL_OPTIONS: [ModelOption; 5] = [
         filename: "ggml-small.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
         size_bytes: 487_601_967,
+        memory_bytes: 843_400_000,
         description: "more accurate than Base, about three times slower",
         english_only: false,
     },
@@ -44,6 +51,7 @@ pub static MODEL_OPTIONS: [ModelOption; 5] = [
         filename: "ggml-large-v3-turbo.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
         size_bytes: 1_624_555_275,
+        memory_bytes: 1_969_800_000,
         description: "best quality, slowest",
         english_only: false,
     },
@@ -52,6 +60,7 @@ pub static MODEL_OPTIONS: [ModelOption; 5] = [
         filename: "ggml-tiny.en.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
         size_bytes: 77_704_715,
+        memory_bytes: 267_900_000,
         description: "fastest, for English speech",
         english_only: true,
     },
@@ -60,13 +69,31 @@ pub static MODEL_OPTIONS: [ModelOption; 5] = [
         filename: "ggml-base.en.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
         size_bytes: 147_964_211,
+        memory_bytes: 376_200_000,
         description: "a little better than Base on English speech",
         english_only: true,
     },
 ];
 
+// How `memory_bytes` was arrived at.
+//
+// Peak resident size (VmHWM) of one transcription of the 116-second
+// website/public/testmedia/en.wav, minus the process before the model was
+// loaded, with the whisper.cpp that whisper-rs-sys 0.15 vendors and the
+// settings `subs_whisper` uses (DTW alignment preset, greedy, auto
+// language, 8 threads), CPU build, Linux x86-64, 2026-11-15:
+//
+//   tiny 257 MiB, tiny.en 255, base 360, base.en 359, small 805,
+//   large-v3-turbo 1879 (MiB)
+//
+// In line with whisper.cpp's own README table (tiny ~273 MB, base ~388 MB,
+// small ~852 MB). Most of it is the weights (file size) plus the KV caches
+// and compute buffers, which is why it is well over the download.
+
 /// The multilingual Base the installers carry, as the list shows it.
 pub const BUNDLED_NAME: &str = "base";
+/// Measured as `memory_bytes` is: 360 MiB for ggml-base.bin.
+pub const BUNDLED_MEMORY_BYTES: u64 = 377_300_000;
 pub const BUNDLED_DESCRIPTION: &str = "comes with the app; a good default for any language";
 
 /// `~/.cache/opensubs-models` -- the exact path the README already tells
@@ -279,6 +306,8 @@ pub struct ModelOptionDto {
     pub filename: String,
     pub url: String,
     pub size_bytes: u64,
+    /// About how much memory a transcription with it takes.
+    pub memory_bytes: u64,
     pub description: String,
     pub already_downloaded: bool,
     pub local_path: Option<String>,
@@ -294,6 +323,7 @@ fn model_option_to_dto(opt: &ModelOption, dir: &Path) -> ModelOptionDto {
         filename: opt.filename.to_string(),
         url: opt.url.to_string(),
         size_bytes: opt.size_bytes,
+        memory_bytes: opt.memory_bytes,
         description: opt.description.to_string(),
         already_downloaded: downloaded,
         local_path: downloaded.then(|| dir.join(opt.filename).to_string_lossy().into_owned()),
@@ -312,6 +342,7 @@ pub fn model_list(bundled: Option<&Path>, dir: &Path) -> Vec<ModelOptionDto> {
             filename: path.file_name()?.to_string_lossy().into_owned(),
             url: String::new(),
             size_bytes: size,
+            memory_bytes: BUNDLED_MEMORY_BYTES,
             description: BUNDLED_DESCRIPTION.to_string(),
             already_downloaded: true,
             local_path: Some(path.to_string_lossy().into_owned()),
@@ -414,6 +445,9 @@ mod tests {
         assert!(multilingual.contains(&"base") && multilingual.contains(&"small"), "{multilingual:?}");
         // No "good default" on an English-only model any more.
         assert!(list.iter().filter(|m| m.english_only).all(|m| !m.description.contains("default")));
+        // The bundled Base has a memory figure too, between Tiny's and Small's.
+        let mem = |n: &str| list.iter().find(|m| m.name == n).unwrap().memory_bytes;
+        assert!(mem("tiny") < mem("base") && mem("base") < mem("small"));
         // A build without a bundled model lists only the downloads.
         assert!(model_list(None, dir.path()).iter().all(|m| !m.bundled));
     }
@@ -440,6 +474,16 @@ mod tests {
                 opt.name
             );
             assert!(opt.size_bytes > 0, "{}", opt.name);
+            // Running a model takes more than its file: the weights, then
+            // the caches and buffers on top. A figure under the download
+            // is a typo, and so is one wildly over it.
+            assert!(
+                opt.memory_bytes > opt.size_bytes && opt.memory_bytes < opt.size_bytes * 4,
+                "{}: memory {} against file {}",
+                opt.name,
+                opt.memory_bytes,
+                opt.size_bytes
+            );
             assert!(!opt.description.is_empty());
         }
     }
@@ -455,6 +499,7 @@ mod tests {
         assert_eq!(dto.filename, opt.filename);
         assert_eq!(dto.url, opt.url);
         assert_eq!(dto.size_bytes, opt.size_bytes);
+        assert_eq!(dto.memory_bytes, opt.memory_bytes);
         assert_eq!(dto.description, opt.description);
         assert!(!dto.already_downloaded);
         assert_eq!(dto.local_path, None);
@@ -557,6 +602,7 @@ mod tests {
             filename: "ggml-tiny.en.bin",
             url: "https://example.invalid/ggml-tiny.en.bin",
             size_bytes: 11,
+            memory_bytes: 22,
             description: "test fixture",
             english_only: true,
         }

@@ -1,7 +1,7 @@
-// The "having trouble? leave us a message" box, where things fail.
+// The "having trouble? ask us on Telegram" box, where things fail.
 //
 //   npm run build && node e2e/support.mjs
-//   SUPPORT_SERVER=http://127.0.0.1:18517 SUPPORT_ADMIN_TOKEN=… \
+//   SUPPORT_SERVER=http://127.0.0.1:18517 \
 //     SUPPORT_SESSION='{"accessToken":…,"refreshToken":…,"topupId":…}' node e2e/support.mjs
 //
 // For the light and dark schemes (the app is light-only; the box must follow
@@ -10,15 +10,17 @@
 //   - under a burn that failed (the encoder refuses, on a real clip);
 //   - where a sign-in came back without a session;
 //   - beside the credit packs while a purchase is pending (SUPPORT_SESSION);
-//   - and as a quiet line in the footer;
+//   - and in the footer, as the "Ask us on Telegram" and "Follow @OpenSubsApp
+//     on X" outlined buttons;
 //
-// and that each message carries what the privacy page lists and nothing
-// else: no query string, no fragment, no file name.
+// and that each one opens a panel pointing at the OpenSubs topic on Telegram
+// in a new tab, shows the error code (or the pending top-up id) to include,
+// and sends nothing: no request to the old /v1/support/messages route.
 //
 // Requests to auth.opensubs.app go to SUPPORT_SERVER when it is set (a local
-// openapps-server, whose rows are read back through its admin API) and to a
-// stand-in in this file otherwise. Nothing reaches the real account server.
-// The clip is made with ffmpeg; without it the burn case is skipped.
+// openapps-server) and to a stand-in in this file otherwise. Nothing reaches
+// the real account server. The clip is made with ffmpeg; without it the burn
+// case is skipped.
 import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -35,7 +37,8 @@ const PORT = Number(process.env.SUPPORT_E2E_PORT ?? 5518);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const AUTH = "https://auth.opensubs.app";
 const SERVER = process.env.SUPPORT_SERVER ?? null;
-const ADMIN = process.env.SUPPORT_ADMIN_TOKEN ?? null;
+const TELEGRAM = "https://t.me/openappsnetwork/57";
+const X_URL = "https://x.com/OpenSubsApp";
 const SESSION = process.env.SUPPORT_SESSION ? JSON.parse(process.env.SUPPORT_SESSION) : null;
 const SCHEMES = (process.env.SCHEMES ?? "light,dark").split(",");
 const TYPES = {
@@ -94,7 +97,6 @@ function check(name, ok, detail = "") {
 }
 
 const sent = [];
-let standIn = 0;
 
 async function wire(context) {
   // The site's page counter is not part of the app; never let a test count.
@@ -102,16 +104,13 @@ async function wire(context) {
   await context.route((url) => url.href.startsWith(AUTH), async (route) => {
     const req = route.request();
     const path = req.url().slice(AUTH.length);
-    if (path.startsWith("/v1/support/messages") && req.method() === "POST") sent.push(JSON.parse(req.postData() ?? "{}"));
+    if (path.startsWith("/v1/support/messages")) sent.push(`${req.method()} ${path}`);
     if (SERVER) {
       const response = await route.fetch({ url: SERVER + path, headers: { ...req.headers(), origin: ORIGIN } });
       return route.fulfill({ response });
     }
     const cors = { "access-control-allow-origin": ORIGIN, "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,POST,DELETE" };
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-    if (path.startsWith("/v1/support/messages")) {
-      return route.fulfill({ status: 202, headers: cors, contentType: "application/json", body: JSON.stringify({ ref: `M-STANDIN${++standIn}`, received: true }) });
-    }
     if (path.startsWith("/v1/auth/methods")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ methods: { google: true } }) });
     if (path.startsWith("/v1/payments/packages")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ packages: [], rails: {} }) });
     return route.fulfill({ status: 401, headers: cors, contentType: "application/json", body: JSON.stringify({ error: { code: "unauthorized", message: "unauthorized" } }) });
@@ -126,35 +125,32 @@ async function triggerIn(page, selector) {
   return page.locator(`${selector} .trigger`).first();
 }
 
-async function sendFrom(page, host, { message, email, shotName }) {
+/**
+ * Open the box at `host` and check the panel: the Telegram topic in a new
+ * tab, the X link, the code to include, and that nothing was sent.
+ */
+async function openFrom(page, host, { name, code, shotName }) {
   const before = sent.length;
   await (await triggerIn(page, host)).click();
   const dialog = page.locator(`${host} dialog[open]`).first();
   await dialog.waitFor({ timeout: 10_000 });
+  const tg = dialog.locator('[data-testid="support-telegram"]');
+  check(`${name}: points at the OpenSubs topic`, (await tg.getAttribute("href")) === TELEGRAM, await tg.getAttribute("href"));
+  check(`${name}: opens Telegram in a new tab`, (await tg.getAttribute("target")) === "_blank" && /noopener/.test((await tg.getAttribute("rel")) ?? ""));
+  check(`${name}: offers the X account`, (await dialog.locator('[data-testid="support-x"]').getAttribute("href")) === X_URL);
+  check(`${name}: no message form`, (await dialog.locator("textarea, form").count()) === 0);
+  let shown = null;
+  if (code) {
+    const value = dialog.locator('[data-testid="support-code-value"]');
+    shown = (await value.count()) ? (await value.innerText()).trim() : "";
+    check(`${name}: shows the code to include`, code(shown), shown);
+    check(`${name}: the code can be copied`, (await dialog.locator('[data-testid="support-copy"]').count()) === 1);
+    check(`${name}: no file name in the code`, !/clip\.(mp4|srt)/.test(shown), shown);
+  }
   if (shotName) await page.screenshot({ path: join(SHOTS, `${shotName}-dialog.png`) });
-  await dialog.locator("textarea").fill(message);
-  if (email) await dialog.locator('input[name="email"]').fill(email);
-  await dialog.locator('button[type="submit"]').click();
-  const ref = dialog.locator('[data-testid="support-ref"]');
-  await ref.waitFor({ timeout: 30_000 });
-  if (shotName) await page.screenshot({ path: join(SHOTS, `${shotName}-sent.png`) });
-  const reference = (await ref.innerText()).trim();
-  await dialog.getByRole("button").first().click();
-  return { reference, body: sent.slice(before).pop() };
-}
-
-function clean(name, body, { context, codePrefix }) {
-  check(`${name}: sent from the right place`, body?.context === context, body?.context);
-  if (codePrefix) check(`${name}: carries its error code`, String(body?.error_code ?? "").startsWith(codePrefix), body?.error_code);
-  check(`${name}: names the product and build`, body?.product === "OpenSubs" && /^\d+\.\d+/.test(body?.app_version ?? ""), `${body?.product} ${body?.app_version}`);
-  check(`${name}: the page has no query or fragment`, typeof body?.page === "string" && !/[?#]/.test(body.page), body?.page);
-  check(`${name}: no file name rides along`, !/clip\.(mp4|srt)/.test(JSON.stringify(body ?? {})));
-}
-
-async function stored(reference) {
-  if (!SERVER || !ADMIN) return null;
-  const list = await (await fetch(`${SERVER}/v1/admin/support?status=all&limit=200`, { headers: { authorization: `Bearer ${ADMIN}` } })).json();
-  return list.messages.find((m) => m.ref === reference) ?? null;
+  await dialog.locator("button.btn:not(.small)").first().click(); // Close
+  check(`${name}: sends nothing`, sent.length === before, sent.slice(before).join(", "));
+  return shown;
 }
 
 const browser = await chromium.launch({ args: ["--no-proxy-server", "--autoplay-policy=no-user-gesture-required"] });
@@ -170,17 +166,34 @@ try {
       const page = await context.newPage();
       await page.goto(`${ORIGIN}/`);
       const link = await triggerIn(page, ".web-footer openapps-support");
-      check("quiet line in the footer", await link.isVisible(), (await link.innerText()).trim());
+      check("Telegram button in the footer", await link.isVisible(), (await link.innerText()).trim());
+      check("the button says Telegram", /Telegram/.test(await link.innerText()));
+      const follow = page.locator(".web-footer openapps-support [data-testid=support-x-quiet]");
+      check("Follow @OpenSubsApp on X, in the footer", (await follow.getAttribute("href")) === X_URL && /@OpenSubsApp/.test(await follow.innerText()), (await follow.innerText()).trim());
+      check("the X link opens in a new tab", (await follow.getAttribute("target")) === "_blank" && /noopener/.test((await follow.getAttribute("rel")) ?? ""));
+      // One pair: both drawn with their brand glyph, same size, no underline.
+      const looks = async (loc) => loc.evaluate((a) => {
+        const svg = a.querySelector("svg");
+        const text = a.querySelector("span") ?? a;
+        const cs = getComputedStyle(text);
+        return { glyph: !!svg && svg.getAttribute("fill") === "currentColor", size: cs.fontSize, underline: cs.textDecorationLine !== "none" || getComputedStyle(a).textDecorationLine !== "none", color: getComputedStyle(a).color };
+      });
+      const [tgLook, xLook] = [await looks(link), await looks(follow)];
+      check("both buttons carry their glyph", tgLook.glyph && xLook.glyph);
+      check("neither is underlined", !tgLook.underline && !xLook.underline);
+      check("same size and colour", tgLook.size === xLook.size && tgLook.color === xLook.color, `${tgLook.size}/${xLook.size} ${tgLook.color}/${xLook.color}`);
+      await openFrom(page, ".web-footer openapps-support", { name: "footer" });
       await page.locator(".web-footer").screenshot({ path: join(SHOTS, `opensubs-${scheme}-quiet.png`) });
       if (scheme === "light") {
         await page.evaluate(() => localStorage.setItem("opensubs.locale", "zh-Hant"));
         await page.reload();
         const zh = await triggerIn(page, ".web-footer openapps-support");
-        check("the line follows the interface language", /留言/.test(await zh.innerText()), (await zh.innerText()).trim());
+        check("the line follows the interface language", /問我們/.test(await zh.innerText()), (await zh.innerText()).trim());
+        check("so does the X link", /追蹤 @OpenSubsApp/.test(await page.locator(".web-footer openapps-support [data-testid=support-x-quiet]").innerText()));
         await zh.click();
         const dialog = page.locator(".web-footer openapps-support dialog[open]");
         await dialog.waitFor();
-        check("the box is in Traditional Chinese", /發生了什麼事/.test(await dialog.innerText()));
+        check("the box is in Traditional Chinese", /OpenSubs 話題/.test(await dialog.innerText()));
         await page.screenshot({ path: join(SHOTS, `opensubs-${scheme}-zh-dialog.png`) });
       }
       await context.close();
@@ -192,8 +205,8 @@ try {
       await wire(context);
       const page = await context.newPage();
       await page.goto(`${ORIGIN}/`);
-      await page.waitForSelector('input[accept="video/*"]', { state: "attached", timeout: 30_000 });
-      await page.setInputFiles('input[accept="video/*"]', CLIP);
+      await page.waitForSelector('input[accept^="video/*"]', { state: "attached", timeout: 30_000 });
+      await page.setInputFiles('input[accept^="video/*"]', CLIP);
       await page.waitForFunction(() => document.querySelector(".file-meta")?.textContent?.includes("×"), null, { timeout: 120_000 });
       await page.locator('input[accept=".srt,.vtt,text/vtt"]').first().setInputFiles(SRT);
       await page.waitForSelector(".cue", { timeout: 30_000 });
@@ -224,13 +237,11 @@ try {
           path: join(SHOTS, `opensubs-${scheme}-burn-failed.png`),
           clip: { x: box.x, y: Math.max(box.y, errBox.y - 160), width: box.width, height: Math.min(260, box.y + box.height - Math.max(box.y, errBox.y - 160)) },
         });
-        const { reference, body } = await sendFrom(page, host, {
-          message: `The burn stopped with an encoder error (${scheme} e2e)`,
-          email: "tester@example.com",
+        await openFrom(page, host, {
+          name: "burn failure",
+          code: (c) => c.startsWith("burn"),
           shotName: `opensubs-${scheme}-burn`,
         });
-        clean("burn failure", body, { context: "export", codePrefix: "burn" });
-        if (SERVER) check("stored as an export failure", (await stored(reference))?.context === "export", reference);
       }
       await context.close();
     }
@@ -244,13 +255,16 @@ try {
       await page.locator('[data-testid="signin-failed"]').waitFor({ timeout: 30_000 });
       const host = '[data-testid="signin-failed"] openapps-support';
       check("a failed sign-in is said, with the box", await (await triggerIn(page, host)).isVisible());
+      const prompt = await page.locator(`${host} .prompt`).innerText();
+      check("at a failure: \"Having trouble?\" and the Telegram button", /Having trouble\?/.test(prompt) && /Ask us on Telegram/.test(prompt), prompt.replace(/\s+/g, " "));
+      const look = await page.locator(`${host} .trigger`).evaluate((b) => getComputedStyle(b).borderTopStyle);
+      check("at a failure: the button is outlined", look === "solid", look);
       await page.locator('[data-testid="signin-failed"]').screenshot({ path: join(SHOTS, `opensubs-${scheme}-signin-failed.png`) });
-      const { reference, body } = await sendFrom(page, host, {
-        message: `Signed in with Google and came back signed out (${scheme} e2e)`,
+      await openFrom(page, host, {
+        name: "sign-in failure",
+        code: (c) => c === "signin:no_session",
         shotName: scheme === "light" ? `opensubs-${scheme}-signin` : null,
       });
-      clean("sign-in failure", body, { context: "signin", codePrefix: "signin:no_session" });
-      if (SERVER) check("stored with no account", (await stored(reference))?.user_id === null, reference);
       await context.close();
     }
 
@@ -264,8 +278,8 @@ try {
       const page = await context.newPage();
       await page.goto(`${ORIGIN}/`);
       if (haveClip) {
-        await page.waitForSelector('input[accept="video/*"]', { state: "attached", timeout: 30_000 });
-        await page.setInputFiles('input[accept="video/*"]', CLIP);
+        await page.waitForSelector('input[accept^="video/*"]', { state: "attached", timeout: 30_000 });
+        await page.setInputFiles('input[accept^="video/*"]', CLIP);
         await page.waitForFunction(() => document.querySelector(".file-meta")?.textContent?.includes("×"), null, { timeout: 120_000 });
       }
       await page.locator('input[accept=".srt,.vtt,text/vtt"]').first().setInputFiles(SRT);
@@ -279,15 +293,11 @@ try {
       check("a pending purchase offers the box", await prompt.isVisible(), (await prompt.innerText()).trim());
       await page.locator(".credit-topup").first().scrollIntoViewIfNeeded();
       await page.locator(".credit-topup").first().screenshot({ path: join(SHOTS, `opensubs-${scheme}-payment-pending.png`) });
-      const { reference, body } = await sendFrom(page, host, {
-        message: `Bought credits by card and they are not here (${scheme} e2e)`,
-        email: "payer@example.com",
+      await openFrom(page, host, {
+        name: "payment",
+        code: (c) => c === String(SESSION.topupId),
         shotName: `opensubs-${scheme}-payment`,
       });
-      clean("payment", body, { context: "payment" });
-      check("the pending top-up is attached", body?.topup_id === SESSION.topupId, body?.topup_id);
-      const row = await stored(reference);
-      if (SERVER) check("stored with the account and the top-up", row?.user_id && row?.topup_id === SESSION.topupId, `${row?.user_id} ${row?.topup_id}`);
       await context.close();
     }
   }
@@ -296,7 +306,8 @@ try {
   server.close();
 }
 
-console.log(`\n${sent.length} messages sent; screenshots in ${SHOTS}`);
+console.log(`\nscreenshots in ${SHOTS}`);
+check("nothing posted to the old message route", sent.length === 0, sent.join(", "));
 if (failures.length) {
   console.error(`\n${failures.length} failed:\n  ${failures.join("\n  ")}`);
   process.exit(1);

@@ -46,6 +46,7 @@ test-results/
 /apps/web/e2e/video-results/
 /apps/web/e2e/shots/
 /apps/web/e2e/output-support/
+/apps/web/e2e/output-community/
 
 # Internal planning documents. They carry absolute paths from the machine
 # they were written on and reference sibling products, neither of which
@@ -95,3 +96,8 @@ answers.md
 data-safety*.md
 review-notes*.md
 PLAY-LISTING.md
+
+# --- the Mac App Store build (apps/desktop/scripts/build-appstore.sh) ---
+# Its output, and the provisioning profile asc.py ensure-mac-profile writes.
+apps/desktop/build-appstore/
+apps/desktop/src-tauri/appstore/embedded.provisionprofile

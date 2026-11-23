@@ -16,6 +16,7 @@ import { LitElement, css } from "lit";
 import { property, state } from "lit/decorators.js";
 import { OpenAppsError } from "@openapps/sdk";
 import { onChange, resolveClient } from "./context.js";
+import { t } from "./catalogue.js";
 export class OpenAppsElement extends LitElement {
     constructor() {
         super(...arguments);
@@ -25,7 +26,13 @@ export class OpenAppsElement extends LitElement {
     #unsubscribe;
     connectedCallback() {
         super.connectedCallback();
-        this.#unsubscribe = onChange(() => this.onSessionChange());
+        // Every change re-renders, whatever the element does with it: a
+        // language switch (catalogue.ts) arrives the same way, and an element
+        // whose onSessionChange only re-fetches would keep its old words.
+        this.#unsubscribe = onChange(() => {
+            this.onSessionChange();
+            this.requestUpdate();
+        });
     }
     disconnectedCallback() {
         this.#unsubscribe?.();
@@ -417,17 +424,17 @@ export function describe(cause) {
     if (cause instanceof OpenAppsError) {
         switch (cause.code) {
             case "unauthorized":
-                return "Please sign in again.";
+                return t("Please sign in again.");
             case "insufficient_balance":
                 return cause.balance === undefined
-                    ? "Not enough credits."
-                    : `Not enough credits — you have ${cause.balance}.`;
+                    ? t("Not enough credits.")
+                    : t("Not enough credits — you have {balance}.", { balance: cause.balance });
             case "rate_limited":
-                return "Too many attempts. Please wait a moment and try again.";
+                return t("Too many attempts. Please wait a moment and try again.");
             case "network":
-                return "Could not reach the server. Check your connection.";
+                return t("Could not reach the server. Check your connection.");
             case "timeout":
-                return "This is taking longer than expected. It may still complete.";
+                return t("This is taking longer than expected. It may still complete.");
             default:
                 return cause.message;
         }

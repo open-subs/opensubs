@@ -10,7 +10,11 @@
       "default": "./dist/index.js"
     },
     "./bundle": "./dist/bundle/openapps-ui.js",
-    "./bundle/*": "./dist/bundle/*.js"
+    "./bundle/*": "./dist/bundle/*.js",
+    "./catalogues/*": {
+      "types": "./dist/catalogues/*.d.ts",
+      "default": "./dist/catalogues/*.js"
+    }
   },
   "dependencies": {
     "lit": "^3.3.0",

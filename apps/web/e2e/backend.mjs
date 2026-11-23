@@ -67,7 +67,7 @@ for (const m of machines) {
   await page.goto(base);
   // The video input specifically: the page also has two subtitle inputs, and
   // an ambiguous selector is refused outright.
-  if (video) await page.setInputFiles('input[type="file"][accept="video/*"]', video);
+  if (video) await page.setInputFiles('input[type="file"][accept^="video/*"]', video);
 
   // The default is set when asrSupport() answers; wait for the model picker
   // to settle on something rather than reading it on the first frame.

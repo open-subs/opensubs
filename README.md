@@ -139,3 +139,8 @@ is under it except the parts below, which say so in their own manifests.
   **MIT OR Apache-2.0** (their `package.json`).
 
 Both are permissive and combine with the AGPL in the rest of the app.
+
+The macOS and Windows desktop installers also carry ffmpeg and ffprobe,
+prebuilt GPL-3.0-or-later builds from ffmpeg.martin-riedl.de and gyan.dev.
+[NOTICE](NOTICE) names them, with a written offer of their source, and is
+inside every installer under `licences/`.

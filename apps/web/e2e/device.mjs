@@ -7,7 +7,8 @@
 // slowest of the three combinations measured.
 //
 //   node --experimental-strip-types e2e/device.mjs
-import { isIntegratedGpu, prefersSmallModel, describeGpu, isAnonymousAdapter, isFirefox, startsOnCpu } from "../src/lib/device.ts";
+import { isIntegratedGpu, prefersSmallModel, describeGpu, isAnonymousAdapter, isFirefox, startsOnCpu,
+  reportedMemoryGb, smallIsTightOn, formatMemory, SMALL_TIGHT_BELOW_GB } from "../src/lib/device.ts";
 
 let pass = 0;
 const fails = [];
@@ -76,6 +77,29 @@ ok("Safari is left alone -- Apple silicon's GPU was measured to pay off",
 ok("a Firefox that does name its GPU is judged like any other",
   !startsOnCpu({ info: { vendor: "nvidia", architecture: "ampere" }, userAgent: UA.firefoxWin }));
 ok("and on the CPU the default is Base", small("wasm", firefoxInfo) === false);
+
+// --- Memory -------------------------------------------------------
+//
+// navigator.deviceMemory is Chromium's, rounded down to a power of two and
+// capped at 8; Firefox and Safari have none.
+ok("no deviceMemory (Firefox, Safari) reads as unknown", reportedMemoryGb({}) === undefined);
+ok("a reported 4 reads as 4 GB", reportedMemoryGb({ deviceMemory: 4 }) === 4);
+ok("a quarter-gigabyte phone reads as 0.25", reportedMemoryGb({ deviceMemory: 0.25 }) === 0.25);
+ok("nonsense reads as unknown", reportedMemoryGb({ deviceMemory: "8" }) === undefined && reportedMemoryGb({ deviceMemory: 0 }) === undefined);
+ok("unknown memory is never called tight -- no advice without evidence", smallIsTightOn(undefined) === false);
+ok("8 GB (Chrome's cap, so 8 or more) is enough for Small", smallIsTightOn(8) === false);
+ok(`below ${SMALL_TIGHT_BELOW_GB} GB Small is advised against`, smallIsTightOn(SMALL_TIGHT_BELOW_GB / 2) === true);
+ok("a 2 GB device is advised against Small", smallIsTightOn(2) === true);
+const gpu = { vendor: "nvidia", architecture: "ampere" };
+ok("a discrete card on a low-memory machine starts on Base",
+  prefersSmallModel({ device: "webgpu", integrated: isIntegratedGpu(gpu), memoryGb: 2 }) === false);
+ok("the same card with 8 GB reported keeps Small",
+  prefersSmallModel({ device: "webgpu", integrated: isIntegratedGpu(gpu), memoryGb: 8 }) === true);
+ok("and with nothing reported keeps Small, as before",
+  prefersSmallModel({ device: "webgpu", integrated: isIntegratedGpu(gpu) }) === true);
+for (const [mb, want] of [[257, "260 MB"], [804, "800 MB"], [1000, "1.0 GB"], [1440, "1.4 GB"], [2970, "2.9 GB"]]) {
+  ok(`${mb} MiB is said as ${want}`, formatMemory(mb) === want, formatMemory(mb));
+}
 
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);

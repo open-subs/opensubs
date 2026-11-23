@@ -163,6 +163,19 @@ export class OpenApps {
             const result = await this.#request("/v1/auth/methods", { signal });
             return result.methods;
         },
+        /**
+         * {@link methods}, with what else the server says about signing in: where
+         * OnWallet is installed from. The link is the server's to give, never
+         * a page's to make up, and anything that is not a plain `https:` URL is
+         * dropped here so it can be put in an `href` as it comes.
+         */
+        serverInfo: async (signal) => {
+            const result = await this.#request("/v1/auth/methods", { signal });
+            return {
+                methods: result.methods,
+                openwallet_install_url: httpsUrl(result.openwallet_install_url),
+            };
+        },
         /** Step 1 of wallet/Nostr login: get something to sign. */
         challenge: (namespace, address, signal) => this.#request("/v1/auth/challenge", {
             method: "POST",
@@ -244,6 +257,70 @@ export class OpenApps {
         /** {@link redirectStartUrl} for Google. */
         googleStartUrl: (returnTo, referralCode) => this.auth.redirectStartUrl("google", returnTo, referralCode),
         /**
+         * {@link redirectStartUrl}, bound to this page with PKCE.
+         *
+         * Generates a one-time verifier, keeps it in this tab's
+         * `sessionStorage`, and puts its SHA-256 on the start URL. The code the
+         * server hands back can then only be redeemed by {@link completeRedirect}
+         * in this tab — a `#code=` planted in someone else's page by an attacker
+         * who signed in to *their* account is refused (login CSRF). Prefer this
+         * to {@link redirectStartUrl} wherever the page that starts the sign-in
+         * is the page it returns to.
+         */
+        redirectStart: async (provider, returnTo, referralCode) => {
+            const base = this.auth.redirectStartUrl(provider, returnTo, referralCode);
+            const challenge = await newPkceChallenge(returnTo);
+            if (!challenge)
+                return base;
+            const join = base.includes("?") ? "&" : "?";
+            return `${base}${join}code_challenge=${challenge}&code_challenge_method=S256`;
+        },
+        /**
+         * {@link redirectStart}, answered with the provider's authorize URL
+         * instead of a redirect to it (`mode=json`).
+         *
+         * For a page that hands the URL to something other than its own
+         * address bar: the OnWallet extension's `window.openwallet.signIn`,
+         * which opens its approval window over the page and then navigates
+         * this tab to the callback itself. Everything else is the redirect
+         * sign-in unchanged — the same PKCE verifier kept in this tab, the same
+         * browser-binding cookie, the same `#code=` back at `returnTo` for
+         * {@link completeRedirect}. The fetch is credentialed because that
+         * cookie is set by this response; the server allows credentials on this
+         * request alone, and only from its `allowed_origins`.
+         *
+         * Throws {@link OpenAppsError} when the server refuses (an origin it
+         * does not serve, a host with no callback of its own: `conflict`) or
+         * cannot be reached; a caller then falls back to
+         * `location.href = await redirectStart(…)`.
+         */
+        redirectAuthorizeUrl: async (provider, returnTo, referralCode, signal) => {
+            const start = await this.auth.redirectStart(provider, returnTo, referralCode);
+            const url = `${start}${start.includes("?") ? "&" : "?"}mode=json`;
+            let response;
+            try {
+                response = await this.#fetch(url, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: { accept: "application/json" },
+                    signal,
+                });
+            }
+            catch (cause) {
+                if (cause instanceof Error && cause.name === "AbortError")
+                    throw cause;
+                throw new OpenAppsError("network", cause instanceof Error ? cause.message : "network request failed");
+            }
+            const payload = await this.#parseBody(response);
+            if (!response.ok)
+                throw errorFromResponse(response.status, payload);
+            const authorizeUrl = payload?.authorize_url;
+            if (typeof authorizeUrl !== "string" || !authorizeUrl) {
+                throw new OpenAppsError("internal", "the sign-in start returned no authorize_url");
+            }
+            return authorizeUrl;
+        },
+        /**
          * Finish a redirect sign-in: exchange the `#code=…` fragment for a
          * session and clear it from the URL.
          *
@@ -252,6 +329,10 @@ export class OpenApps {
          * calls share one exchange, because a framework that double-invokes
          * effects would otherwise spend the code on the first call and fail the
          * second.
+         *
+         * Sends the PKCE verifier {@link redirectStart} kept, if any. A code that
+         * arrives in a page that started no sign-in while already signed in is
+         * ignored rather than allowed to replace the session silently.
          */
         completeRedirect: (options = {}) => {
             const code = readRedirectParam(options, "code");
@@ -259,11 +340,16 @@ export class OpenApps {
                 return Promise.resolve(null);
             if (this.#completing)
                 return this.#completing;
+            const verifier = takePkceVerifier();
+            if (!verifier && this.isLoggedIn) {
+                stripRedirectParams(options, ["code"]);
+                return Promise.resolve(null);
+            }
             this.#completing = (async () => {
                 try {
                     const result = await this.#request("/v1/auth/oidc/exchange", {
                         method: "POST",
-                        body: { code },
+                        body: verifier ? { code, code_verifier: verifier } : { code },
                         signal: options.signal,
                     });
                     this.#setSession({
@@ -337,32 +423,101 @@ export class OpenApps {
                 challenge_id: challengeId,
                 proof,
                 merge: options.merge ?? false,
+                // The identity the person was shown and agreed to link
+                // (`nostr:npub1…`). When given, the server links nothing unless
+                // the proof came from exactly that one: a signer that answers
+                // with a different key between the preview and the signature is
+                // refused (`signed_by_a_different_key`), not quietly linked.
+                ...(options.expect ? { expect: options.expect } : {}),
             },
             signal: options.signal,
         }),
         /**
-         * Begin connecting Google or GitHub to the account already signed in
-         * here.
+         * Begin connecting Google, GitHub or Apple to the account already
+         * signed in here.
          *
          * Wallet and Nostr link by signing in the page; these need a full
          * redirect, which carries no bearer token — so this authenticated call
-         * records the intent first and hands back a URL to navigate to. On
-         * return, {@link completeLinkRedirect} reports what happened.
+         * records who is asking and hands back a URL to navigate to (on the
+         * server, which binds the flow to this browser on the way through). On
+         * return, {@link completeLinkRedirect} reports a `pending` link, which
+         * {@link confirmLink} completes from this page.
          *
-         * Throws `identity_belongs_to_another_account` semantics via the
-         * redirect rather than here: the conflict is only discovered after the
-         * provider has verified the identity, so it comes back in the fragment
-         * and you re-run this with `{ merge: true }`.
+         * Nothing about merging is decided here: if the identity turns out to
+         * be on another account, {@link confirmLink} answers with that conflict
+         * and the page asks the user before confirming with `{ merge: true }`.
+         * (`merge` is accepted for compatibility and ignored.)
+         *
+         * Needs a recent sign-in: an old session gets `reauth_required`.
          */
-        redirectLinkStart: async (provider, returnTo, options = {}) => {
-            const result = await this.#request(`/v1/auth/link/oidc/${provider}/start`, {
-                method: "POST",
-                auth: "bearer",
-                body: { return_to: returnTo, merge: options.merge ?? false },
-                signal: options.signal,
-            });
-            return result.auth_url;
+        redirectLinkStart: async (provider, returnTo, options = {}) => (await this.auth.redirectLinkBegin(provider, returnTo, options)).auth_url,
+        /**
+         * {@link redirectLinkStart}, with everything the server handed back:
+         * the form to post (`go`) as well as the older URL.
+         */
+        redirectLinkBegin: (provider, returnTo, options = {}) => this.#request(`/v1/auth/link/oidc/${provider}/start`, {
+            method: "POST",
+            auth: "bearer",
+            body: { return_to: returnTo },
+            signal: options.signal,
+        }),
+        /**
+         * Begin connecting a redirect provider and leave for it — the way to
+         * start a link from a page.
+         *
+         * Where the server offers it, the page leaves by **submitting a form**
+         * rather than following a URL. The server binds the link to the browser
+         * that posts that form from one of its own pages, so a link cannot be
+         * started by sending someone a URL: only this browser, showing this
+         * page, with this account signed in, can go on to the provider. A
+         * server from before the form existed gets the URL, as before.
+         *
+         * The page is navigated away; the promise settles only if that fails
+         * to start. A page whose Content-Security-Policy sets `form-action`
+         * must allow the account server's origin.
+         *
+         * Needs a recent sign-in: an old session gets `reauth_required`.
+         */
+        redirectLink: async (provider, returnTo, options = {}) => {
+            const start = await this.auth.redirectLinkBegin(provider, returnTo, options);
+            if (submitLinkForm(start))
+                return;
+            if (typeof window === "undefined") {
+                throw new Error("redirectLink needs a page to navigate; use redirectLinkBegin");
+            }
+            window.location.href = start.auth_url;
         },
+        /**
+         * Complete a redirect link this session started, from the `code` of a
+         * `pending` {@link completeLinkRedirect} outcome.
+         *
+         * Answers like {@link linkVerify}: the link, or a thrown
+         * `identity_belongs_to_another_account` conflict to put to the user
+         * (then call again with `{ merge: true }` and the same code), or
+         * `merge_blocked_by_duplicate_namespace`.
+         */
+        confirmLink: (code, options = {}) => this.#request("/v1/auth/link/oidc/confirm", {
+            method: "POST",
+            auth: "bearer",
+            body: { code, merge: options.merge ?? false },
+            signal: options.signal,
+        }),
+        /** This account's live sessions, the current one marked. */
+        sessions: (signal) => this.#request("/v1/sessions", { auth: "bearer", signal }),
+        /** End one session. Needs a recent sign-in. */
+        revokeSession: (id, signal) => this.#request(`/v1/sessions/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            auth: "bearer",
+            signal,
+        }),
+        /** End every session but this one. Needs a recent sign-in. */
+        revokeOtherSessions: (signal) => this.#request("/v1/sessions/revoke-others", {
+            method: "POST",
+            auth: "bearer",
+            signal,
+        }),
+        /** The account's security activity: sign-ins, links, merges, revocations. */
+        events: (signal) => this.#request("/v1/me/events", { auth: "bearer", signal }),
         /** {@link redirectLinkStart} for Google. */
         googleLinkStart: (returnTo, options = {}) => this.auth.redirectLinkStart("google", returnTo, options),
         /**
@@ -372,19 +527,21 @@ export class OpenApps {
          */
         completeLinkRedirect: (options = {}) => {
             const params = redirectParams(options);
+            const pending = params.get("link_pending");
             const linked = params.get("linked");
             const conflict = params.get("link_conflict");
             const blockedBy = params.get("link_blocked");
             const error = params.get("link_error");
-            if (!linked && !conflict && !blockedBy && !error)
+            if (!pending && !linked && !conflict && !blockedBy && !error)
                 return null;
-            stripRedirectParams(options, [
-                "linked",
-                "link_conflict",
-                "link_blocked",
-                "link_error",
-                "clashes",
-            ]);
+            stripRedirectParams(options, ["link_pending", "provider", "linked", "link_conflict", "link_blocked", "link_error", "clashes"], 
+            // What an older server put beside `linked` and `link_conflict`.
+            // Everyday words, so they are cleared from the fragment only: a
+            // page's own `?credits=` is not ours to remove.
+            ["merged", "credits", "balance"]);
+            if (pending) {
+                return { status: "pending", code: pending, namespace: params.get("provider") ?? "" };
+            }
             if (error)
                 return { status: "error", message: error };
             if (blockedBy) {
@@ -412,6 +569,11 @@ export class OpenApps {
                 credits: Number(params.get("credits") ?? 0),
             };
         },
+        /**
+         * Cancel a merge that is waiting ({@link Me.pending_merges}), from
+         * either of the two accounts. Nothing has moved, so nothing is undone.
+         */
+        cancelMerge: (id, signal) => this.#request(`/v1/auth/merges/${encodeURIComponent(id)}/cancel`, { method: "POST", auth: "bearer", signal }),
         unlink: (caip10, signal) => this.#request(`/v1/auth/link/${encodeURIComponent(caip10)}`, {
             method: "DELETE",
             auth: "bearer",
@@ -427,6 +589,16 @@ export class OpenApps {
             });
             return result.balance;
         },
+        /**
+         * The balance and, where the server keeps track, what it is made of:
+         * credits bought (which never lapse) and this month's member credits
+         * (which do), when they lapse, and why there are none.
+         *
+         * The same request as {@link balance}. A server with member credits off
+         * answers `{ balance }` alone; the other fields are then undefined, and
+         * that is how a UI knows to show nothing new.
+         */
+        breakdown: (signal) => this.#request("/v1/credits/balance", { auth: "bearer", signal }),
         /**
          * Charge the logged-in user for something this app did.
          *
@@ -446,6 +618,19 @@ export class OpenApps {
             signal: options.signal,
         }),
     };
+    // ---------- what agents may spend ----------
+    /**
+     * The person's delegation: what agents they approve in OnWallet may spend
+     * from their credits, per day and per run (`/v1/me/delegation`).
+     *
+     * - `delegation()` reads it.
+     * - `delegation("PUT", { per_day_credits?, per_run_credits? })` creates
+     *   or changes it, or turns a revoked one back on (send `{}` for that, or
+     *   for the defaults); an omitted limit keeps its current value.
+     * - `delegation("DELETE")` turns it off: agents can no longer start
+     *   spending.
+     */
+    delegation = (method = "GET", limits) => this.#request("/v1/me/delegation", { method, auth: "bearer", body: limits });
     // ---------- payments ----------
     payments = {
         packages: (signal) => this.#request("/v1/payments/packages", { signal }),
@@ -476,6 +661,17 @@ export class OpenApps {
             method: "POST",
             auth: "bearer",
             body: { package_id: packageId },
+            signal,
+        }),
+        /**
+         * A USD₮0 deposit address on one network: an `id` from
+         * `packages().usdt0.networks`. Fails with a 400 unless the server has
+         * USD₮0 enabled on that network.
+         */
+        usdt0DepositAddress: (packageId, network, signal) => this.#request("/v1/payments/usdt0/deposit-address", {
+            method: "POST",
+            auth: "bearer",
+            body: { package_id: packageId, network },
             signal,
         }),
         lightningInvoice: (packageId, signal) => this.#request("/v1/payments/lightning/invoice", {
@@ -601,8 +797,8 @@ function currentPageUrl() {
  *   - **The analytics see a page.** A page-view tag reports `location` as it
  *     finds it, so every sign-in produces a unique "page" -- `/#code=oac_4fa4…`
  *     -- with exactly one visitor, for ever. openpixels.app's report filled up
- *     with them, and the funnel through `/#studio` was cut into slivers
- *    . Nothing errors; the only symptom is in a dashboard nobody
+ *     with them, and the funnel through `/#studio` was cut into slivers.
+ *     Nothing errors; the only symptom is in a dashboard nobody
  *     reads daily.
  *   - **The code lands in browser history.**
  *
@@ -622,7 +818,7 @@ function currentPageUrl() {
  * clearing. `url` is still skipped -- that is a string the caller parsed, not
  * the address bar, and there is nothing there to rewrite.
  */
-function stripRedirectParams(options, names) {
+function stripRedirectParams(options, names, fragmentOnly = []) {
     if (options.url !== undefined)
         return;
     if (typeof history === "undefined" || typeof location === "undefined")
@@ -633,6 +829,8 @@ function stripRedirectParams(options, names) {
         query.delete(name);
         fragment.delete(name);
     }
+    for (const name of fragmentOnly)
+        fragment.delete(name);
     const q = query.toString();
     const f = fragment.toString();
     history.replaceState({}, "", location.pathname + (q ? `?${q}` : "") + (f ? `#${f}` : ""));
@@ -658,9 +856,128 @@ function redirectParams(options) {
 function readRedirectParam(options, name) {
     return redirectParams(options).get(name);
 }
+// ---------- leaving for a provider to link ----------
+/** `value` if it is a plain `https:` URL, else `null`. */
+function httpsUrl(value) {
+    if (typeof value !== "string")
+        return null;
+    try {
+        const url = new URL(value);
+        return url.protocol === "https:" && !url.username && !url.password ? value : null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Submit the server's link form as a top-level navigation. False when there
+ * is no form to submit (an older server) or no document to submit it from,
+ * so the caller can fall back to the URL.
+ *
+ * The target must be http(s): the fields carry the flow's state, and it
+ * goes to the account server or nowhere.
+ */
+function submitLinkForm(start) {
+    const go = start.go;
+    if (!go || go.method !== "POST" || typeof document === "undefined")
+        return false;
+    let action;
+    try {
+        action = new URL(go.url);
+    }
+    catch {
+        return false;
+    }
+    if (action.protocol !== "https:" && action.protocol !== "http:")
+        return false;
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = action.href;
+    form.hidden = true;
+    for (const [name, value] of Object.entries(go.fields ?? {})) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = String(value);
+        form.append(input);
+    }
+    document.body.append(form);
+    form.submit();
+    return true;
+}
+// ---------- PKCE for the redirect code exchange ----------
+const PKCE_KEY = "openapps.pkce_verifier";
+function tabStorage() {
+    try {
+        return typeof sessionStorage === "undefined" ? null : sessionStorage;
+    }
+    catch {
+        // Storage disabled (privacy mode, sandboxed frame): no PKCE, and the
+        // server accepts that only while it allows challenge-less sign-ins.
+        return null;
+    }
+}
+function base64url(bytes) {
+    let s = "";
+    for (const b of bytes)
+        s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+/**
+ * Make a verifier, keep it for this tab, and return its S256 challenge —
+ * or null where that cannot work: no storage or Web Crypto, or a `returnTo`
+ * on another origin, whose page could never read this tab's storage.
+ */
+async function newPkceChallenge(returnTo) {
+    const storage = tabStorage();
+    const subtle = globalThis.crypto?.subtle;
+    if (!storage || !subtle || typeof location === "undefined")
+        return null;
+    if (returnTo) {
+        try {
+            if (new URL(returnTo).origin !== location.origin)
+                return null;
+        }
+        catch {
+            return null;
+        }
+    }
+    const random = new Uint8Array(32);
+    globalThis.crypto.getRandomValues(random);
+    const verifier = base64url(random);
+    const digest = new Uint8Array(await subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    try {
+        storage.setItem(PKCE_KEY, verifier);
+    }
+    catch {
+        return null;
+    }
+    return base64url(digest);
+}
+/** The verifier this tab kept, removed as it is read: it is single-use. */
+function takePkceVerifier() {
+    const storage = tabStorage();
+    if (!storage)
+        return null;
+    try {
+        const verifier = storage.getItem(PKCE_KEY);
+        storage.removeItem(PKCE_KEY);
+        return verifier;
+    }
+    catch {
+        return null;
+    }
+}
 /** How to name a sign-in method to a person. */
 function providerName(namespace) {
-    return ({ google: "Google", github: "GitHub", eip155: "wallet", nostr: "Nostr" }[namespace] ?? namespace);
+    return ({
+        google: "Google",
+        github: "GitHub",
+        apple: "Apple",
+        openwallet: "OnWallet",
+        eip155: "wallet",
+        nostr: "Nostr",
+    }[namespace] ?? namespace);
 }
 function sleep(ms, signal) {
     return new Promise((resolve, reject) => {

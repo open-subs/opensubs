@@ -2,8 +2,10 @@
 
 > A subtitle generator that runs inside the browser tab. It transcribes a
 > video's speech, translates it, styles it, and burns the result into the
-> picture. The video file is never uploaded, because the product contains no
-> upload endpoint.
+> picture. It opens audio files too (MP3, WAV, M4A, AAC, OGG, FLAC, Opus,
+> WebA) and turns them into subtitle files; burning in needs a video. The
+> video file is never uploaded, because the product contains no upload
+> endpoint.
 
 https://opensubs.app
 
@@ -25,7 +27,7 @@ https://opensubs.app
 
 - **There is no upload endpoint in the product.** This is stronger than a
   promise not to upload: there is no server to upload to, so a footage leak
-  is not something that has to be prevented. It can be checked in the browser's Network tab: on the default on-device route, no request carries the video, its audio or the subtitles. What you will see is the app's own files loading from opensubs.app or the browser's cache, the speech model from Hugging Face the first time, the sign-in when you burn, and anonymous counts of page views and of how far a task gets.
+  is not something that has to be prevented. It can be checked in the browser's Network tab: on the default on-device route, no request carries the video, its audio or the subtitles. What you will see is the app's own files loading from opensubs.app or the browser's cache, the speech model from its download host the first time, the sign-in when you burn, and anonymous counts of page views and of how far a task gets.
 - **No file-size limit, no queue, no watermark.** All three exist on hosted
   tools because the file has to reach a server and the server has to pay for
   the encode. Neither applies here.
@@ -50,6 +52,10 @@ https://opensubs.app
   translation, each cue shows its original under it, also editable; a split
   cuts the other language in proportion and marks both halves "Check the
   translation". The editor works at phone width.
+- **Input files:** a video (MP4, MOV, WebM, MKV) or an audio file (MP3, WAV, M4A, AAC, OGG, FLAC, Opus, WebA),
+  chosen with the file picker or dropped on the page. Audio is transcribed and
+  translated like a video; burning subtitles in needs a video, so an audio file
+  leaves as .srt, .vtt, .ass or .txt.
 - **Exports:** .srt, .vtt and .ass; .txt, the words alone with no timings;
   or an MP4 with the subtitles burned in. All of them use the edited cues.
 - **Licence:** AGPL-3.0-or-later.
@@ -99,7 +105,9 @@ https://opensubs.app
   - Firefox Add-ons: https://addons.mozilla.org/en-US/firefox/addon/opensubs/
   - Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/live-subtitles-in-your-br/ocegdknngeahbblajpajaekoekghgdnh
 - As a desktop app for macOS, Windows and Linux, for long files (one video at a time).
+  - Microsoft Store (Windows): https://apps.microsoft.com/detail/9p8v54qnm6x1
 - As a command-line tool, built from source.
+- No batch processing: every version (web app, desktop app, command line) subtitles one video at a time. The command line handles one file per command, so a script can loop over a folder.
 
 Contact: hello@opensubs.app
 
@@ -126,10 +134,48 @@ Contact: hello@opensubs.app
 - [Add SRT to MP4](https://opensubs.app/add-srt-to-mp4): burning an existing .srt into an MP4 in the browser (hardcoded, not a switchable track), and the options for soft subtitles.
 - [Subtitle generator with no watermark](https://opensubs.app/subtitle-generator-no-watermark): what no watermark, no account to try, no upload and free mean on OpenSubs, and how to check each one.
 - [Japanese to English subtitles](https://opensubs.app/japanese-to-english-subtitles): make English subtitles from a Japanese video: Whisper writes the Japanese in the browser, then it is translated to English, free on your device in desktop Chrome, or with your own key or credits.
+- [Korean to English subtitles](https://opensubs.app/korean-to-english-subtitles): make English subtitles from a Korean video: Whisper writes the Korean in the browser, then it is translated into English with every timing kept, free on your device in desktop Chrome.
+- [Chinese to English subtitles](https://opensubs.app/chinese-to-english-subtitles): make English subtitles from a Chinese (Mandarin) video: Whisper writes the Chinese in the browser, then it is translated into English, free on your device in desktop Chrome.
+- [Spanish to English subtitles](https://opensubs.app/spanish-to-english-subtitles): make English subtitles from a Spanish video: Whisper writes the Spanish in the browser, then it is translated into English, free on your device in desktop Chrome.
+- [Russian to English subtitles](https://opensubs.app/russian-to-english-subtitles): make English subtitles from a Russian video: Whisper writes the Russian in the browser, then it is translated into English, free on your device in desktop Chrome.
+- [Arabic to English subtitles](https://opensubs.app/arabic-to-english-subtitles): make English subtitles from an Arabic video: Whisper writes the Arabic in the browser, then it is translated into English, on your device in desktop Chrome where Chrome offers the pair, or with your own key or OpenSubs credits.
+- [Hindi to English subtitles](https://opensubs.app/hindi-to-english-subtitles): make English subtitles from a Hindi video: Whisper writes the Hindi in the browser, then it is translated into English, on your device in desktop Chrome where Chrome offers the pair, or with your own key or OpenSubs credits.
+- [English to Spanish subtitles](https://opensubs.app/english-to-spanish-subtitles): make Spanish subtitles from an English video: Whisper writes the English in the browser, then it is translated into Spanish with every timing kept, free on your device in desktop Chrome.
+- [Add subtitles to MOV](https://opensubs.app/add-subtitles-to-mov): add subtitles to a .mov file in the browser: Whisper writes them from the audio, then burn them in (saved as MP4) or save SRT, VTT, ASS or TXT. The file is not uploaded.
+- [Add subtitles to MKV](https://opensubs.app/add-subtitles-to-mkv): add subtitles to a .mkv file in the browser: Whisper writes them from the audio, then burn them in (saved as MP4) or save SRT, VTT, ASS or TXT. The file is not uploaded.
+- [Add subtitles to WebM](https://opensubs.app/add-subtitles-to-webm): add subtitles to a .webm file in the browser: Whisper writes them from the audio, then burn them in (saved as MP4) or save SRT, VTT, ASS or TXT. The file is not uploaded.
+- [English to Portuguese subtitles](https://opensubs.app/english-to-portuguese-subtitles): make Portuguese subtitles from an English video: Whisper writes the English in the browser, then it is translated into Portuguese with every timing kept; which translator gives Brazilian or European Portuguese.
+- [English to French subtitles](https://opensubs.app/english-to-french-subtitles): make French subtitles from an English video: Whisper writes the English in the browser, then it is translated into French with the timings kept, free on your device in desktop Chrome.
+- [English to Hindi subtitles](https://opensubs.app/english-to-hindi-subtitles): make Hindi subtitles in Devanagari from an English video: Whisper writes the English in the browser, then it is translated into Hindi with Chrome, your own key or OpenSubs credits.
+- [English to Japanese subtitles](https://opensubs.app/english-to-japanese-subtitles): make Japanese subtitles from an English video: Whisper writes the English in the browser, then it is translated into Japanese with the timings kept, free on your device in desktop Chrome.
+- [French to English subtitles](https://opensubs.app/french-to-english-subtitles): make English subtitles from a French video: Whisper writes the French in the browser, then it is translated into English, free on your device in desktop Chrome.
+- [German to English subtitles](https://opensubs.app/german-to-english-subtitles): make English subtitles from a German video: Whisper writes the German in the browser, then it is translated into English with the timings kept, free on your device in desktop Chrome.
+- [Portuguese to English subtitles](https://opensubs.app/portuguese-to-english-subtitles): make English subtitles from a Brazilian or European Portuguese video: Whisper writes the Portuguese in the browser, then it is translated into English, free on your device in desktop Chrome.
+- [Subtitles for long videos](https://opensubs.app/subtitles-for-long-videos): subtitles for a 1 to 3 hour video: no time limit, no file-size limit, no upload; what to expect in the browser, and when the desktop app is the better choice.
+- [Subtitles for DaVinci Resolve](https://opensubs.app/subtitles-for-davinci-resolve): make an .srt for DaVinci Resolve free edition or Studio: Whisper writes the subtitles from the exported video in the browser, then File > Import > Subtitle puts them on a subtitle track; why imported subtitles can be out of sync, and burning them in from the Deliver page.
+- [Audio to SRT](https://opensubs.app/audio-to-srt): convert an audio file (MP3, WAV, M4A, AAC, OGG, FLAC, Opus, WebA) to an .srt: Whisper writes the timed subtitles in the browser and the recording is not uploaded; also .vtt, .ass, .txt and translation; burning in needs a video, so an audio file leaves with a subtitle file.
+- [Audio to text](https://opensubs.app/audio-to-text): transcribe an audio file (MP3, WAV, M4A, AAC, OGG, FLAC, Opus, WebA) to plain text in the browser: meetings, interviews, voice memos, lectures, podcasts; Whisper runs on your device and the recording is not uploaded; .txt is the words alone (a two-second pause starts a new paragraph), .srt or .vtt when timestamps are needed; no speaker labels, no summaries, one file at a time.
+- [Captions for deaf students](https://opensubs.app/captions-for-deaf-students): for a teacher with a deaf student who posts lecture videos online: Whisper drafts the captions in the browser, every line is then checked by hand (subject terms, names, questions from the room), sounds such as [laughter] and speaker names are typed in by hand (the app does not detect sounds or speakers), long lines are split; a .vtt or .srt uploaded as closed captions the student can turn on, or burned into an MP4 (free sign-in) where the platform takes no caption file; no length limit, video not uploaded on the default route.
 - [影片轉文字](https://opensubs.app/zh-Hant/transcribe-video): Traditional Chinese page on transcribing a video to text in the browser (.txt, .srt, .vtt, .ass), and choosing 繁體中文 so the transcript is not converted to Simplified.
 - [影片上字幕](https://opensubs.app/zh-Hant/add-subtitles-to-video): Traditional Chinese page on adding subtitles to a video in the browser, burned into an MP4 (a free sign-in) or saved as .srt/.vtt/.ass.
+- [英文视频加中文字幕](https://opensubs.app/zh-Hans/english-to-chinese-subtitles): Simplified Chinese page on giving an English video Chinese subtitles in the browser: Whisper writes the English, each line is translated into Simplified Chinese on the same timings, bilingual Chinese-English subtitles, and GBK-encoded .srt files opened correctly.
+- [英文影片翻譯繁體中文字幕](https://opensubs.app/zh-Hant/english-to-chinese-subtitles): Traditional Chinese page on giving an English video Traditional Chinese subtitles in the browser: Whisper writes the English, each line is translated into Traditional Chinese on the same timings, and the Taiwan and Hong Kong wording to check before publishing.
 - [Transcrever vídeo em texto](https://opensubs.app/pt/transcribe-video): Portuguese page on transcribing a video to text in the browser, exported as .txt, .srt, .vtt or .ass.
+- [Poner subtítulos a un video](https://opensubs.app/es/add-subtitles-to-video): Spanish page on adding subtitles to a video in the browser, burned into an MP4 (a free sign-in) or saved as .srt/.vtt/.ass.
+- [Transcribir video a texto](https://opensubs.app/es/transcribe-video): Spanish page on transcribing a video to text in the browser, exported as .txt, .srt, .vtt or .ass.
+- [Subtítulos automáticos](https://opensubs.app/es/auto-subtitles): Spanish page on automatic subtitles from a video's speech, burned into an MP4 with no watermark (a free sign-in) or saved as .srt.
+- [Traduzir legenda](https://opensubs.app/pt/translate-subtitles): Portuguese page on translating an .srt or a video's subtitles into 20 languages with the timings kept; free on the device in desktop Chrome 138 or later.
+- [動画 文字起こし](https://opensubs.app/ja/transcribe-video): Japanese page on transcribing a video to text in the browser (.txt, .srt, .vtt, .ass); Base or Small for Japanese, Tiny is English only.
+- [Видео в текст](https://opensubs.app/ru/transcribe-video): Russian page on transcribing a video to text in the browser (.txt, .srt, .vtt, .ass); Base or Small for Russian, Tiny is English only.
+- [Sous-titrer une vidéo](https://opensubs.app/fr/add-subtitles-to-video): French page on adding subtitles to a video in the browser, burned into an MP4 (a free sign-in) or saved as .srt/.vtt/.ass; the app interface itself is in English.
 - [Blog](https://opensubs.app/blog)
+- [How to add subtitles to an MP4](https://opensubs.app/blog/add-subtitles-to-mp4): two ways to put subtitles on an MP4, a separate .srt or burned into the picture, and what each means for players, platforms and later edits.
+- [Captions vs subtitles](https://opensubs.app/blog/caption-vs-subtitle): captions carry the sounds as well as the words, subtitles translate the speech; what each one is for and which you need.
+- [How to add captions to a video](https://opensubs.app/blog/how-to-add-captions-to-a-video): three ways to caption a video (type them, let a platform do it, or generate them on your own machine), step by step.
+- [SRT to VTT](https://opensubs.app/blog/srt-to-vtt): converting SRT subtitles to WebVTT (and back) in the browser, and what changes between the two formats.
+- [Subtitle file formats](https://opensubs.app/blog/subtitle-file-formats): what SRT, VTT and ASS files contain, which one each player and platform accepts, and how to pick.
+- [Subtitles for Reels and TikTok](https://opensubs.app/blog/subtitles-for-reels-and-tiktok): Reels and TikTok take no subtitle files, so the text is burned into the picture; generating, styling and burning in captions.
+- [Word-by-word captions](https://opensubs.app/blog/word-by-word-captions): karaoke-style captions that light up one word at a time, when they help, and how to make them from your own video.
 - [Privacy](https://opensubs.app/privacy): what is stored, and where.
 - [Windows desktop privacy policy](https://opensubs.app/desktop-privacy): the
   separate policy for the Windows desktop app.
@@ -149,6 +195,7 @@ in each language is:
 - Deutsch — https://opensubs.app/de
 - Español — https://opensubs.app/es
 - Português — https://opensubs.app/pt
+- Русский — https://opensubs.app/ru (home page only; the app interface shows in English)
 
 The other three sit under the same prefix: /ja/burn-subtitles-into-video,
 /ja/styles, /de/privacy, and so on. Where the tool is embedded in a page, it
@@ -161,6 +208,15 @@ English. One blog post, How to add captions
 to a video, also has a Portuguese version at
 https://opensubs.app/pt/blog/how-to-add-captions-to-a-video.
 Transcribe video also has a Traditional Chinese version at
-https://opensubs.app/zh-Hant/transcribe-video and a Portuguese one at
-https://opensubs.app/pt/transcribe-video; Add subtitles to video has a
-Traditional Chinese version at https://opensubs.app/zh-Hant/add-subtitles-to-video.
+https://opensubs.app/zh-Hant/transcribe-video, a Portuguese one at
+https://opensubs.app/pt/transcribe-video, a Spanish one at
+https://opensubs.app/es/transcribe-video, a Japanese one at
+https://opensubs.app/ja/transcribe-video and a Russian one at
+https://opensubs.app/ru/transcribe-video; Add subtitles to video has a
+Traditional Chinese version at https://opensubs.app/zh-Hant/add-subtitles-to-video,
+a Spanish one at https://opensubs.app/es/add-subtitles-to-video and a
+French one at https://opensubs.app/fr/add-subtitles-to-video (the page is in
+French; the app interface is not, and shows in English).
+Translate subtitles has a Portuguese version at
+https://opensubs.app/pt/translate-subtitles. Automatic subtitles
+(https://opensubs.app/es/auto-subtitles) is in Spanish only.

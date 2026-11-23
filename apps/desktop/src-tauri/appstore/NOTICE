@@ -1,0 +1,50 @@
+OpenSubs for the Mac App Store
+==============================
+
+OpenSubs is free software under the GNU Affero General Public License,
+version 3 or later (LICENSE, beside this file). Its source is at
+https://github.com/open-subs/opensubs. This copy of the app was built from
+that source by apps/desktop/scripts/build-appstore.sh.
+
+It carries the following parts, each under its own licence. Their licence
+texts are in the folders named.
+
+ffmpeg and ffprobe (Contents/Resources/vendor/)
+  FFmpeg 7.1.1, built from source by apps/desktop/scripts/ffmpeg-lgpl.sh as
+  an LGPL build: no component under the GPL and nothing nonfree. FFmpeg is
+  licensed under the GNU Lesser General Public License, version 2.1 or later.
+  It is statically linked with:
+    FreeType 2.13.3   FreeType License (FTL)
+    FriBidi 1.0.16    GNU Lesser General Public License 2.1 or later
+    HarfBuzz 10.4.0   MIT ("Old MIT") licence
+    libass 0.17.3     ISC licence
+    dav1d 1.5.1       BSD 2-Clause licence
+    zimg 3.0.5        WTFPL, version 2
+  and with the system's own zlib, bzip2, iconv, libc++, VideoToolbox and
+  AudioToolbox. The exact configure line is in licences/ffmpeg/BUILD.txt.
+  The complete corresponding source of FFmpeg and of every library above,
+  as the archives it was built from, is in licences/ffmpeg/source/. The
+  licence texts are in licences/ffmpeg/.
+
+  These two programs are separate from OpenSubs: the app runs them to read
+  a video and to write the subtitled one, and you may replace them with any
+  ffmpeg and ffprobe built from modified sources.
+
+Speech recognition
+  whisper.cpp (MIT licence), compiled into the app through the whisper-rs
+  crate (Unlicense). The Whisper Base model (ggml-base.bin, Contents/
+  Resources/models/) is OpenAI's Whisper, released under the MIT licence.
+
+Translation on the Mac
+  CTranslate2 (MIT licence), compiled into the app through the ct2rs crate
+  (MIT), with SentencePiece (Apache-2.0). The translation model (Contents/
+  Resources/models/m2m100/) is Meta's M2M-100 418M, released under the MIT
+  licence, converted to CTranslate2's int8 format by the OpenSubs project.
+
+The account and credits
+  The account elements (@openapps/ui) and client (@openapps/sdk) are under
+  MIT OR Apache-2.0, at your option.
+
+The app itself is a Tauri 2 application (MIT OR Apache-2.0); the Rust and
+JavaScript libraries it is built from keep their own licences, listed in
+the source repository's Cargo.lock and package-lock.json files.

@@ -55,14 +55,14 @@ const MEDIA = {
 };
 
 // Six entries, as `model_list` builds them: the bundled one first, then the
-// downloads with their real sizes (from models.rs).
+// downloads with their real sizes and measured memory (from models.rs).
 const MODELS = [
-  { name: "base", filename: "ggml-base.bin", url: "", sizeBytes: 147951465, description: "comes with the app; a good default for any language", alreadyDownloaded: true, localPath: BUNDLED, englishOnly: false, bundled: true },
-  { name: "tiny", filename: "ggml-tiny.bin", url: "x", sizeBytes: 77691713, description: "fastest, roughest", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
-  { name: "small", filename: "ggml-small.bin", url: "x", sizeBytes: 487601967, description: "more accurate than Base, about three times slower", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
-  { name: "large-v3-turbo", filename: "ggml-large-v3-turbo.bin", url: "x", sizeBytes: 1624555275, description: "best quality, slowest", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
-  { name: "tiny.en", filename: "ggml-tiny.en.bin", url: "x", sizeBytes: 77704715, description: "fastest, for English speech", alreadyDownloaded: true, localPath: TINY_EN, englishOnly: true, bundled: false },
-  { name: "base.en", filename: "ggml-base.en.bin", url: "x", sizeBytes: 147964211, description: "a little better than Base on English speech", alreadyDownloaded: false, localPath: null, englishOnly: true, bundled: false },
+  { name: "base", filename: "ggml-base.bin", url: "", sizeBytes: 147951465, memoryBytes: 377300000, description: "comes with the app; a good default for any language", alreadyDownloaded: true, localPath: BUNDLED, englishOnly: false, bundled: true },
+  { name: "tiny", filename: "ggml-tiny.bin", url: "x", sizeBytes: 77691713, memoryBytes: 269600000, description: "fastest, roughest", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
+  { name: "small", filename: "ggml-small.bin", url: "x", sizeBytes: 487601967, memoryBytes: 843400000, description: "more accurate than Base, about three times slower", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
+  { name: "large-v3-turbo", filename: "ggml-large-v3-turbo.bin", url: "x", sizeBytes: 1624555275, memoryBytes: 1969800000, description: "best quality, slowest", alreadyDownloaded: false, localPath: null, englishOnly: false, bundled: false },
+  { name: "tiny.en", filename: "ggml-tiny.en.bin", url: "x", sizeBytes: 77704715, memoryBytes: 267900000, description: "fastest, for English speech", alreadyDownloaded: true, localPath: TINY_EN, englishOnly: true, bundled: false },
+  { name: "base.en", filename: "ggml-base.en.bin", url: "x", sizeBytes: 147964211, memoryBytes: 376200000, description: "a little better than Base on English speech", alreadyDownloaded: false, localPath: null, englishOnly: true, bundled: false },
 ];
 
 const UNREADABLE = {
@@ -251,6 +251,9 @@ console.log("the model list");
   check("the one that came with the app is listed, and selected", rows[0].includes("base") && rows[0].includes("Included") && rows[0].includes("Selected"), rows[0]);
   check(".en models say English only", rows.filter((r) => /\.en/.test(r)).every((r) => r.includes("English only")));
   check("multilingual base and small are offered", rows.some((r) => r.startsWith("base") && r.includes("Multilingual")) && rows.some((r) => r.startsWith("small") && r.includes("Multilingual")));
+  check("every model says about how much memory it needs", rows.every((r) => /needs about \d+(\.\d)? [MG]B of memory/.test(r)), rows.join(" | "));
+  check("the memory figures are the measured ones", rows[0].includes("about 360 MB") && rows.some((r) => r.startsWith("small") && r.includes("about 800 MB")) && rows.some((r) => r.startsWith("large-v3-turbo") && r.includes("about 1.8 GB")), rows.join(" | "));
+  check("and only approximately -- never a promise", rows.every((r) => !/requires|guaranteed/i.test(r)));
   check("no English-only model is called the default", rows.filter((r) => r.includes("English only")).every((r) => !r.includes("default")));
   await shot(page, "model-list", ".model-download-list");
   await context.close();

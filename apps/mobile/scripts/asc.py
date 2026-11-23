@@ -14,6 +14,7 @@ profile that ties them together.
     ./scripts/asc.py ensure-app-id   # the bundle id, with In-App Purchase
     ./scripts/asc.py ensure-profile  # the App Store profile, installed
     ./scripts/asc.py setup           # all three, in order
+    ./scripts/asc.py ensure-mac-profile   # the Mac App Store profile, for apps/desktop
     ./scripts/asc.py ensure-iaps     # the consumables, worded and priced
     ./scripts/asc.py show-iaps       # what App Store Connect holds now
     ./scripts/asc.py upload-screenshots shots/*.png
@@ -256,6 +257,47 @@ def install_profile(profile: dict) -> None:
     print(f"  PROVISIONING_PROFILE_SPECIFIER={plist['Name']}")
 
 
+MAC_PROFILE_NAME = os.environ.get("MAC_PROFILE_NAME", f"{APP_NAME} Mac App Store")
+MAC_PROFILE_PATH = (Path(__file__).resolve().parents[2]
+                    / "desktop" / "src-tauri" / "appstore" / "embedded.provisionprofile")
+
+
+def ensure_mac_profile() -> None:
+    """The Mac App Store profile for the same App ID, written where
+    apps/desktop/scripts/build-appstore.sh looks for it (git-ignored).
+
+    One App ID serves the iPhone, iPad and Mac apps (it is UNIVERSAL), so the
+    Mac app joins the iOS app's record and its credit packs. The profile is
+    made after the App ID's capabilities: adding one later invalidates it."""
+    bundle_id = ensure_app_id()
+    certs = [c for c in call("GET", "/certificates?limit=200").get("data", [])
+             if c["attributes"]["certificateType"] == "DISTRIBUTION"]
+    if not certs:
+        die("no Apple Distribution certificate on the account — run ensure-cert first")
+    profile = None
+    for p in call("GET", f"/bundleIds/{bundle_id}/profiles?limit=200").get("data", []):
+        a = p["attributes"]
+        if a["name"] == MAC_PROFILE_NAME and a["profileType"] == "MAC_APP_STORE" and a["profileState"] == "ACTIVE":
+            profile = p
+            print(f"profile {MAC_PROFILE_NAME} exists")
+            break
+    if profile is None:
+        print(f"creating profile {MAC_PROFILE_NAME}")
+        profile = call("POST", "/profiles", {
+            "data": {"type": "profiles", "attributes": {
+                "name": MAC_PROFILE_NAME, "profileType": "MAC_APP_STORE",
+            }, "relationships": {
+                "bundleId": {"data": {"type": "bundleIds", "id": bundle_id}},
+                "certificates": {"data": [{"type": "certificates", "id": c["id"]} for c in certs]},
+            }},
+        })["data"]
+    content = base64.b64decode(profile["attributes"]["profileContent"])
+    plist = plistlib.loads(re.search(rb"<\?xml.*</plist>", content, re.S).group(0))
+    MAC_PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    MAC_PROFILE_PATH.write_bytes(content)
+    print(f"wrote {MAC_PROFILE_PATH.name} ({plist['Name']}, {plist['UUID']}, expires {plist['ExpirationDate']:%Y-%m-%d})")
+
+
 # --- what a purchase needs ------------------------------------------------------
 
 def app_record() -> str:
@@ -462,6 +504,7 @@ def main() -> None:
         "ensure-cert": ensure_cert,
         "ensure-app-id": lambda: print(f"app id record {ensure_app_id()}"),
         "ensure-profile": ensure_profile,
+        "ensure-mac-profile": ensure_mac_profile,
         "ensure-iaps": ensure_iaps,
         "upload-screenshots": lambda: upload_screenshots(sys.argv[2:]),
         "show-listing": show_listing,

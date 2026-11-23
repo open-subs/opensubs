@@ -60,7 +60,7 @@ ORIGIN = "https://opensubs.app"
 # The eight, and the path each page answers on. `en` lives at the root:
 # it is the canonical site, and moving it to /en/ would break every link
 # anyone has already saved.
-LOCALES = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"]
+LOCALES = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt", "ru"]
 
 # path, and the sitemap hints that used to live in public/sitemap.xml --
 # which this script now writes, because a hand-kept sitemap and thirty-two
@@ -88,7 +88,12 @@ PAGES = {
 # The footer row still offers all eight: a language with no copy of *this*
 # page links to that language's home, which exists, and the reader gets
 # where they were going.
-PAGE_LOCALES = {}
+# Russian (2026-11-12) has the home page only so far; the other three pages
+# keep their eight-language ring until their copy is translated.
+PAGE_LOCALES = {
+    page: [code for code in LOCALES if code != "ru"]
+    for page in ("burn-subtitles-into-video.html", "styles.html", "privacy.html")
+}
 
 
 def locales_for(page):
@@ -97,7 +102,7 @@ def locales_for(page):
 # og:locale wants a POSIX-ish tag, not BCP 47.
 OG_LOCALE = {
     "en": "en_US", "zh-Hans": "zh_CN", "zh-Hant": "zh_TW", "ja": "ja_JP",
-    "ko": "ko_KR", "de": "de_DE", "es": "es_ES", "pt": "pt_BR",
+    "ko": "ko_KR", "de": "de_DE", "es": "es_ES", "pt": "pt_BR", "ru": "ru_RU",
 }
 
 
@@ -143,7 +148,7 @@ IDENTICAL = {
     "<span>Paris, 1968</span>", "<span>\u5b57\u5e55\u306f\u81ea\u52d5\u3067\u4f5c\u308c\u307e\u3059</span>",
     # Names of things, and the one English word German, Spanish and
     # Portuguese all borrowed. Translating any of these would be wrong.
-    "GitHub", "X", "YouTube", "opensubs.app", "&copy; 2026 OpenSubs", "Blog",
+    "GitHub", "X", "YouTube", "Telegram", "opensubs.app", "&copy; 2026 OpenSubs", "Blog",
 }
 
 ASSET_HREF = re.compile(r"\.(png|ico|svg|txt|xml|json|wasm|webmanifest|jpg|webp)$")
@@ -381,7 +386,7 @@ def translate_page(raw, page, locale, catalogue, stats):
         m.group(1) + localise_link(m.group(2), locale) + m.group(3),
         S.splice(raw, edits),
     )
-    return offer_locale_only(out, locale)
+    return offer_locale_tasks(offer_locale_only(out, locale), page, locale)
 
 
 # Pages that exist in one language and not in English, so the English
@@ -391,12 +396,70 @@ def translate_page(raw, page, locale, catalogue, stats):
 # further in.
 LOCALE_ONLY = {
     "pt": [("/pt/blog/how-to-add-captions-to-a-video", "Guia"),
+           ("/pt/translate-subtitles", "Traduzir legenda"),
            ("/pt/transcribe-video", "Transcrever vídeo em texto")],
     # Each one goes in right after the burn link, so the last listed ends up
     # first: 影片轉文字, then 影片上字幕.
     "zh-Hant": [("/zh-Hant/add-subtitles-to-video", "影片上字幕"),
                 ("/zh-Hant/transcribe-video", "影片轉文字")],
+    "es": [("/es/auto-subtitles", "Subtítulos automáticos"),
+           ("/es/transcribe-video", "Transcribir video a texto"),
+           ("/es/add-subtitles-to-video", "Poner subtítulos a un video")],
+    # 2026-11-06
+    "ja": [("/ja/transcribe-video", "動画 文字起こし")],
 }
+
+
+# The same hand-written pages, offered from the body of their language's home
+# page as well (2026-10-31): first in the task grid, ahead of the cards that
+# keep pointing at the English pages (KEEP_ENGLISH). A footer link alone left
+# them with no ChatGPT visitors and no OpenAI crawl in their first days.
+LOCALE_TASKS = {
+    "es": [("/es/add-subtitles-to-video", "Poner subtítulos a un video",
+            "El generador de subtítulos los escribe a partir de la voz; corrige cualquier línea y luego incrústalos en un MP4 o guarda un .srt."),
+           ("/es/transcribe-video", "Transcribir video a texto",
+            "Whisper escribe lo que se dice en tu navegador; guarda un .txt solo con el texto, o un .srt con los tiempos."),
+           ("/es/auto-subtitles", "Subtítulos automáticos",
+            "Generados a partir de la voz e incrustados en un MP4 sin marca de agua, sin subir el video.")],
+    "pt": [("/pt/transcribe-video", "Transcrever vídeo em texto",
+            "O Whisper escreve a fala no seu navegador; salve um .txt só com o texto, ou um .srt com os tempos."),
+           ("/pt/translate-subtitles", "Traduzir legenda",
+            "Abra um .srt ou gere a legenda, escolha o idioma e os tempos não mudam.")],
+    # 2026-11-17
+    "zh-Hans": [("/zh-Hans/english-to-chinese-subtitles", "英文视频加中文字幕",
+                 "Whisper 写出英文字幕，再逐行翻成简体中文，时间轴不变；也能做中英双语字幕。")],
+    "zh-Hant": [("/zh-Hant/english-to-chinese-subtitles", "英文影片翻中文字幕",
+                 "Whisper 寫出英文字幕，再逐行翻成繁體中文，時間軸不變；也能做中英雙語字幕。"),
+                ("/zh-Hant/add-subtitles-to-video", "影片上字幕",
+                 "字幕產生器從語音寫出字幕；修正任何一行，再燒錄進 MP4 或存成 .srt。"),
+                ("/zh-Hant/transcribe-video", "影片轉文字",
+                 "Whisper 在瀏覽器裡寫下語音；存成只有文字的 .txt，或帶時間的 .srt。")],
+    "ru": [("/ru/transcribe-video", "Видео в текст",
+            "Whisper записывает речь прямо в браузере; сохраните .txt только с текстом или .srt с таймкодами.")],
+    "ja": [("/ja/transcribe-video", "動画 文字起こし",
+            "Whisper がブラウザーの中で話し言葉を書き起こします。文字だけの .txt か、時間付きの .srt で保存できます。")],
+}
+
+
+def offer_locale_tasks(out, page, locale):
+    """Put this language's own task pages at the start of the home page's task grid."""
+    extras = LOCALE_TASKS.get(locale, [])
+    if page != "index.html" or not extras:
+        return out
+    at = out.find('<section id="tasks">')
+    if at < 0:
+        return out
+    grid = '<div class="grid grid-4">\n'
+    found = out.find(grid, at)
+    if found < 0:
+        return out
+    cards = "".join(
+        f'      <div class="site-card">\n        <h3><a href="{href}">{title}</a></h3>\n        <p>{text}</p>\n      </div>\n'
+        for href, title, text in extras
+        if f'<h3><a href="{href}">' not in out[at:]
+    )
+    close = found + len(grid)
+    return out[:close] + cards + out[close:]
 
 
 def offer_locale_only(out, locale):
@@ -665,7 +728,7 @@ def main():
     overlong = []
     for page, path in sources.items():
         raw = io.open(path, encoding="utf-8").read()
-        for locale in LOCALES:
+        for locale in locales_for(page):
             catalogue = load_catalogue(locale)
             out = translate_page(raw, page, locale, catalogue, stats)
             if check_only:

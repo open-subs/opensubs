@@ -1,5 +1,5 @@
-import{a as i,b as r,d as o,e as a,f as n,g as d,l,m as s}from"./chunk-D7VGXHRZ.js";import{a as t}from"./chunk-LCQWCHVU.js";var e=class extends s{constructor(){super(...arguments);this.label="Sign out";this.signedIn=!1}connectedCallback(){super.connectedCallback(),this.refresh()}refresh(){this.signedIn=this.sdkOrNull?.isLoggedIn??!1}onSessionChange(){this.refresh()}async signOut(){await this.run(()=>this.sdk.auth.logout()),this.signedIn=!1,this.emit("openapps-logout",null),l()}render(){return this.signedIn?r`
-      <button ?disabled=${this.busy} @click=${this.signOut}>${this.label}</button>
+import{a as i,c as r,e as o,f as a,g as n,h as d,m as l,p as h,q as s}from"./chunk-HLRRPXU7.js";import{a as t}from"./chunk-LCQWCHVU.js";var e=class extends s{constructor(){super(...arguments);this.label="Sign out";this.signedIn=!1}connectedCallback(){super.connectedCallback(),this.refresh()}refresh(){this.signedIn=this.sdkOrNull?.isLoggedIn??!1}onSessionChange(){this.refresh()}async signOut(){await this.run(()=>this.sdk.auth.logout()),this.signedIn=!1,this.emit("openapps-logout",null),l()}render(){return this.signedIn?r`
+      <button ?disabled=${this.busy} @click=${this.signOut}>${h(this.label)}</button>
       ${this.error?r`<p class="error" role="alert">${this.error}</p>`:o}
     `:o}};e.styles=[s.baseStyles,i`
       /* Full width and quiet. Nobody opens an account screen in order to

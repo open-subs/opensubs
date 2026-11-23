@@ -1,76 +1,102 @@
-import{a as v,b as r,d as l,e as k,f as h,g as p,l as y,m as g}from"./chunk-D7VGXHRZ.js";import{a as c,b as u,c as f,d as b}from"./chunk-LCQWCHVU.js";var d,n=class extends g{constructor(){super(...arguments);this.rails="";this.returnTo="";this.packages=null;this.selected=null;this.instruction=null;this.topup=null;this.waiting=!1;f(this,d)}connectedCallback(){super.connectedCallback(),this.load()}disconnectedCallback(){u(this,d)?.abort(),super.disconnectedCallback()}onSessionChange(){if(!this.packages){this.load();return}this.requestUpdate()}async load(){if(!this.sdkOrNull)return;let e=await this.run(()=>this.sdk.payments.packages());e&&(this.packages=e)}get offeredRails(){if(!this.packages)return[];let e=["stripe","ethereum","lightning"].filter(a=>this.packages?.rails?.[a]),t=this.rails.split(",").map(a=>a.trim()).filter(Boolean);return t.length?e.filter(a=>t.includes(a)):e}async start(e){let t=this.selected;t&&await this.run(async()=>{let a;switch(e){case"stripe":{let s=await this.sdk.payments.stripeCheckout(t.id,{returnTo:this.returnTo==="none"?null:this.returnTo||void 0});this.instruction={kind:"redirect"},!this.dispatchEvent(new CustomEvent("openapps-checkout",{detail:{url:s.checkout_url,packageId:t.id},cancelable:!0,bubbles:!0,composed:!0}))||(window.location.href=s.checkout_url);return}case"ethereum":{let s=await this.sdk.payments.ethDepositAddress(t.id);a=s.topup_id,this.instruction={kind:"address",chain:s.chain,address:s.address,amount:s.expected_amount};break}case"lightning":{let s=await this.sdk.payments.lightningInvoice(t.id);a=s.topup_id,this.instruction={kind:"invoice",bolt11:s.bolt11,amountMsat:s.amount_msat};break}}this.watch(a,x[e])})}async watch(e,t){u(this,d)?.abort();let a=new AbortController;b(this,d,a),this.waiting=!0;try{let s=await this.sdk.payments.waitFor(e,{timeoutMs:t,signal:a.signal,onPoll:m=>{this.topup=m}});this.topup=s,s.status==="confirmed"&&(this.emit("openapps-topup",s),y())}catch(s){s instanceof Error&&s.name==="AbortError"||(this.error=M(s))}finally{this.waiting=!1}}reset(){u(this,d)?.abort(),this.selected=null,this.instruction=null,this.topup=null,this.error=null}render(){return this.sdkOrNull?this.sdk.isLoggedIn?this.packages?this.instruction?this.renderInstruction(this.instruction):this.selected?this.renderRails(this.selected):this.renderPackages(this.packages.packages??[]):r`<p class="muted">${this.error??"Loading packages\u2026"}</p>`:r`<p class="muted">Sign in to buy credits.</p>`:r`<p class="muted">Loading…</p>`}renderPackages(e){return e.length===0?r`<p class="muted">No credit packages are configured.</p>`:r`
+import{a as $,c as s,e as c,f as y,g as f,h,m as w,o as m,p as e,q as b}from"./chunk-HLRRPXU7.js";import{a as p,b as g,c as k,d as v}from"./chunk-LCQWCHVU.js";var P="USD\u20AE0 is issued by Tether, which can freeze any address holding it.",u,d=class extends b{constructor(){super(...arguments);this.rails="";this.returnTo="";this.packages=null;this.selected=null;this.instruction=null;this.topup=null;this.waiting=!1;k(this,u)}connectedCallback(){super.connectedCallback(),this.load()}disconnectedCallback(){g(this,u)?.abort(),super.disconnectedCallback()}onSessionChange(){if(!this.packages){this.load();return}this.requestUpdate()}async load(){if(!this.sdkOrNull)return;let t=await this.run(()=>this.sdk.payments.packages());t&&(this.packages=t)}get offeredRails(){if(!this.packages)return[];let t=["stripe","ethereum","lightning","usdt0"].filter(i=>this.packages?.rails?.[i]===!0).filter(i=>i!=="usdt0"||this.usdt0Networks.length>0),r=this.rails.split(",").map(i=>i.trim()).filter(Boolean);return r.length?t.filter(i=>r.includes(i)):t}get usdt0Networks(){let t=this.packages?.usdt0?.networks;return Array.isArray(t)?t:[]}get usdt0Notice(){return this.packages?.usdt0?.notice||P}async start(t,r){let i=this.selected;i&&await this.run(async()=>{let o;switch(t){case"stripe":{let a=await this.sdk.payments.stripeCheckout(i.id,{returnTo:this.returnTo==="none"?null:this.returnTo||void 0});this.instruction={kind:"redirect"},!this.dispatchEvent(new CustomEvent("openapps-checkout",{detail:{url:a.checkout_url,packageId:i.id},cancelable:!0,bubbles:!0,composed:!0}))||(window.location.href=a.checkout_url);return}case"ethereum":{let a=await this.sdk.payments.ethDepositAddress(i.id);o=a.topup_id,this.instruction={kind:"address",chain:a.chain,address:a.address,amount:a.expected_amount};break}case"usdt0":{if(!r)return;let a=await this.sdk.payments.usdt0DepositAddress(i.id,r.id);o=a.topup_id,this.instruction={kind:"address",chain:a.chain,address:a.address,amount:a.expected_amount,usdt0:{token:a.token?.symbol||"USD\u20AE0",networkName:a.network_name||r.name,notice:a.notice||this.usdt0Notice}};break}case"lightning":{let a=await this.sdk.payments.lightningInvoice(i.id);o=a.topup_id,this.instruction={kind:"invoice",bolt11:a.bolt11,amountMsat:a.amount_msat};break}}this.watch(o,S[t])})}async watch(t,r){g(this,u)?.abort();let i=new AbortController;v(this,u,i),this.waiting=!0;try{let o=await this.sdk.payments.waitFor(t,{timeoutMs:r,signal:i.signal,onPoll:a=>{this.topup=a}});this.topup=o,o.status==="confirmed"&&(this.emit("openapps-topup",o),w())}catch(o){o instanceof Error&&o.name==="AbortError"||(this.error=U(o))}finally{this.waiting=!1}}reset(){g(this,u)?.abort(),this.selected=null,this.instruction=null,this.topup=null,this.error=null}render(){return this.sdkOrNull?this.sdk.isLoggedIn?this.packages?this.instruction?this.renderInstruction(this.instruction):this.selected?this.renderRails(this.selected):this.renderPackages(this.packages.packages??[]):s`<p class="muted">${this.error??e("Loading packages\u2026")}</p>`:s`<p class="muted">${e("Sign in to buy credits.")}</p>`:s`<p class="muted">${e("Loading\u2026")}</p>`}renderPackages(t){return t.length===0?s`<p class="muted">${e("No credit packages are configured.")}</p>`:s`
       <div class="grid">
-        ${e.map(t=>r`
-            <button class="package" @click=${()=>this.selected=t}>
+        ${t.map(r=>s`
+            <button class="package" @click=${()=>this.selected=r}>
               <span class="credits">
-                ${t.credits.toLocaleString()} credits
+                ${e("{n} credits",{n:r.credits})}
               </span>
-              <span class="perunit caption">${P(t)}</span>
-              <span class="price">${w(t.usd_price)}</span>
+              <span class="perunit caption">${R(r)}</span>
+              <span class="price">${T(r.usd_price)}</span>
             </button>
           `)}
       </div>
-      ${this.error?r`<p class="error" role="alert">${this.error}</p>`:l}
-    `}renderRails(e){let t=this.offeredRails;return r`
+      ${this.error?s`<p class="error" role="alert">${this.error}</p>`:c}
+    `}renderRails(t){let r=this.offeredRails;return s`
       <p>
-        <strong>${e.credits.toLocaleString()} credits</strong> —
-        ${w(e.usd_price)}
+        <strong>${e("{n} credits",{n:t.credits})}</strong> —
+        ${T(t.usd_price)}
       </p>
       <div class="stack">
-        ${t.map(a=>r`
-            <button class="primary" ?disabled=${this.busy} @click=${()=>this.start(a)}>
-              ${$[a]}
+        ${r.map(i=>i==="usdt0"?this.renderUsdt0Options():s`
+                <button class="primary" ?disabled=${this.busy} @click=${()=>this.start(i)}>
+                  ${e(x[i])}
+                </button>
+              `)}
+        ${r.length===0?s`<p class="muted">${e("No payment methods are enabled.")}</p>`:c}
+        <button @click=${this.reset}>${e("Back")}</button>
+      </div>
+      ${this.error?s`<p class="error" role="alert">${this.error}</p>`:c}
+    `}renderUsdt0Options(){return s`
+      <div class="usdt0" role="group" aria-label="Pay with USD₮">
+        ${this.usdt0Networks.map(t=>s`
+            <button
+              class="primary"
+              ?disabled=${this.busy}
+              @click=${()=>this.start("usdt0",t)}
+            >
+              ${x.usdt0} on ${t.name}
             </button>
           `)}
-        ${t.length===0?r`<p class="muted">No payment methods are enabled.</p>`:l}
-        <button @click=${this.reset}>Back</button>
+        <p class="caption freezable">
+          <strong>Issuer-freezable.</strong> ${this.usdt0Notice}
+        </p>
       </div>
-      ${this.error?r`<p class="error" role="alert">${this.error}</p>`:l}
-    `}renderInstruction(e){let t=this.topup?.status??"pending";return t==="confirmed"?r`
-        <span class="badge success"><span class="dot"></span>Confirmed</span>
-        <p class="ok">Payment confirmed — credits added.</p>
-        <button @click=${this.reset}>Buy more</button>
-      `:t==="failed"||t==="expired"?r`
-        <span class="badge danger"><span class="dot"></span>${t==="failed"?"Failed":"Expired"}</span>
-        <p class="error" role="alert">This top-up ${t}. Nothing was charged.</p>
-        <button @click=${this.reset}>Try again</button>
-      `:r`
-      ${e.kind==="redirect"?r`<p class="muted">Redirecting to checkout…</p>`:l}
-      ${e.kind==="address"?r`
-            <p>Send exactly <strong>${S(e.amount,6)}</strong> USDC or
-            USDT on <strong class="network">${R(e.chain)}</strong>
-            (<code>${e.chain}</code>) to:</p>
-            <code class="payload">${e.address}</code>
-            <p class="caption">On any other network it is not credited.</p>
-          `:l}
-      ${e.kind==="invoice"?r`
-            <p>Pay this Lightning invoice
-            (<strong>${Math.ceil(e.amountMsat/1e3).toLocaleString()} sats</strong>):</p>
-            <code class="payload">${e.bolt11}</code>
-          `:l}
-      ${e.kind!=="redirect"?r`
+    `}renderInstruction(t){let r=this.topup?.status??"pending";return r==="confirmed"?s`
+        <span class="badge success"><span class="dot"></span>${e("Confirmed")}</span>
+        <p class="ok">${e("Payment confirmed \u2014 credits added.")}</p>
+        <button @click=${this.reset}>${e("Buy more")}</button>
+      `:r==="failed"||r==="expired"?s`
+        <span class="badge danger"><span class="dot"></span>${r==="failed"?e("Failed"):e("Expired")}</span>
+        <p class="error" role="alert">${r==="failed"?e("This top-up failed. Nothing was charged."):e("This top-up expired. Nothing was charged.")}</p>
+        <button @click=${this.reset}>${e("Try again")}</button>
+      `:s`
+      ${t.kind==="redirect"?s`<p class="muted">${e("Redirecting to checkout\u2026")}</p>`:c}
+      ${t.kind==="address"&&t.usdt0?s`
+            <p>Send exactly <strong>${C(t.amount,6)}</strong>
+            ${t.usdt0.token} on <strong>${t.usdt0.networkName}</strong>
+            to:</p>
+            <code class="payload">${t.address}</code>
+            <p class="caption">
+              Only ${t.usdt0.token} on ${t.usdt0.networkName} is credited
+              to this address; other tokens or networks are not.
+            </p>
+            <p class="caption freezable">
+              <strong>Issuer-freezable.</strong> ${t.usdt0.notice}
+            </p>
+          `:c}
+      ${t.kind==="address"&&!t.usdt0?s`
+            <p>${e("Send exactly")} <strong>${C(t.amount,6)}</strong> ${e("USDC or USDT on")}
+            <code>${t.chain}</code> ${e("to:")}</p>
+            <code class="payload">${t.address}</code>
+          `:c}
+      ${t.kind==="invoice"?s`
+            <p>${e("Pay this Lightning invoice")}
+            (<strong>${e("{n} sats",{n:Math.ceil(t.amountMsat/1e3)})}</strong>):</p>
+            <code class="payload">${t.bolt11}</code>
+          `:c}
+      ${t.kind!=="redirect"?s`
             <div class="row">
-              <button @click=${()=>this.copy(C(e))}>Copy</button>
-              <button @click=${this.reset}>Cancel</button>
+              <button @click=${()=>this.copy(N(t))}>${e("Copy")}</button>
+              <button @click=${this.reset}>${e("Cancel")}</button>
             </div>
             ${this.renderWaiting()}
-          `:l}
-      ${this.error?r`<p class="error" role="alert">${this.error}</p>`:l}
-    `}renderWaiting(){if(!this.waiting)return r`<p class="muted" aria-live="polite">Not watching for payment.</p>`;let e=this.topup?.confirmations;if(e===void 0)return r`<p class="muted" aria-live="polite">Waiting for payment…</p>`;let t=this.topup?.confirmations_required;if(t==null)return r`
+          `:c}
+      ${this.error?s`<p class="error" role="alert">${this.error}</p>`:c}
+    `}renderWaiting(){if(!this.waiting)return s`<p class="muted" aria-live="polite">${e("Not watching for payment.")}</p>`;let t=this.topup?.confirmations;if(t===void 0)return s`<p class="muted" aria-live="polite">${e("Waiting for payment\u2026")}</p>`;let r=this.topup?.confirmations_required;if(r==null)return s`
         <p class="muted" aria-live="polite">
-          Payment received — waiting for the network to finalise it.
+          ${e("Payment received \u2014 waiting for the network to finalise it.")}
         </p>
-      `;let a=Math.min(e,t);return r`
+      `;let i=Math.min(t,r);return s`
       <p class="muted" aria-live="polite">
-        Payment received — confirming (${a} of ${t}).
+        ${e("Payment received \u2014 confirming ({done} of {required}).",{done:String(i),required:String(r)})}
       </p>
       <progress
         class="confirms"
-        max=${t}
-        value=${a}
-        aria-label="Confirmations"
+        max=${r}
+        value=${i}
+        aria-label=${e("Confirmations")}
       ></progress>
-    `}async copy(e){try{await navigator.clipboard.writeText(e)}catch{this.error="Could not copy \u2014 select the text and copy it manually."}}};d=new WeakMap,n.styles=[g.baseStyles,v`
+    `}async copy(t){try{await navigator.clipboard.writeText(t)}catch{this.error=e("Could not copy \u2014 select the text and copy it manually.")}}};u=new WeakMap,d.styles=[b.baseStyles,$`
       /* Packs stack as rows rather than tiles: the numbers line up down the
          right edge, which is what makes three prices comparable at a glance. */
       .grid {
@@ -121,6 +147,15 @@ import{a as v,b as r,d as l,e as k,f as h,g as p,l as y,m as g}from"./chunk-D7VG
       .ok {
         font-weight: 600;
       }
+      .usdt0 {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+      }
+      .freezable {
+        margin: 0;
+        color: var(--text-muted, var(--fb-muted));
+      }
       .confirms {
         display: block;
         width: 100%;
@@ -139,5 +174,5 @@ import{a as v,b as r,d as l,e as k,f as h,g as p,l as y,m as g}from"./chunk-D7VG
       .confirms::-webkit-progress-value {
         background: var(--brand, var(--fb-brand));
       }
-    `],c([h({type:String})],n.prototype,"rails",2),c([h({type:String,attribute:"return-to"})],n.prototype,"returnTo",2),c([p()],n.prototype,"packages",2),c([p()],n.prototype,"selected",2),c([p()],n.prototype,"instruction",2),c([p()],n.prototype,"topup",2),c([p()],n.prototype,"waiting",2),n=c([k("openapps-buy")],n);var $={stripe:"Pay by card",ethereum:"Pay with USDC / USDT",lightning:"Pay with Lightning"},x={stripe:void 0,lightning:void 0,ethereum:1800*1e3};function C(i){return i.kind==="address"?i.address:i.kind==="invoice"?i.bolt11:""}function w(i){return`$${(i/100).toFixed(2)}`}function P(i){if(i.credits<=0)return"";let o=i.usd_price/i.credits;return`${o<1?o.toFixed(2):o.toFixed(1)}\xA2 each`}var T={"eip155:1":"Ethereum Mainnet","eip155:10":"OP Mainnet","eip155:56":"BNB Smart Chain","eip155:137":"Polygon PoS","eip155:8453":"Base","eip155:42161":"Arbitrum One","eip155:11155111":"Sepolia testnet"};function R(i){return T[i.trim().toLowerCase()]??i}function S(i,o){let e=10**o;return(i/e).toFixed(o).replace(/\.?0+$/,"")}function M(i){let o=i instanceof Error?i.message:String(i);return o.includes("still pending")?"Still waiting on the network. Your credits will appear once the payment settles.":o}export{n as OpenAppsBuy,S as formatUnits,w as formatUsd,R as networkName,P as perCreditCost};
+    `],p([f({type:String})],d.prototype,"rails",2),p([f({type:String,attribute:"return-to"})],d.prototype,"returnTo",2),p([h()],d.prototype,"packages",2),p([h()],d.prototype,"selected",2),p([h()],d.prototype,"instruction",2),p([h()],d.prototype,"topup",2),p([h()],d.prototype,"waiting",2),d=p([y("openapps-buy")],d);var x={stripe:"Pay by card",ethereum:"Pay with USDC / USDT",lightning:"Pay with Lightning",usdt0:"Pay with USD\u20AE"},S={stripe:void 0,lightning:void 0,ethereum:1800*1e3,usdt0:2400*1e3};function N(n){return n.kind==="address"?n.address:n.kind==="invoice"?n.bolt11:""}function T(n){return m(n/100,{style:"currency",currency:"USD"})}function R(n){if(n.credits<=0)return"";let l=n.usd_price/n.credits,t=l<1?2:1;return e("{cents}\xA2 each",{cents:m(l,{minimumFractionDigits:t,maximumFractionDigits:t})})}function C(n,l){return m(n/10**l,{maximumFractionDigits:l,useGrouping:!1})}function U(n){let l=n instanceof Error?n.message:String(n);return l.includes("still pending")?e("Still waiting on the network. Your credits will appear once the payment settles."):l}export{d as OpenAppsBuy,C as formatUnits,T as formatUsd,R as perCreditCost};
 //# sourceMappingURL=openapps-buy.js.map

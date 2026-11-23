@@ -21,7 +21,7 @@ export class OpenAppsError extends Error {
     }
     /** True when re-authenticating could plausibly fix this. */
     get isAuthError() {
-        return this.code === "unauthorized";
+        return this.code === "unauthorized" || this.code === "reauth_required";
     }
 }
 const STATUS_CODES = {

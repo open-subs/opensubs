@@ -187,6 +187,13 @@ try {
     ok("nothing pushes the panel sideways", !first.sideways);
     ok("no setting is counted as changed", first.changed === "", first.changed);
     for (const b of first.buttons) ok(`button "${b.text}" sits on one line`, b.lines <= 1, `${b.lines} lines`);
+    // Each model gives its download and, in this language, about how much
+    // memory it takes (the measured figures in ../web/src/lib/asr.ts).
+    const models = await first.page.evaluate(() =>
+      [...document.querySelectorAll("#model option")].filter((o) => o.value !== "auto").map((o) => o.textContent));
+    const [before, after] = say("needs about {memory} of memory", { memory: "\u0000" }).split("\u0000");
+    ok("every model says, in this language, about how much memory it needs",
+      models.length === 3 && models.every((m) => m.includes(before) && m.includes(after) && /\d(\.\d)? GB/.test(m)), models.join(" | "));
     await shoot(first.page, "1-first-open");
     const natural = first.content;
     await first.page.close();

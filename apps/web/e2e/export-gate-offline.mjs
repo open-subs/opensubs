@@ -14,6 +14,8 @@
 //     under it; Not now sends signin-dismissed
 //   - offline, signed out: the sheet opens with the offline sentence and the
 //     burn does not start; the subtitles stay
+//   - a switch that answers slowly (6 s) is not offline: the sheet opens
+//     without the offline sentence
 //   - signed in (which confirms the session): offline, the burn starts;
 //     confirmed 31 days ago, "connect once" and nothing starts, no sheet
 //   - kept subtitles offered back to a signed-out visitor: pending-restored;
@@ -47,11 +49,13 @@ const TYPES = {
 };
 
 let offline = false;
+let slowSwitch = 0;
 const server = createServer(async (req, res) => {
   if (offline) return req.socket.destroy();
   const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
   if (path === "/__opensubs-gate-offline") return res.writeHead(200).end("opensubs-gate-offline");
   if (path === "/export-gate.json") {
+    if (slowSwitch) await new Promise((r) => setTimeout(r, slowSwitch));
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end('{"exportGate": true, "funnelEvents": true}');
   }
@@ -202,6 +206,23 @@ await section("offline, signed out: the sheet says why, and nothing burns", asyn
   await context.close();
 });
 
+await section("a slow switch is not offline", async () => {
+  const context = await newContext();
+  const page = await openSample(context);
+  slowSwitch = 6000;
+  try {
+    await page.getByRole("button", { name: GATED }).click();
+    await page.locator(SHEET).waitFor({ timeout: 20000 });
+    check(await page.locator(SHEET).isVisible(), "signed out, the sheet opens");
+    await page.waitForTimeout(800);
+    check(!(await page.locator("[data-export-gate-offline]").isVisible()), "and does not say the visitor is offline");
+    check(!(await startedNow(page, 1000)), "the burn does not start");
+  } finally {
+    slowSwitch = 0;
+  }
+  await context.close();
+});
+
 await section("signed in: offline burns; confirmed 31 days ago asks to connect once", async () => {
   const context = await newContext();
   let page = await openSample(context);
@@ -219,7 +240,7 @@ await section("signed in: offline burns; confirmed 31 days ago asks to connect o
   // The sample streams from this server by URL; a visitor's video is a
   // file on their device. Hand the same clip over as a file before the
   // connection goes, so the burn reads nothing from the network.
-  await page.locator('input[type=file][accept="video/*"]').first().setInputFiles(SAMPLE);
+  await page.locator('input[type=file][accept^="video/*"]').first().setInputFiles(SAMPLE);
   await exportTab(page);
   await page.getByRole("button", { name: PLAIN }).waitFor({ timeout: 60000 });
   await page.waitForTimeout(1000);

@@ -1,5 +1,5 @@
 /**
- * The sign-in box's words, in the suite's eight languages.
+ * The sign-in box's words, in the suite's languages: the eight, and Russian.
  *
  * The English text is the key (gettext's convention): a missing entry falls
  * back to English rather than to an identifier on a button. The language
@@ -8,7 +8,7 @@
  * its own interface, and a sign-in box in a different language from the
  * page around it reads as someone else's form.
  */
-export const LOCALES = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"];
+export const LOCALES = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt", "ru"];
 /** exact tag → Chinese script → base language → English. */
 export function pickLocale(tag) {
     if (!tag)
@@ -40,7 +40,7 @@ export function localeFor(host) {
 }
 /**
  * Each language is its own chunk, fetched only by a page in that language:
- * eight catalogues inline would cost every English page ~8 KB gzipped for
+ * every catalogue inline would cost every English page ~8 KB gzipped for
  * strings it never shows. Until a catalogue arrives the box reads in
  * English, which is the same fallback a missing entry gets.
  */
@@ -52,6 +52,7 @@ const LOADERS = {
     de: () => import("./locales/de.js"),
     es: () => import("./locales/es.js"),
     pt: () => import("./locales/pt.js"),
+    ru: () => import("./locales/ru.js"),
 };
 const loaded = new Map();
 const loading = new Map();

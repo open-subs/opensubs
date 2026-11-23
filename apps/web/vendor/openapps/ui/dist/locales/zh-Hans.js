@@ -7,6 +7,7 @@ const catalogue = {
     "Continue with a wallet": "使用钱包继续",
     "Continue with {name}": "使用 {name} 继续",
     "Continue with Nostr": "使用 Nostr 继续",
+    "Coming soon": "即将推出",
     "No extension? Use a remote signer": "没有扩展？使用远程签名器",
     "Email address": "邮箱地址",
     "Send code": "发送验证码",
@@ -31,7 +32,13 @@ const catalogue = {
     "Email sign-in is not available here.": "此处暂不支持邮箱登录。",
     "Could not reach the server. Check your connection and try again.": "无法连接服务器，请检查网络后重试。",
     "Sign out": "退出登录",
-    "This server has no login methods configured.": "此服务器未配置任何登录方式。"
+    "This server has no login methods configured.": "此服务器未配置任何登录方式。",
+    // OnWallet: the button reads these words, then the wordmark.
+    "Sign in with": "使用",
+    "Continue in OnWallet…": "请在 OnWallet 中继续…",
+    "Approve in your OnWallet browser extension": "请在 OnWallet 浏览器扩展中批准",
+    "Sign-in was declined in OnWallet.": "已在 OnWallet 中拒绝登录。",
+    "The OnWallet request timed out. Try again.": "OnWallet 请求已超时，请重试。"
 };
 export default catalogue;
 //# sourceMappingURL=zh-Hans.js.map

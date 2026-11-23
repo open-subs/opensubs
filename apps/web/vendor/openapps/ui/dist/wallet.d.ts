@@ -137,6 +137,28 @@ export declare function signSiwe(message: string, address: string, chosen?: Eip1
  * the server rejects events outside its skew window.
  */
 export declare function signNostr(templateJson: string): Promise<Proof>;
+/** A Nostr public key in both of the forms it is written in. */
+export interface NostrKey {
+    /** 64 lowercase hex characters, as NIP-07 answers and events carry it. */
+    hex: string;
+    /** The same key as people see it, `npub1…`. */
+    npub: string;
+}
+/**
+ * Ask the page's Nostr signer which key it would sign with, without asking
+ * it to sign anything.
+ *
+ * This is what lets an account page show "this key will sign" before a
+ * link. With two Nostr extensions installed, whichever injected first owns
+ * `window.nostr`, and OnWallet's provider steps aside for one that got
+ * there earlier — so the key that answers is not always the one the person
+ * has in mind, and a link made blind attaches the wrong key for good.
+ *
+ * The bech32 encoder is loaded on demand, like the rest of `nostr-tools`.
+ */
+export declare function nostrPublicKey(): Promise<NostrKey>;
+/** The public key a signed Nostr proof was made with, or null. */
+export declare function proofPublicKey(proof: Proof): string | null;
 /**
  * Sign with a remote signer over NIP-46 ("Nostr Connect", "bunker").
  *

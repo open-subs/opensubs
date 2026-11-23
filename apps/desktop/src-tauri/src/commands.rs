@@ -338,7 +338,7 @@ fn work_dir_for(output: &Path) -> PathBuf {
 /// Two places count as shipped, because the two platforms put bundled files
 /// in different places: beside the executable on Windows, and in the app's
 /// `Contents/Resources` on macOS (the executable is in `Contents/MacOS`).
-fn resolve_ffmpeg() -> PathBuf {
+#[cfg(not(feature = "appstore"))] fn resolve_ffmpeg() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(Path::to_path_buf))
@@ -414,7 +414,7 @@ pub fn build_job_spec(
         style,
         fonts_dir: work_dir.clone(),
         work_dir,
-        encoder: VideoEncoder::X264,
+        encoder: BURN_ENCODER,
         crf: 16,
         preset: "slow".to_string(),
         tonemap: true,
@@ -963,7 +963,7 @@ pub fn check_ffmpeg() -> FfmpegCheck {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "appstore", allow(dead_code))] #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FfmpegInstallOutputPayload {
     line: String,
@@ -976,7 +976,7 @@ struct FfmpegInstallOutputPayload {
 /// frontend re-runs `check_ffmpeg` after this resolves to learn whether it
 /// actually fixed things -- this command only reports whether the install
 /// itself succeeded, not whether libass ended up present.
-#[tauri::command]
+#[cfg_attr(feature = "appstore", allow(dead_code))] #[tauri::command]
 pub async fn install_ffmpeg(app: AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         subs_pipeline::install_ffmpeg_full(|line| {
@@ -1179,7 +1179,7 @@ pub async fn burn(
 
 /// Show the finished file in the system's file manager: selected in Finder
 /// and Explorer, its folder opened on Linux.
-#[tauri::command]
+#[cfg(not(feature = "appstore"))] #[tauri::command]
 pub fn reveal(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -1398,7 +1398,7 @@ mod tests {
             PathBuf::from("/tmp/work"),
             &BurnOptions::default(),
         );
-        assert_eq!(spec.encoder, VideoEncoder::X264);
+        assert_eq!(spec.encoder, BURN_ENCODER);
         assert_eq!(spec.crf, 16);
         assert_eq!(spec.preset, "slow");
         assert!(spec.tonemap);
@@ -1814,4 +1814,83 @@ mod tests {
         assert!(without_whisper(missing).is_empty());
     }
 
+}
+
+/// The encoder every burn uses: x264, the best quality per bitrate, in the
+/// direct-download build. The Mac App Store build's ffmpeg is LGPL and so
+/// has no x264 (GPL); it encodes with the system's VideoToolbox instead.
+#[cfg(not(feature = "appstore"))]
+const BURN_ENCODER: VideoEncoder = VideoEncoder::X264;
+#[cfg(feature = "appstore")]
+const BURN_ENCODER: VideoEncoder = VideoEncoder::VideoToolbox;
+
+/// The Mac App Store build's ffmpeg: the LGPL one inside the app, and never
+/// one found on `PATH`. A sandboxed app may run only what it carries.
+#[cfg(feature = "appstore")]
+fn resolve_ffmpeg() -> PathBuf {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .unwrap_or_default();
+    exe_dir.join("../Resources/vendor/ffmpeg")
+}
+
+/// The commands the Mac App Store build answers differently. See
+/// `crate::store` for why each one differs.
+#[cfg(feature = "appstore")]
+pub mod store_cmds {
+    use super::*;
+
+    /// As [`super::check_ffmpeg`], with no install offered: the store build
+    /// carries its ffmpeg and may not install another. Its own name, because
+    /// a Tauri command's name is crate-wide; the store page asks for it
+    /// (src/store/api.ts).
+    #[tauri::command]
+    pub fn store_check_ffmpeg() -> FfmpegCheck {
+        FfmpegCheck { install: None, ..super::check_ffmpeg() }
+    }
+
+    /// Show the finished file in Finder, through `NSWorkspace`: a sandboxed
+    /// app does not start `open`.
+    #[tauri::command]
+    pub fn reveal(path: String) -> Result<(), String> {
+        tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|e| format!("failed to show {path}: {e}"))
+    }
+
+    /// Where an export of `input` goes in `dir`, the folder the person just
+    /// picked: the first `<stem>.subbed.mp4`, `(1)`, ... nothing is using,
+    /// exactly as beside the video in the other build.
+    #[tauri::command]
+    pub fn output_in(input: String, dir: String) -> Result<String, String> {
+        let name = Path::new(&input)
+            .file_name()
+            .ok_or_else(|| format!("{input} has no file name"))?;
+        let dir = Path::new(&dir);
+        if !dir.is_dir() {
+            return Err(format!("{} is not a folder", dir.display()));
+        }
+        Ok(unique_output(&dir.join(name), |p| p.exists()).to_string_lossy().into_owned())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn an_export_goes_into_the_folder_picked_under_a_free_name() {
+            let dir = tempfile::tempdir().unwrap();
+            let picked = dir.path().to_string_lossy().into_owned();
+            let first = output_in("/elsewhere/clip.mov".into(), picked.clone()).unwrap();
+            assert_eq!(Path::new(&first), dir.path().join("clip.subbed.mp4"));
+            std::fs::write(&first, b"x").unwrap();
+            let second = output_in("/elsewhere/clip.mov".into(), picked).unwrap();
+            assert_eq!(Path::new(&second), dir.path().join("clip.subbed (1).mp4"));
+        }
+
+        #[test]
+        fn the_store_build_burns_with_videotoolbox_and_offers_no_install() {
+            assert_eq!(BURN_ENCODER, VideoEncoder::VideoToolbox);
+            assert!(store_check_ffmpeg().install.is_none());
+        }
+    }
 }

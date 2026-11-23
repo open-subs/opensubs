@@ -12,6 +12,7 @@
 // the charging live in `account.ts`, against the real backend.
 
 import { quoteTranslation, quoteTranscription, creditPricing } from "../wasm-gen/subs_engine";
+import { getLocale } from "./i18n/index.svelte";
 
 export interface Quote {
   /** The only figure the interface should ever show. */
@@ -86,13 +87,31 @@ export function creditWord(credits: number): string {
 }
 
 /**
- * A dollar figure at a resolution worth reading.
+ * A dollar figure at a resolution worth reading, written the way the app's
+ * language writes it: "$0.004" in English, "0,004 $" in Russian and German.
  *
  * Sub-cent amounts get three decimals rather than rounding to `$0.00`,
  * which reads as free and is the one thing a price must never do.
  */
 export function usd(value: number): string {
-  if (value === 0) return "$0";
-  if (value < 0.01) return `$${value.toFixed(3)}`;
-  return `$${value.toFixed(2)}`;
+  const digits = value === 0 ? 0 : value < 0.01 ? 3 : 2;
+  return currency(digits).format(value);
+}
+
+const currencyFormats = new Map<string, Intl.NumberFormat>();
+
+function currency(digits: number): Intl.NumberFormat {
+  const tag = getLocale();
+  const key = `${tag}|${digits}`;
+  let format = currencyFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(tag, {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    currencyFormats.set(key, format);
+  }
+  return format;
 }

@@ -138,7 +138,8 @@ jobs:
       - name: The models and ffmpeg came along
         run: |
           foreach ($f in 'opensubs-desktop.exe', 'models\ggml-base.bin', 'models\m2m100\model.bin',
-                         'vendor\ffmpeg.exe', 'vendor\ffprobe.exe') {
+                         'vendor\ffmpeg.exe', 'vendor\ffprobe.exe',
+                         'licences\NOTICE', 'licences\LICENSE', 'licences\GPL-3.0.txt', 'licences\ffmpeg-build.txt') {
             if (-not (Test-Path "pkg\$f")) { throw "missing from the package: $f" }
           }
 

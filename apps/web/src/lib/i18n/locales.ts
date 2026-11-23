@@ -1,7 +1,8 @@
 /**
  * The languages OpenSubs ships in.
  *
- * The same eight as the rest of the suite.
+ * The suite's eight, plus Russian (opensubs.app/ru has more
+ * visitors than the German, Japanese or Korean pages).
  * Deliberately a short list: every locale here is a permanent
  * commitment — each new string in the product needs a translation in all
  * of them, forever, and a half-translated interface reads worse than an
@@ -11,7 +12,7 @@
  * "Chinese (Simplified)" in English is no use to someone who cannot read
  * English, which is the entire audience for the control.
  *
- * All eight are left-to-right. Adding Arabic or Hebrew later is a layout
+ * All nine are left-to-right. Adding Arabic or Hebrew later is a layout
  * change (`dir="rtl"`, logical CSS properties, mirrored icons) and not
  * merely a translation — worth knowing before anyone promises one.
  */
@@ -35,6 +36,7 @@ export const LOCALES: readonly LocaleDef[] = [
   { code: "de", name: "Deutsch" },
   { code: "es", name: "Español" },
   { code: "pt", name: "Português" },
+  { code: "ru", name: "Русский" },
 ] as const;
 
 export const DEFAULT_LOCALE = "en";
@@ -49,8 +51,14 @@ export const DEFAULT_LOCALE = "en";
  * "zh-TW" falls through to `zh`, is handed Simplified, and that is worse
  * than being handed English.
  */
-export function resolveLocale(preferred: readonly string[]): string {
-  const have = new Set(LOCALES.map((l) => l.code));
+export function resolveLocale(
+  preferred: readonly string[],
+  // A context that ships fewer catalogues (the extension) passes its own,
+  // so a language it cannot show is skipped for the next one asked for
+  // rather than chosen and then shown in English.
+  available: readonly string[] = LOCALES.map((l) => l.code),
+): string {
+  const have = new Set(available);
   for (const raw of preferred) {
     const tag = raw.trim();
     if (!tag) continue;

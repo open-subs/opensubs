@@ -393,6 +393,22 @@
     return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
   }
 
+  /** A measured peak, rounded to what "about" can honestly claim: 804 MiB is "800 MB". */
+  function formatMemory(bytes: number): string {
+    const mb = bytes / (1024 * 1024);
+    return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb / 10) * 10} MB`;
+  }
+
+  /**
+   * "148 MB download · needs about 360 MB of memory · …". The memory is
+   * an approximate measured peak, so it says "about" and nothing firmer.
+   */
+  function modelCaption(m: ModelOptionDto): string {
+    const memory = m.memoryBytes ? `needs about ${formatMemory(m.memoryBytes)} of memory` : "";
+    const size = m.bundled ? "" : `${formatModelSize(m.sizeBytes)} download`;
+    return [size, memory, m.description].filter(Boolean).join(" · ");
+  }
+
   function reset() {
     videoPath = null;
     mediaInfo = null;
@@ -1002,7 +1018,7 @@
                 {#if m.bundled}<span class="tag tag-free">Included</span>{/if}
               </span>
               <span class="oa-caption">
-                {m.bundled ? m.description : `${formatModelSize(m.sizeBytes)} · ${m.description}`}
+                {modelCaption(m)}
               </span>
             </div>
             {#if downloadingFilename === m.filename}

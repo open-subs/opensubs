@@ -333,7 +333,7 @@ await section("a video that can no longer be read: choose it again and the burn 
     await writeFile(srt, "1\n00:00:00,500 --> 00:00:02,500\nHello\n\n");
     const { context, page, events, errors } = await newContext();
     await page.goto(`${base}/`);
-    await page.locator('input[type=file][accept="video/*"]').first().setInputFiles(video);
+    await page.locator('input[type=file][accept^="video/*"]').first().setInputFiles(video);
     await page.waitForFunction(() => (document.querySelector("video")?.videoWidth ?? 0) > 0, null, { timeout: 30000 });
     await page.locator('input[type=file][accept=".srt,.vtt,text/vtt"]').first().setInputFiles(srt);
     await exportTab(page);
@@ -378,9 +378,12 @@ await section("a video that can no longer be read: choose it again and the burn 
 });
 
 await section("what the events carry", async () => {
-  const allowed = new Set(["tool", "device", "method", "stage", "error", "ename"]);
+  // burn-* carry the first six; the transcribe-* and the cancelled events add
+  // lang/engine/dur (the request), `after` (how far in a cancel came) and `bg`
+  // (a backgrounded interruption). No file name, text or account id, ever.
+  const allowed = new Set(["tool", "device", "method", "stage", "error", "ename", "lang", "engine", "dur", "after", "bg"]);
   const extra = all.flatMap((e) => Object.keys(e.data ?? {}).filter((k) => !allowed.has(k)));
-  check(all.length > 0 && extra.length === 0, `${all.length} events carry only tool, device, method, stage, error, ename`, extra.join(","));
+  check(all.length > 0 && extra.length === 0, `${all.length} events carry only known, non-identifying keys`, extra.join(","));
   check(!/sample|\.mp4|u-funnel|simulated|Nothing was uploaded/.test(JSON.stringify(all)), "no file name, subtitle text, account id or code");
   check(all.filter((e) => e.data?.method).every((e) => e.name === "signin-complete"), "method only on signin-complete");
   check(all.filter((e) => e.data?.ename).every((e) => e.name === "burn-failed"), "ename only on burn-failed");

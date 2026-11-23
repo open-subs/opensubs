@@ -271,8 +271,8 @@ for (const fixture of FIXTURES) {
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage({ viewport: { width: 1100, height: 900 } });
   await page.goto(base);
-  await page.waitForSelector('input[accept="video/*"]', { state: "attached", timeout: 30000 });
-  await page.setInputFiles('input[accept="video/*"]', built.clip);
+  await page.waitForSelector('input[accept^="video/*"]', { state: "attached", timeout: 30000 });
+  await page.setInputFiles('input[accept^="video/*"]', built.clip);
   await page.waitForFunction(
     () => document.querySelector(".file-meta")?.textContent?.includes("×"),
     { timeout: 60000 },

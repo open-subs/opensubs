@@ -21,6 +21,7 @@
          composed page the real site header carries the same ids and this bar,
          being outside the markers, is left behind. -->
     <div style="display:flex;gap:12px;justify-content:flex-end;padding:8px 16px">
+      <openapps-community variant="header"></openapps-community>
       <div id="language"></div>
       <div id="account"></div>
     </div>
@@ -43,15 +44,15 @@
       <main class="screen">
         <section class="card card-start">
           <div class="start">
-            <h3 class="start-title">Start with a video</h3>
+            <h3 class="start-title">Start with a video or audio file</h3>
             <p class="start-sub">
               Its speech becomes subtitles here, on this machine. Nothing is
               uploaded.
             </p>
             <div class="start-row">
               <label class="btn btn-primary start-primary">
-                <input type="file" accept="video/*" aria-label="Choose a video" hidden />
-                Choose a video
+                <input type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.m4v,.avi,.ogv,.mp3,.wav,.m4a,.aac,.ogg,.oga,.flac,.opus,.weba" aria-label="Choose a file" hidden />
+                Choose a file
               </label>
               <button type="button" class="btn btn-secondary start-sample">Try a sample</button>
             </div>
@@ -68,8 +69,8 @@
               </label>
             </div>
             <p class="start-fine">
-              MP4, MOV, WebM and MKV. Free, no account to try; burning into a
-              video takes a free sign-in. The speech model downloads once, when
+              MP4, MOV, WebM and MKV, or MP3, WAV and M4A audio. Free, no
+              account to try; burning into a video takes a free sign-in. The speech model downloads once, when
               you generate.
             </p>
           </div>

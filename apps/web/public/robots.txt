@@ -1,7 +1,12 @@
 # The app and the site are one page, so there is nothing to steer a crawler
 # away from: the copy that describes the product is in the same document as
 # the tool itself.
+# /script.js and /api/send are the visitor-statistics script and the
+# endpoint it reports to; neither carries page content, so every group
+# below keeps crawlers off those two addresses and nothing else.
 User-agent: *
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 # The rule above already admits everything, but several AI crawlers read
@@ -10,33 +15,53 @@ Allow: /
 # a time for that reason, not because anything here is being treated
 # differently.
 User-agent: GPTBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: ChatGPT-User
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: OAI-SearchBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: ClaudeBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: anthropic-ai
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: Google-Extended
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: PerplexityBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: CCBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: YouBot
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 User-agent: cohere-ai
+Disallow: /api/send
+Disallow: /script.js
 Allow: /
 
 Sitemap: https://opensubs.app/sitemap.xml

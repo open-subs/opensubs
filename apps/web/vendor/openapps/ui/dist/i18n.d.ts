@@ -1,5 +1,5 @@
 /**
- * The sign-in box's words, in the suite's eight languages.
+ * The sign-in box's words, in the suite's languages: the eight, and Russian.
  *
  * The English text is the key (gettext's convention): a missing entry falls
  * back to English rather than to an identifier on a button. The language
@@ -8,7 +8,7 @@
  * its own interface, and a sign-in box in a different language from the
  * page around it reads as someone else's form.
  */
-export declare const LOCALES: readonly ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"];
+export declare const LOCALES: readonly ["en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt", "ru"];
 export type Locale = (typeof LOCALES)[number];
 /** exact tag → Chinese script → base language → English. */
 export declare function pickLocale(tag: string | null | undefined): Locale | null;

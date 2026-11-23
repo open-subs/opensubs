@@ -60,6 +60,8 @@ export function isIntegratedGpu(info: GpuInfo | null | undefined): boolean {
 export interface DeviceFacts {
   device: "webgpu" | "wasm";
   integrated?: boolean;
+  /** `navigator.deviceMemory`, where the browser reports it. See reportedMemoryGb. */
+  memoryGb?: number;
 }
 
 /**
@@ -71,7 +73,51 @@ export interface DeviceFacts {
  * way to run it.
  */
 export function prefersSmallModel(facts: DeviceFacts): boolean {
-  return facts.device === "webgpu" && !facts.integrated;
+  return facts.device === "webgpu" && !facts.integrated && !smallIsTightOn(facts.memoryGb);
+}
+
+/**
+ * The machine's memory as the browser reports it, in GB, or undefined.
+ *
+ * `navigator.deviceMemory` exists in Chromium only -- Chrome, Edge, Opera,
+ * Android's WebView -- and is deliberately coarse: rounded down to a power
+ * of two and capped at 8 (0.25, 0.5, 1, 2, 4, 8). So "8" means "8 GB or
+ * more", and "4" means anything from 4 GB up to just under 8. Firefox and
+ * Safari report nothing, and nothing is then said.
+ */
+export function reportedMemoryGb(nav: { deviceMemory?: unknown } | undefined =
+  typeof navigator === "undefined" ? undefined : (navigator as { deviceMemory?: unknown })): number | undefined {
+  const gb = nav?.deviceMemory;
+  return typeof gb === "number" && Number.isFinite(gb) && gb > 0 ? gb : undefined;
+}
+
+/**
+ * Below this reported memory, Small is advised against and Base suggested.
+ *
+ * Small was measured at about 3.4 GB on WebGPU and 4.1 GB on the CPU (see
+ * ASR_MODELS in ./asr), Base at about 2 GB. A browser reporting 4 means 4 to
+ * just under 8 GB, of which the system and the browser itself already hold
+ * a good part, so Small would be most of what is left; Base fits. 8 means 8
+ * or more, and Small is left alone. Firefox and Safari report nothing, and
+ * get no advice.
+ */
+export const SMALL_TIGHT_BELOW_GB = 8;
+
+/** Whether Small is a squeeze on a machine reporting this much memory. */
+export function smallIsTightOn(memoryGb: number | undefined): boolean {
+  return memoryGb !== undefined && memoryGb < SMALL_TIGHT_BELOW_GB;
+}
+
+/**
+ * A measured peak, said as roughly as it is known: "360 MB", "1.4 GB" (the sentence around it says "about").
+ *
+ * Rounded to two figures, because these are peaks measured on one machine
+ * and the copy says "about" -- a third figure would claim a precision
+ * the measurement does not have.
+ */
+export function formatMemory(mb: number): string {
+  if (mb >= 1000) return `${(Math.round(mb / 102.4) / 10).toFixed(1)} GB`;
+  return `${Math.round(mb / 10) * 10} MB`;
 }
 
 /** "Intel · gen-12lp", for the one line that says which GPU was found. */

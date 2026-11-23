@@ -30,9 +30,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OpenAppsElement } from "./base.js";
+import { formatNumber, intlLocale } from "./catalogue.js";
 /** Unix seconds → "3 Aug". Dates here are context, not precision. */
 function shortDate(seconds) {
-    return new Date(seconds * 1000).toLocaleDateString(undefined, {
+    return new Date(seconds * 1000).toLocaleDateString(intlLocale(), {
         day: "numeric",
         month: "short",
     });
@@ -162,7 +163,7 @@ let OpenAppsReferral = class OpenAppsReferral extends OpenAppsElement {
       </div>
       <div class="earned">
         <span class="eyebrow">Earned</span>
-        <span class="total mono">${total.toLocaleString()}</span>
+        <span class="total mono">${formatNumber(total)}</span>
         <span class="caption">
           ${count === 0
             ? "No referred purchases yet."
@@ -193,7 +194,7 @@ let OpenAppsReferral = class OpenAppsReferral extends OpenAppsElement {
             : `${p.purchases} purchase${p.purchases === 1 ? "" : "s"}`}
               </span>
               <span class="mono amount ${p.earned > 0 ? "good" : ""}">
-                ${p.earned > 0 ? `+${p.earned.toLocaleString()}` : "—"}
+                ${p.earned > 0 ? `+${formatNumber(p.earned)}` : "—"}
               </span>
             </div>
           `)}
@@ -219,10 +220,10 @@ let OpenAppsReferral = class OpenAppsReferral extends OpenAppsElement {
               <span class="grow caption">
                 ${r.referee ?? "unknown"}
                 ${r.referee_credits
-            ? html ` bought ${r.referee_credits.toLocaleString()} credits`
+            ? html ` bought ${formatNumber(r.referee_credits)} credits`
             : nothing}
               </span>
-              <span class="mono amount good">+${r.amount.toLocaleString()}</span>
+              <span class="mono amount good">+${formatNumber(r.amount)}</span>
             </div>
           `)}
       </div>

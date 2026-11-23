@@ -89,7 +89,7 @@ for (const [width, height] of VIEWPORTS) {
         await page.route(/\/script\.js$|\/api\/send$/, (r) => r.abort());
         await page.goto(base + "/");
         await page.waitForFunction(() => !!document.querySelector('input[type=file][accept*=".srt"]'), null, { timeout: 60000 });
-        await page.locator('input[type=file][accept="video/*"]').first().setInputFiles({ name, mimeType: "video/mp4", buffer: video });
+        await page.locator('input[type=file][accept^="video/*"]').first().setInputFiles({ name, mimeType: "video/mp4", buffer: video });
         await page.waitForFunction(() => (document.querySelector("video")?.videoWidth ?? 0) > 0, null, { timeout: 30000 });
         await page.locator('input[type=file][accept*=".srt"]').first().setInputFiles({ name: "cues.srt", mimeType: "text/plain", buffer: Buffer.from(srt(cues)) });
         await page.waitForFunction((n) => document.querySelectorAll("textarea.cue-text").length === n, cues, { timeout: 15000 });

@@ -134,8 +134,8 @@ for (const lang of ["en", "zh", "ja"]) {
   const ctx = await browser.newContext({ acceptDownloads: true });
   const page = await ctx.newPage({ viewport: { width: 1100, height: 900 } });
   await page.goto(base);
-  await page.waitForSelector('input[accept="video/*"]', { state: "attached", timeout: 30000 });
-  await page.setInputFiles('input[accept="video/*"]', video);
+  await page.waitForSelector('input[accept^="video/*"]', { state: "attached", timeout: 30000 });
+  await page.setInputFiles('input[accept^="video/*"]', video);
   await page.waitForFunction(
     () => document.querySelector(".file-meta")?.textContent?.includes("×"), { timeout: 60000 });
   // The Subtitles card holds more than one <select>; pick the one whose

@@ -12,6 +12,7 @@ import { api, DEFAULT_SETTINGS, tell, type Settings, type Status } from "../lib/
 import { nearestSize } from "../lib/pace";
 import { direction, getLocale, LOCALES, t, useLocale } from "../lib/i18n";
 import { cannotScript, NOT_A_WEB_PAGE } from "../lib/pages";
+import { formatMemory, isFirefox, reportedMemoryGb, smallIsTightOn } from "../../../web/src/lib/device";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -111,8 +112,9 @@ function fill() {
     const o = document.createElement("option");
     o.value = m.id;
     // Base and Small are the models' names and stay as they are; only
-    // "(English)" in Tiny's says something a reader needs translated.
-    o.textContent = `${t(m.label)} · ${m.size}`;
+    // "(English)" in Tiny's says something a reader needs translated. The
+    // words are filled in by labelModels, since the memory figure follows
+    // the backend.
     modelEl.append(o);
   }
   for (const [code, label] of LANGUAGES) {
@@ -175,13 +177,47 @@ function syncChanged() {
   changedEl.textContent = n === 0 ? "" : n === 1 ? t("1 changed") : t("{n} changed", { n });
 }
 
+/**
+ * Which backend the memory figure is for. "Automatic" runs on the CPU in
+ * Firefox (see BACKEND_NOTES), and so does any browser without WebGPU; the
+ * Intel built-in graphics case is decided in the engine, which the popup
+ * cannot see, so there it shows the GPU figure.
+ */
+function memoryBackend(): "webgpu" | "wasm" {
+  if (backendEl.value === "cpu") return "wasm";
+  if (!("gpu" in navigator)) return "wasm";
+  if (backendEl.value === "auto" && isFirefox(navigator.userAgent)) return "wasm";
+  return "webgpu";
+}
+
+/** "Small · ~250 MB · needs about 3.4 GB of memory", for the backend in use. */
+function labelModels() {
+  const device = memoryBackend();
+  for (const o of modelEl.options) {
+    const m = ASR_MODELS.find((x) => x.id === o.value);
+    if (!m) continue;
+    o.textContent = `${t(m.label)} · ${m.size} · ${t("needs about {memory} of memory", { memory: formatMemory(m.memory[device]) })}`;
+  }
+}
+
 function syncNotes() {
+  labelModels();
   windowOut.textContent = t("{n}s", { n: windowEl.value });
   modelNote.textContent = t(
     modelEl.value === "auto"
       ? "Base where this machine can keep up with the video, Tiny where it cannot."
       : (ASR_MODELS.find((m) => m.id === modelEl.value)?.note ?? ""),
   );
+  // Chrome and Edge say roughly how much memory the machine has; where it is
+  // too little for Small, say so beside it. Advice only -- it may still run.
+  const small = ASR_MODELS.find((m) => m.id === modelEl.value && m.id.includes("whisper-small"));
+  const gb = reportedMemoryGb();
+  if (small && smallIsTightOn(gb)) {
+    modelNote.textContent += " " + t(
+      "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.",
+      { gb: gb ?? 0, memory: formatMemory(small.memory[memoryBackend()]) },
+    );
+  }
   backendNote.textContent = t(BACKEND_NOTES[backendEl.value] ?? "");
   syncChanged();
 }

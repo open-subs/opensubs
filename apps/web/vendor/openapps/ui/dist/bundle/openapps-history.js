@@ -1,68 +1,66 @@
-import{a as m,b as s,d,e as g,f as p,g as u,m as c}from"./chunk-D7VGXHRZ.js";import{a as n}from"./chunk-LCQWCHVU.js";var i=class extends c{constructor(){super(...arguments);this.pageSize=25;this.appId="";this.noSummary=!1;this.entries=[];this.cursor=null;this.complete=!1;this.loaded=!1}connectedCallback(){super.connectedCallback(),this.refresh()}onSessionChange(){this.refresh()}async refresh(){this.entries=[],this.cursor=null,this.complete=!1,this.loaded=!1,await this.loadMore()}async loadMore(){let t=this.sdkOrNull;if(!t?.isLoggedIn){this.loaded=!0;return}let r=await this.run(()=>t.credits.history({cursor:this.cursor??void 0,limit:this.pageSize}));this.loaded=!0,r&&(this.entries=[...this.entries,...r.entries],this.cursor=r.next_cursor,this.complete=r.next_cursor===null)}get visible(){return this.appId?this.entries.filter(t=>t.app_id===this.appId):this.entries}get spending(){let t=new Map;for(let r of this.visible){if(r.amount>=0)continue;let l=h(r),e=t.get(l);e?(e.credits+=-r.amount,e.count+=1):t.set(l,{label:l,credits:-r.amount,count:1})}return[...t.values()].sort((r,l)=>l.credits-r.credits)}render(){if(!this.sdkOrNull)return s`<p class="muted">Loading…</p>`;if(!this.sdk.isLoggedIn)return s`<p class="muted">Sign in to see where your credits went.</p>`;if(!this.loaded)return s`<p class="muted">Loading…</p>`;let t=this.visible;if(t.length===0)return s`
+import{a as f,c as n,e as u,f as b,g as p,h as c,n as v,o as h,p as e,q as m}from"./chunk-HLRRPXU7.js";import{a as l}from"./chunk-LCQWCHVU.js";var o=class extends m{constructor(){super(...arguments);this.pageSize=25;this.appId="";this.noSummary=!1;this.entries=[];this.cursor=null;this.complete=!1;this.loaded=!1}connectedCallback(){super.connectedCallback(),this.refresh()}onSessionChange(){this.refresh()}async refresh(){this.entries=[],this.cursor=null,this.complete=!1,this.loaded=!1,await this.loadMore()}async loadMore(){let t=this.sdkOrNull;if(!t?.isLoggedIn){this.loaded=!0;return}let a=this.entries,s=await this.run(()=>t.credits.history({cursor:this.cursor??void 0,limit:this.pageSize}));this.entries===a&&(this.loaded=!0,s&&(this.entries=[...this.entries,...s.entries],this.cursor=s.next_cursor,this.complete=s.next_cursor===null))}get visible(){return this.appId?this.entries.filter(t=>t.app_id===this.appId):this.entries}get spending(){let t=new Map;for(let a of this.visible){if(a.amount>=0)continue;let s=g(a),r=t.get(s);r?(r.credits+=-a.amount,r.count+=1):t.set(s,{label:s,credits:-a.amount,count:1})}return[...t.values()].sort((a,s)=>s.credits-a.credits)}render(){if(!this.sdkOrNull)return n`<p class="muted">${e("Loading\u2026")}</p>`;if(!this.sdk.isLoggedIn)return n`<p class="muted">${e("Sign in to see where your credits went.")}</p>`;if(!this.loaded)return n`<p class="muted">${e("Loading\u2026")}</p>`;let t=this.visible;if(t.length===0)return n`
         <p class="muted">
-          Nothing yet. Credits you buy and spend both appear here, with what
-          each one was for.
+          ${e("Nothing yet. Credits you buy and spend both appear here, with what each one was for.")}
         </p>
-        ${this.error?s`<p class="error" role="alert">${this.error}</p>`:d}
-      `;let r=this.noSummary?[]:this.spending,l=r.reduce((e,b)=>e+b.credits,0);return s`
-      ${r.length?s`
+        ${this.error?n`<p class="error" role="alert">${this.error}</p>`:u}
+      `;let a=this.noSummary?[]:this.spending,s=a.reduce((r,y)=>r+y.credits,0);return n`
+      ${a.length?n`
             <div class="summary">
               <div class="eyebrow">
-                ${this.complete?"Spent, all time":"Spent, recent activity"}
+                ${this.complete?e("Spent, all time"):e("Spent, recent activity")}
               </div>
               <ul class="groups">
-                ${r.map(e=>s`
+                ${a.map(r=>n`
                     <li>
-                      <span class="what" title=${e.label}>${e.label}</span>
+                      <span class="what" title=${r.label}>${r.label}</span>
                       <span class="times muted"
-                        >${e.count===1?"once":`${e.count}\xD7`}</span
+                        >${r.count===1?e("once"):`${r.count}\xD7`}</span
                       >
-                      <span class="mono amount">${e.credits.toLocaleString()}</span>
+                      <span class="mono amount">${h(r.credits)}</span>
                       <!-- The bar is proportional to the largest row, not to
                            the total: with one dominant item every other bar
                            would round to nothing and the comparison people
                            actually want — this against that — disappears. -->
                       <span
                         class="bar"
-                        style=${`--w:${Math.round(e.credits/r[0].credits*100)}%`}
+                        style=${`--w:${Math.round(r.credits/a[0].credits*100)}%`}
                       ></span>
                     </li>
                   `)}
               </ul>
               <p class="caption">
-                ${l.toLocaleString()} credits across ${t.length}
-                ${t.length===1?"entry":"entries"}${this.complete?"":" so far"}.
+                ${this.complete?t.length===1?e("{credits} credits across 1 entry.",{credits:s}):e("{credits} credits across {n} entries.",{credits:s,n:t.length}):t.length===1?e("{credits} credits across 1 entry so far.",{credits:s}):e("{credits} credits across {n} entries so far.",{credits:s,n:t.length})}
               </p>
             </div>
-          `:d}
+          `:u}
 
-      <div class="eyebrow rule">Activity</div>
+      <div class="eyebrow rule">${e("Activity")}</div>
       <ul class="entries">
-        ${t.map(e=>s`
+        ${t.map(r=>n`
             <li>
-              <span class="when muted">${v(e.created_at)}</span>
-              <span class="what" title=${f(e)}
-                >${f(e)}</span
+              <span class="when muted">${$(r.created_at)}</span>
+              <span class="what" title=${w(r)}
+                >${w(r)}</span
               >
-              <span class="mono amount ${e.amount<0?"debit":"credit"}">
-                ${e.amount>0?"+":"\u2212"}${Math.abs(e.amount).toLocaleString()}
+              <span class="mono amount ${r.amount<0?"debit":"credit"}">
+                ${r.amount>0?"+":"\u2212"}${h(Math.abs(r.amount))}
               </span>
-              <span class="mono after muted" title="Balance after"
-                >${e.balance_after.toLocaleString()}</span
+              <span class="mono after muted" title=${e("Balance after")}
+                >${h(r.balance_after)}</span
               >
             </li>
           `)}
       </ul>
 
-      ${this.cursor!==null?s`<button
+      ${this.cursor!==null?n`<button
             class="block"
             ?disabled=${this.busy}
             @click=${()=>{this.loadMore()}}
           >
-            ${this.busy?"Loading\u2026":"Show earlier"}
-          </button>`:d}
-      ${this.error?s`<p class="error" role="alert">${this.error}</p>`:d}
-    `}};i.styles=[c.baseStyles,m`
+            ${this.busy?e("Loading\u2026"):e("Show earlier")}
+          </button>`:u}
+      ${this.error?n`<p class="error" role="alert">${this.error}</p>`:u}
+    `}};o.styles=[m.baseStyles,f`
       ul {
         list-style: none;
         margin: 0;
@@ -142,5 +140,5 @@ import{a as m,b as s,d,e as g,f as p,g as u,m as c}from"./chunk-D7VGXHRZ.js";imp
       button.block {
         margin-top: 12px;
       }
-    `],n([p({type:Number,attribute:"page-size"})],i.prototype,"pageSize",2),n([p({type:String,attribute:"app-id"})],i.prototype,"appId",2),n([p({type:Boolean,attribute:"no-summary"})],i.prototype,"noSummary",2),n([u()],i.prototype,"entries",2),n([u()],i.prototype,"cursor",2),n([u()],i.prototype,"complete",2),n([u()],i.prototype,"loaded",2),i=n([g("openapps-history")],i);function h(a){let o=a.app_name??a.app_id??null,t=a.ref_id??null;return o&&t?`${o} \xB7 ${t}`:o||t||"Spent"}function f(a){switch(a.kind){case"debit":return h(a);case"topup":return"Credits purchased";case"referral_bonus":return"Referral bonus";case"adjustment":return a.ref_id?`Adjustment \u2014 ${a.ref_id}`:"Adjustment";case"refund":return a.amount<0?"Payment reversed":"Refund";default:return h(a)}}function v(a){let o=new Date(a*1e3);return Number.isNaN(o.getTime())?"":o.toLocaleDateString(void 0,{month:"short",day:"numeric"})}export{i as OpenAppsHistory,f as describeEntry,v as formatDate,h as spendLabel};
+    `],l([p({type:Number,attribute:"page-size"})],o.prototype,"pageSize",2),l([p({type:String,attribute:"app-id"})],o.prototype,"appId",2),l([p({type:Boolean,attribute:"no-summary"})],o.prototype,"noSummary",2),l([c()],o.prototype,"entries",2),l([c()],o.prototype,"cursor",2),l([c()],o.prototype,"complete",2),l([c()],o.prototype,"loaded",2),o=l([b("openapps-history")],o);function g(i){let d=i.app_name??i.app_id??null,t=i.ref_id??null;return d&&t?`${d} \xB7 ${t}`:d||t||e("Spent")}function w(i){switch(i.kind){case"debit":return g(i);case"topup":return e("Credits purchased");case"referral_bonus":return e("Referral bonus");case"adjustment":return i.ref_id?e("Adjustment \u2014 {reason}",{reason:i.ref_id}):e("Adjustment");case"refund":return i.amount<0?e("Payment reversed"):e("Refund");default:return g(i)}}function $(i){let d=new Date(i*1e3);return Number.isNaN(d.getTime())?"":d.toLocaleDateString(v(),{month:"short",day:"numeric"})}export{o as OpenAppsHistory,w as describeEntry,$ as formatDate,g as spendLabel};
 //# sourceMappingURL=openapps-history.js.map

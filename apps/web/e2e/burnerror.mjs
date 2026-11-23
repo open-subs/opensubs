@@ -2,7 +2,7 @@
 // for the errors the burn really meets. No browser.
 //
 //   node --experimental-strip-types e2e/burnerror.mjs
-import { burnStage, errorName, errorType, failureCode } from "../src/lib/burnerror.ts";
+import { burnStage, errorName, errorType, failureCode, cancelAfterBucket } from "../src/lib/burnerror.ts";
 
 let pass = 0;
 const fails = [];
@@ -47,6 +47,12 @@ eq("an invented category is not trusted", errorType({ category: "Sneaky Value!",
 eq("the support code", failureCode("Reading the video", new TypeError("network error")), "burn:read:file-read:TypeError");
 eq("the support code has no message", /network error/.test(failureCode("Reading the video", new Error("my holiday.mp4 failed"))), false);
 eq("stages", ["Reading the video", "Copying audio", "Burning 4%", "Finishing the file", null].map(burnStage), ["read", "audio", "render", "finish", "prepare"]);
+eq(
+  "the cancel-after buckets",
+  [-1, 3000, 10000, 25000, 45000, 120000, 400000, 999999999].map(cancelAfterBucket),
+  ["unknown", "<=5s", "5-15s", "15-30s", "30-60s", "1-3m", "3-10m", ">10m"],
+);
+eq("an unrecorded start is unknown, not zero", cancelAfterBucket(undefined), "unknown");
 
 console.log(`${pass} passed, ${fails.length} failed`);
 for (const f of fails) console.log(`  FAIL ${f}`);

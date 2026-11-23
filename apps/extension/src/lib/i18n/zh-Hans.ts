@@ -25,6 +25,8 @@ const zhHans: Record<string, string> = {
   "Fastest. Fine for clear speech.": "最快。语音清晰时够用。",
   "A good default. Handles 99 languages.": "不错的默认选择。支持 99 种语言。",
   "Most accurate here, and the slowest.": "本机最准确，也最慢。",
+  "needs about {memory} of memory": "大约需要 {memory} 内存",
+  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.": "这台设备报告的内存约为 {gb} GB。Small 运行时大约需要 {memory}，这里建议改用 Base。",
   "Runs on": "运行设备",
   "Graphics card (GPU)": "显卡 (GPU)",
   "Processor (CPU)": "处理器 (CPU)",

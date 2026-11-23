@@ -25,6 +25,8 @@ const ja: Record<string, string> = {
   "Fastest. Fine for clear speech.": "最速。はっきりした音声なら十分です。",
   "A good default. Handles 99 languages.": "無難な既定値。99 言語に対応します。",
   "Most accurate here, and the slowest.": "ここで最も正確ですが、最も低速です。",
+  "needs about {memory} of memory": "メモリが約 {memory} 必要",
+  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.": "この端末のメモリは約 {gb} GB と報告されています。Small は動作中に約 {memory} を使うため、ここでは Base をおすすめします。",
   "Runs on": "実行するデバイス",
   "Graphics card (GPU)": "グラフィックス (GPU)",
   "Processor (CPU)": "プロセッサー (CPU)",

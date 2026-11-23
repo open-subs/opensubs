@@ -173,15 +173,19 @@ export async function exportGateOn(): Promise<boolean> {
  *
  * Read afresh rather than reusing the page load's answer, because what
  * matters is the connection at this moment, and navigator.onLine stays true
- * on a network that answers nothing. No answer within SWITCH_TIMEOUT_MS
- * counts as no connection.
+ * on a network that refuses every connection. Only a request that fails,
+ * or the browser saying it is offline, is offline. A request that is merely
+ * slow (7 s was seen on a phone) is not: after SWITCH_TIMEOUT_MS the press
+ * goes on with the last answer this browser read, as an online one, and the
+ * sign-in sheet does not claim there is no connection.
  */
 export async function exportGateNow(): Promise<{ on: boolean; offline: boolean }> {
   if (!onWeb()) return { on: false, offline: false };
   const late = new Promise<null>((ok) => setTimeout(() => ok(null), SWITCH_TIMEOUT_MS));
   const read = await Promise.race([fetchSwitches(), late]);
   if (read) rememberSwitch(read);
-  const offline = !read || !read.reached || (typeof navigator !== "undefined" && navigator.onLine === false);
+  const failed = read ? !read.reached : false;
+  const offline = failed || (typeof navigator !== "undefined" && navigator.onLine === false);
   const on = forcedOn() || (read?.reached ? read.switches.exportGate === true : exportGateLastKnown());
   return { on, offline };
 }

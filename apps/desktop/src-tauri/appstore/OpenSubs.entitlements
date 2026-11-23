@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The Mac App Store build's entitlements, and nothing it does not use.
+     scripts/build-appstore.sh signs the app with these (store mode). -->
+<plist version="1.0">
+<dict>
+	<!-- Required for the store. Settings, downloaded speech models and the
+	     work files of an export all live in the app's own container. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The video the person picks (open panel, or dropped on the window), a
+	     model or style file they pick, and the folder they choose to save an
+	     export in (folder panel). Nothing else on the disk is reachable. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- Out to the network: the larger speech models, downloaded from Hugging
+	     Face only when the person asks for one; and the account and cloud
+	     translation, on auth.opensubs.app and gateway.opensubs.app. The video
+	     itself never leaves the Mac. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Sign in with Apple, beside Google (guideline 4.8). The App ID
+	     app.opensubs.mobile has the capability, shared with the iOS app. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- Required for a store build signed outside Xcode: they tie the binary
+	     to the provisioning profile embedded beside it. -->
+	<key>com.apple.application-identifier</key>
+	<string>JY2NWT5QFV.app.opensubs.mobile</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>JY2NWT5QFV</string>
+</dict>
+</plist>

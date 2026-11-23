@@ -37,7 +37,7 @@ import pt from "./i18n/pt.ts";
 import zhHans from "./i18n/zh-Hans.ts";
 import zhHant from "./i18n/zh-Hant.ts";
 
-export { LOCALES } from "../../../web/src/lib/i18n/locales.ts";
+import { LOCALES as WEB_LOCALES } from "../../../web/src/lib/i18n/locales.ts";
 
 export type Catalogue = Record<string, string>;
 
@@ -51,6 +51,14 @@ const CATALOGUES: Record<string, Catalogue> = {
   "zh-Hans": zhHans,
   "zh-Hant": zhHant,
 };
+
+/**
+ * The web app's languages that this panel has words for. The web app ships
+ * Russian; the panel does not yet, so a Russian browser falls to
+ * its next language, and the picker does not offer one it cannot show.
+ */
+export const LOCALES = WEB_LOCALES.filter((l) => l.code in CATALOGUES);
+const SHIPPED = LOCALES.map((l) => l.code);
 
 /** The language the browser's interface is in, as the browser says it. */
 export function browserLanguages(): string[] {
@@ -77,7 +85,7 @@ let locale: string | null = null;
 
 /** The active locale, decided once per context. */
 export function getLocale(): string {
-  locale ??= resolveLocale(browserLanguages());
+  locale ??= resolveLocale(browserLanguages(), SHIPPED);
   return locale;
 }
 
@@ -95,7 +103,7 @@ export function setLocale(code: string): void {
  * of its own (Chromium's offscreen document has none).
  */
 export function useLocale(choice: string | undefined): void {
-  locale = choice && choice !== "auto" && choice in CATALOGUES ? choice : resolveLocale(browserLanguages());
+  locale = choice && choice !== "auto" && choice in CATALOGUES ? choice : resolveLocale(browserLanguages(), SHIPPED);
 }
 
 /**

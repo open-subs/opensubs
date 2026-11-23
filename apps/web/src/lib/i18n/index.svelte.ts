@@ -34,11 +34,13 @@
  * fails at build with an error that does not mention the filename.
  */
 import { DEFAULT_LOCALE, resolveLocale } from "./locales";
+import { pluralForm } from "./plural";
 import de from "./de";
 import es from "./es";
 import ja from "./ja";
 import ko from "./ko";
 import pt from "./pt";
+import ru from "./ru";
 import zhHans from "./zh-Hans";
 import zhHant from "./zh-Hant";
 
@@ -54,6 +56,7 @@ const CATALOGUES: Record<string, Catalogue> = {
   ja,
   ko,
   pt,
+  ru,
   "zh-Hans": zhHans,
   "zh-Hant": zhHant,
 };
@@ -136,6 +139,19 @@ export function alternateHref(code: string): string | null {
   return link ? link.href : null;
 }
 
+const listeners = new Set<(code: string) => void>();
+
+/**
+ * Hear every language change, starting with the current one. For what sits
+ * outside Svelte's reach -- the account elements, which keep their own
+ * language (lib/account.ts). Returns an unsubscribe.
+ */
+export function onLocaleChange(listener: (code: string) => void): () => void {
+  listeners.add(listener);
+  listener(locale);
+  return () => listeners.delete(listener);
+}
+
 export function getLocale(): string {
   return locale;
 }
@@ -143,6 +159,7 @@ export function getLocale(): string {
 export function setLocale(next: string, options: { persist?: boolean } = {}): void {
   if (!(next in CATALOGUES)) return;
   locale = next;
+  for (const listener of listeners) listener(next);
   if (typeof document !== "undefined") {
     // Not cosmetic. `lang` is what picks the right glyphs for Han
     // characters — the same codepoint is drawn differently in Chinese and
@@ -163,13 +180,18 @@ export function setLocale(next: string, options: { persist?: boolean } = {}): vo
 /**
  * Translate `text`, falling back to the English it was written in.
  *
- * `vars` interpolates `{name}` placeholders. Deliberately small — no
- * plural rules, no date formats — because nothing in this interface needs
- * them yet, and `Intl.PluralRules` is there for the day it does.
+ * `vars` interpolates `{name}` placeholders. No date formats. Plurals are
+ * the English keys' own two ("{n} cue" / "{n} cues", picked at the call
+ * site), which is enough for every language that has no grammatical number
+ * or splits at one -- and not for Russian, which has three forms and puts
+ * 21 with 1 ("21 кредит") but 3 and 22 apart from 5. So a catalogue value
+ * may carry its forms separated by "|", and `pluralForm` (./plural.ts)
+ * picks one.
  */
 export function t(text: string, vars?: Record<string, string | number>): string {
   const table = CATALOGUES[locale];
   let out = (table && table[text]) || text;
+  if (out !== text && out.includes("|")) out = pluralForm(out, locale, vars);
   if (vars) {
     for (const [key, value] of Object.entries(vars)) {
       out = out.replaceAll(`{${key}}`, String(value));

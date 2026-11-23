@@ -42,3 +42,15 @@ tauri = { version = "2", features = ["test"] }
 [[bin]]
 name = "opensubs-desktop"
 path = "src/main.rs"
+
+[features]
+# The Mac App Store build (scripts/build-appstore.sh), and nothing else:
+# StoreKit and Sign in with Apple (appstore/StoreBridge.swift, compiled by
+# build.rs), the bundled LGPL ffmpeg only, no ffmpeg install, exports to a
+# folder the person picks. Off by default, so the direct-download build is
+# compiled exactly as before.
+appstore = []
+# The sandboxed `test` build only (build-appstore.sh test): a hook that runs a
+# script in the window, so the sandbox can be tested with no clicks
+# (scripts/appstore-smoke.sh). Never in a build for the store.
+appstore-test = ["appstore"]

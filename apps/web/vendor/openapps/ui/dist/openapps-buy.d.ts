@@ -38,12 +38,22 @@ export declare class OpenAppsBuy extends OpenAppsElement {
     private load;
     /** Rails the server has enabled, intersected with the `rails` attribute. */
     private get offeredRails();
+    /** The USD₮0 networks the server lists. Empty unless it enabled them. */
+    private get usdt0Networks();
+    private get usdt0Notice();
     private start;
     private watch;
     private reset;
     render(): TemplateResult;
     private renderPackages;
     private renderRails;
+    /**
+     * One "Pay with USD₮" button per network, and the freeze notice once
+     * beneath them. Per network rather than one button and a picker after:
+     * sending on the wrong chain is the expensive mistake here, so the chain
+     * is chosen in the same act as the rail.
+     */
+    private renderUsdt0Options;
     private renderInstruction;
     /**
      * What to say while a payment settles.
@@ -59,7 +69,7 @@ export declare class OpenAppsBuy extends OpenAppsElement {
     private copy;
     static styles: import("lit").CSSResult[];
 }
-/** USD minor units → "$10.00". */
+/** USD minor units → "$10.00" (in Russian "10,00 $", in German "10,00 $"). */
 export declare function formatUsd(cents: number): string;
 /**
  * Unit price, as "0.45¢ each".
@@ -70,9 +80,11 @@ export declare function formatUsd(cents: number): string;
  * so a realistic range stays readable without implying false precision.
  */
 export declare function perCreditCost(pkg: CreditPackage): string;
-/** A CAIP-2 chain id as a person would recognise it; the id itself if unknown. */
-export declare function networkName(chain: string): string;
-/** Token minor units → a decimal string, trailing zeros trimmed. */
+/**
+ * Token minor units → a decimal number, trailing zeros trimmed, in the
+ * interface's language ("0.5" in English, "0,5" in Russian). Not grouped:
+ * it is the exact amount to send, read off and typed into a wallet.
+ */
 export declare function formatUnits(amount: number, decimals: number): string;
 declare global {
     interface HTMLElementTagNameMap {

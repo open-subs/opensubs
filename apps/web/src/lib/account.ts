@@ -29,7 +29,8 @@ import type { OpenApps } from "@openapps/sdk";
 // <openapps-signout> as custom elements. The import is a side effect, which
 // is why it has no bindings.
 import "@openapps/ui";
-import { configure, getClient, notify, onChange } from "@openapps/ui";
+import { addCatalogue, configure, getClient, notify, onChange, setLocale as setElementsLocale } from "@openapps/ui";
+import { getLocale, onLocaleChange } from "./i18n/index.svelte";
 import { Say } from "./say";
 import { paidTranslation, rememberPaid } from "./paidjobs";
 import { installNativeAppleSignIn } from "./appleSignIn";
@@ -95,6 +96,27 @@ configure(CLIENT_OPTIONS);
 // redirect (./appleSignIn.ts). Installed here for the same reason: before
 // any <openapps-login> connects and asks the server what it offers.
 installNativeAppleSignIn();
+
+// The account elements follow the app's language. The sign-in box carries
+// its own catalogues and reads <html lang>; the account, buy, balance,
+// history and sign-out elements take their words from a catalogue the host
+// hands them. Russian has one (@openapps/ui/catalogues/ru, fetched only when
+// the app is in Russian); in the other languages their words stay English.
+// Their numbers, prices and dates are written in the app's language in
+// every case -- "0,50 ¢" in Russian, "0,50¢" in German, "0.50¢" in English
+// -- which is why the tag is always the app's own. The empty "en"
+// catalogue makes English mean English conventions too, rather than the
+// browser's.
+addCatalogue("en", {});
+onLocaleChange(async (code) => {
+  if (code === "ru") {
+    const { default: catalogue } = await import("@openapps/ui/catalogues/ru");
+    addCatalogue("ru", catalogue);
+  }
+  // A later switch may have landed while the catalogue loaded.
+  if (getLocale() !== code) return;
+  setElementsLocale(code);
+});
 
 /**
  * Kept for callers that want to be explicit. Returns the client configured

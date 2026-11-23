@@ -1,5 +1,5 @@
 import { type Session, type TokenStore } from "./storage.js";
-import type { AuthMethods, Challenge, CreditPackage, DeductResult, EmailPowChallenge, EmailPowSolution, EmailStart, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, RedirectProvider, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup } from "./types.js";
+import type { AccountEvent, AuthMethods, AuthServerInfo, LinkStart, SessionInfo, Challenge, CreditPackage, CreditsBreakdown, DelegationView, DeductResult, EmailPowChallenge, EmailPowSolution, EmailStart, EthDeposit, History, LightningInvoice, LinkRedirect, LinkResult, LoginResult, Me, Namespace, Packages, Proof, RedirectProvider, ReferralCode, Referees, ReferralEarnings, StripeCheckout, Topup, Usdt0Deposit } from "./types.js";
 /** Fetch implementations differ across runtimes; only this shape is used. */
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export interface OpenAppsOptions {
@@ -35,6 +35,13 @@ export declare class OpenApps {
          * switched off, so a sign-in UI should ask rather than assume.
          */
         methods: (signal?: AbortSignal) => Promise<AuthMethods>;
+        /**
+         * {@link methods}, with what else the server says about signing in: where
+         * OnWallet is installed from. The link is the server's to give, never
+         * a page's to make up, and anything that is not a plain `https:` URL is
+         * dropped here so it can be put in an `href` as it comes.
+         */
+        serverInfo: (signal?: AbortSignal) => Promise<AuthServerInfo>;
         /** Step 1 of wallet/Nostr login: get something to sign. */
         challenge: (namespace: Namespace, address?: string, signal?: AbortSignal) => Promise<Challenge>;
         /**
@@ -79,6 +86,38 @@ export declare class OpenApps {
         /** {@link redirectStartUrl} for Google. */
         googleStartUrl: (returnTo?: string, referralCode?: string) => string;
         /**
+         * {@link redirectStartUrl}, bound to this page with PKCE.
+         *
+         * Generates a one-time verifier, keeps it in this tab's
+         * `sessionStorage`, and puts its SHA-256 on the start URL. The code the
+         * server hands back can then only be redeemed by {@link completeRedirect}
+         * in this tab — a `#code=` planted in someone else's page by an attacker
+         * who signed in to *their* account is refused (login CSRF). Prefer this
+         * to {@link redirectStartUrl} wherever the page that starts the sign-in
+         * is the page it returns to.
+         */
+        redirectStart: (provider: RedirectProvider, returnTo?: string, referralCode?: string) => Promise<string>;
+        /**
+         * {@link redirectStart}, answered with the provider's authorize URL
+         * instead of a redirect to it (`mode=json`).
+         *
+         * For a page that hands the URL to something other than its own
+         * address bar: the OnWallet extension's `window.openwallet.signIn`,
+         * which opens its approval window over the page and then navigates
+         * this tab to the callback itself. Everything else is the redirect
+         * sign-in unchanged — the same PKCE verifier kept in this tab, the same
+         * browser-binding cookie, the same `#code=` back at `returnTo` for
+         * {@link completeRedirect}. The fetch is credentialed because that
+         * cookie is set by this response; the server allows credentials on this
+         * request alone, and only from its `allowed_origins`.
+         *
+         * Throws {@link OpenAppsError} when the server refuses (an origin it
+         * does not serve, a host with no callback of its own: `conflict`) or
+         * cannot be reached; a caller then falls back to
+         * `location.href = await redirectStart(…)`.
+         */
+        redirectAuthorizeUrl: (provider: RedirectProvider, returnTo: string, referralCode?: string, signal?: AbortSignal) => Promise<string>;
+        /**
          * Finish a redirect sign-in: exchange the `#code=…` fragment for a
          * session and clear it from the URL.
          *
@@ -87,6 +126,10 @@ export declare class OpenApps {
          * calls share one exchange, because a framework that double-invokes
          * effects would otherwise spend the code on the first call and fail the
          * second.
+         *
+         * Sends the PKCE verifier {@link redirectStart} kept, if any. A code that
+         * arrives in a page that started no sign-in while already signed in is
+         * ignored rather than allowed to replace the session silently.
          */
         completeRedirect: (options?: {
             url?: string;
@@ -120,26 +163,88 @@ export declare class OpenApps {
          */
         linkVerify: (challengeId: string, proof: Proof, options?: {
             merge?: boolean;
+            expect?: string;
             signal?: AbortSignal;
         }) => Promise<LinkResult>;
         /**
-         * Begin connecting Google or GitHub to the account already signed in
-         * here.
+         * Begin connecting Google, GitHub or Apple to the account already
+         * signed in here.
          *
          * Wallet and Nostr link by signing in the page; these need a full
          * redirect, which carries no bearer token — so this authenticated call
-         * records the intent first and hands back a URL to navigate to. On
-         * return, {@link completeLinkRedirect} reports what happened.
+         * records who is asking and hands back a URL to navigate to (on the
+         * server, which binds the flow to this browser on the way through). On
+         * return, {@link completeLinkRedirect} reports a `pending` link, which
+         * {@link confirmLink} completes from this page.
          *
-         * Throws `identity_belongs_to_another_account` semantics via the
-         * redirect rather than here: the conflict is only discovered after the
-         * provider has verified the identity, so it comes back in the fragment
-         * and you re-run this with `{ merge: true }`.
+         * Nothing about merging is decided here: if the identity turns out to
+         * be on another account, {@link confirmLink} answers with that conflict
+         * and the page asks the user before confirming with `{ merge: true }`.
+         * (`merge` is accepted for compatibility and ignored.)
+         *
+         * Needs a recent sign-in: an old session gets `reauth_required`.
          */
         redirectLinkStart: (provider: RedirectProvider, returnTo: string, options?: {
             merge?: boolean;
             signal?: AbortSignal;
         }) => Promise<string>;
+        /**
+         * {@link redirectLinkStart}, with everything the server handed back:
+         * the form to post (`go`) as well as the older URL.
+         */
+        redirectLinkBegin: (provider: RedirectProvider, returnTo: string, options?: {
+            signal?: AbortSignal;
+        }) => Promise<LinkStart>;
+        /**
+         * Begin connecting a redirect provider and leave for it — the way to
+         * start a link from a page.
+         *
+         * Where the server offers it, the page leaves by **submitting a form**
+         * rather than following a URL. The server binds the link to the browser
+         * that posts that form from one of its own pages, so a link cannot be
+         * started by sending someone a URL: only this browser, showing this
+         * page, with this account signed in, can go on to the provider. A
+         * server from before the form existed gets the URL, as before.
+         *
+         * The page is navigated away; the promise settles only if that fails
+         * to start. A page whose Content-Security-Policy sets `form-action`
+         * must allow the account server's origin.
+         *
+         * Needs a recent sign-in: an old session gets `reauth_required`.
+         */
+        redirectLink: (provider: RedirectProvider, returnTo: string, options?: {
+            signal?: AbortSignal;
+        }) => Promise<void>;
+        /**
+         * Complete a redirect link this session started, from the `code` of a
+         * `pending` {@link completeLinkRedirect} outcome.
+         *
+         * Answers like {@link linkVerify}: the link, or a thrown
+         * `identity_belongs_to_another_account` conflict to put to the user
+         * (then call again with `{ merge: true }` and the same code), or
+         * `merge_blocked_by_duplicate_namespace`.
+         */
+        confirmLink: (code: string, options?: {
+            merge?: boolean;
+            signal?: AbortSignal;
+        }) => Promise<LinkResult>;
+        /** This account's live sessions, the current one marked. */
+        sessions: (signal?: AbortSignal) => Promise<{
+            sessions: SessionInfo[];
+        }>;
+        /** End one session. Needs a recent sign-in. */
+        revokeSession: (id: string, signal?: AbortSignal) => Promise<{
+            ok: boolean;
+        }>;
+        /** End every session but this one. Needs a recent sign-in. */
+        revokeOtherSessions: (signal?: AbortSignal) => Promise<{
+            ok: boolean;
+            revoked: number;
+        }>;
+        /** The account's security activity: sign-ins, links, merges, revocations. */
+        events: (signal?: AbortSignal) => Promise<{
+            events: AccountEvent[];
+        }>;
         /** {@link redirectLinkStart} for Google. */
         googleLinkStart: (returnTo: string, options?: {
             merge?: boolean;
@@ -154,12 +259,30 @@ export declare class OpenApps {
             url?: string;
             hash?: string;
         }) => LinkRedirect | null;
+        /**
+         * Cancel a merge that is waiting ({@link Me.pending_merges}), from
+         * either of the two accounts. Nothing has moved, so nothing is undone.
+         */
+        cancelMerge: (id: string, signal?: AbortSignal) => Promise<{
+            ok: boolean;
+            cancelled: string;
+        }>;
         unlink: (caip10: string, signal?: AbortSignal) => Promise<{
             ok: boolean;
         }>;
     };
     credits: {
         balance: (signal?: AbortSignal) => Promise<number>;
+        /**
+         * The balance and, where the server keeps track, what it is made of:
+         * credits bought (which never lapse) and this month's member credits
+         * (which do), when they lapse, and why there are none.
+         *
+         * The same request as {@link balance}. A server with member credits off
+         * answers `{ balance }` alone; the other fields are then undefined, and
+         * that is how a UI knows to show nothing new.
+         */
+        breakdown: (signal?: AbortSignal) => Promise<CreditsBreakdown>;
         /**
          * Charge the logged-in user for something this app did.
          *
@@ -174,6 +297,21 @@ export declare class OpenApps {
             signal?: AbortSignal;
         }) => Promise<History>;
     };
+    /**
+     * The person's delegation: what agents they approve in OnWallet may spend
+     * from their credits, per day and per run (`/v1/me/delegation`).
+     *
+     * - `delegation()` reads it.
+     * - `delegation("PUT", { per_day_credits?, per_run_credits? })` creates
+     *   or changes it, or turns a revoked one back on (send `{}` for that, or
+     *   for the defaults); an omitted limit keeps its current value.
+     * - `delegation("DELETE")` turns it off: agents can no longer start
+     *   spending.
+     */
+    delegation: (method?: "GET" | "PUT" | "DELETE", limits?: {
+        per_day_credits?: number;
+        per_run_credits?: number;
+    }) => Promise<DelegationView>;
     payments: {
         packages: (signal?: AbortSignal) => Promise<Packages>;
         /**
@@ -193,6 +331,12 @@ export declare class OpenApps {
             signal?: AbortSignal;
         }) => Promise<StripeCheckout>;
         ethDepositAddress: (packageId: string, signal?: AbortSignal) => Promise<EthDeposit>;
+        /**
+         * A USD₮0 deposit address on one network: an `id` from
+         * `packages().usdt0.networks`. Fails with a 400 unless the server has
+         * USD₮0 enabled on that network.
+         */
+        usdt0DepositAddress: (packageId: string, network: string, signal?: AbortSignal) => Promise<Usdt0Deposit>;
         lightningInvoice: (packageId: string, signal?: AbortSignal) => Promise<LightningInvoice>;
         list: (signal?: AbortSignal) => Promise<{
             topups: Topup[];

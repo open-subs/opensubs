@@ -52,7 +52,7 @@ rmSync(join(www, "testmedia"), { recursive: true, force: true });
 // is what a language picker reads to decide that changing language means
 // *navigating*, which inside a shell means leaving the app with no address
 // bar to come back from.
-const LOCALES = ["zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt"];
+const LOCALES = ["zh-Hans", "zh-Hant", "ja", "ko", "de", "es", "pt", "ru"];
 for (const locale of LOCALES) {
   rmSync(join(www, locale), { recursive: true, force: true });
   rmSync(join(www, `${locale}.html`), { force: true });

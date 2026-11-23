@@ -33,6 +33,15 @@ import {
   type InputAudioTrack,
 } from "mediabunny";
 
+import {
+  installModelHooks,
+  isModelDownloadFailure,
+  readModelSourcePref,
+  sourceOrder,
+  useModelSource,
+  type ModelSource,
+  type ModelSourcePref,
+} from "./modelsource";
 import { load, planVoiced, transcriptFrom, transcriptFromKept, type Piece, type Segment, type Transcript } from "./engine";
 import { inheritQuiet, smoothLabels } from "./languages";
 import { cleanUp, mergeBriefs } from "./cleanup";
@@ -138,6 +147,12 @@ export interface AsrModel {
   label: string;
   /** Approximate download, once. */
   size: string;
+  /**
+   * About how much memory a transcription with it takes, in MiB, on each
+   * backend -- they load different weights (q8 on WebGPU, fp32 on WASM; see
+   * `loadLocalModel`). Measured, not promised: see the note on ASR_MODELS.
+   */
+  memory: { webgpu: number; wasm: number };
   note: string;
   /** English-only models are smaller and better at English. */
   englishOnly: boolean;
@@ -149,12 +164,39 @@ export interface AsrModel {
  * Deliberately short. The desktop ships three for the same reason: a
  * dropdown of fifteen checkpoints is a worse product than three that span
  * the real trade-off, which is download size against accuracy.
+ *
+ * ## Where `memory` comes from
+ *
+ * Measured with e2e/enginecheck (memory.mjs, memory-windows.mjs): the real
+ * `transcribeLocally` on the first 40 s of testmedia/en.wav, warm cache, in
+ * Chrome 151 on Windows 11 with an RTX 3090, 2026-11-15. The figure is the
+ * browser's rise over an idle tab at its peak -- Private Bytes of every
+ * Chrome process, plus the rise in GPU memory on WebGPU -- in MiB:
+ *
+ *                 WebGPU (RAM + GPU)     CPU / WASM
+ *   Tiny (en)     1072 + 430 = 1502      1210
+ *   Base          1257 + 691 = 1948      2042
+ *   Small         2410 + 1106 = 3516     4243
+ *
+ * Headless Chromium on Linux (PSS, CPU) agreed: Tiny 1184, Base 1726.
+ *
+ * Two things the numbers say that the download sizes do not. About a
+ * gigabyte is the same whichever model runs -- the page, ONNX Runtime's
+ * WASM heap and the audio, nearly all in the renderer -- so Tiny is not
+ * forty megabytes of memory. And the WebGPU total is RAM plus video memory:
+ * on a discrete card the part in brackets is the card's; on integrated
+ * graphics and Apple silicon it is all the machine's own memory.
+ *
+ * A first run, which also downloads the model, peaks higher (Small on the
+ * CPU: 5.8 GB against 4.2). The picker shows the warm figure and says
+ * "about": it is a measurement on one machine, not a guarantee.
  */
 export const ASR_MODELS: AsrModel[] = [
   {
     id: "onnx-community/whisper-tiny.en",
     label: "Tiny (English)",
     size: "~40 MB",
+    memory: { webgpu: 1500, wasm: 1210 },
     note: "Fastest. Fine for clear speech.",
     englishOnly: true,
   },
@@ -162,6 +204,7 @@ export const ASR_MODELS: AsrModel[] = [
     id: "onnx-community/whisper-base",
     label: "Base",
     size: "~80 MB",
+    memory: { webgpu: 1950, wasm: 2040 },
     note: "A good default. Handles 99 languages.",
     englishOnly: false,
   },
@@ -169,6 +212,7 @@ export const ASR_MODELS: AsrModel[] = [
     id: "onnx-community/whisper-small",
     label: "Small",
     size: "~250 MB",
+    memory: { webgpu: 3520, wasm: 4240 },
     note: "Most accurate here, and the slowest.",
     englishOnly: false,
   },
@@ -642,6 +686,12 @@ async function resample(
 /** transformers.js is imported lazily: it is ~10 MB and most sessions never transcribe. */
 let pipelinePromise: Promise<unknown> | null = null;
 let loadedModelId: string | null = null;
+/** The host the loaded model came from (or was found cached under). */
+let lastModelSource: ModelSource | null = null;
+/** Where the speech model in use was downloaded from, for the funnel. */
+export function modelSource(): ModelSource | null {
+  return lastModelSource;
+}
 
 
 /**
@@ -1493,6 +1543,8 @@ export async function loadLocalModel(options: {
   model: string;
   device: "webgpu" | "wasm";
   wasmProxy?: boolean;
+  /** Where to download from; the visitor's saved choice when absent. */
+  source?: ModelSourcePref;
   onProgress?: (progress: AsrProgress) => void;
 }): Promise<unknown> {
   const { model, device, onProgress } = options;
@@ -1520,7 +1572,7 @@ export async function loadLocalModel(options: {
   // 2. This product's whole claim is that nothing leaves your machine but
   //    what you choose to send. A silent runtime dependency on a third
   //    party CDN is a claim we would be making falsely, and it is one our
-  //    own privacy page enumerates: Hugging Face for the model, and
+  //    own privacy page enumerates: Hugging Face or ModelScope for the model, and
   //    nothing else.
   //
   // Widening the CSP would fix (1) and make (2) worse. Self-hosting fixes
@@ -1559,7 +1611,7 @@ export async function loadLocalModel(options: {
     pipelinePromise = null;
     loadedModelId = wanted;
   }
-  pipelinePromise ??= pipeline("automatic-speech-recognition", model, {
+  const buildPipeline = () => pipeline("automatic-speech-recognition", model, {
     device,
     // Quantised weights on WebGPU, full precision on WASM -- and this is
     // not a tuning preference, it is a hard constraint.
@@ -1619,6 +1671,35 @@ export async function loadLocalModel(options: {
       });
     },
   });
+
+  // The preferred host first, the other only if it cannot be reached (see
+  // ./modelsource). A model already in the browser cache reaches neither:
+  // the cache is keyed the same way whichever host filled it.
+  await installModelHooks(env);
+  if (!pipelinePromise) {
+    const attempt = (async () => {
+      let lastError: unknown;
+      for (const source of sourceOrder(options.source ?? readModelSourcePref())) {
+        useModelSource(env, source);
+        try {
+          const loaded = await buildPipeline();
+          lastModelSource = source;
+          return loaded;
+        } catch (err) {
+          if (!isModelDownloadFailure(err)) throw err;
+          lastError = err;
+        }
+      }
+      throw lastError;
+    })();
+    // A failed load is not kept: the next try (a retry, the visitor back on
+    // a network that works) starts over instead of being handed the same
+    // rejection for the rest of the session.
+    attempt.catch(() => {
+      if (pipelinePromise === attempt) pipelinePromise = null;
+    });
+    pipelinePromise = attempt;
+  }
 
   return pipelinePromise;
 }

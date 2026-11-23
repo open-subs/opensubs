@@ -136,6 +136,47 @@ export async function reopenVideo(handle: FileSystemFileHandle): Promise<File | 
 }
 
 /**
+ * What the app can transcribe: any video, and any audio file.
+ *
+ * The speech is all transcription needs, so an mp3 is as good a source as
+ * an mp4 -- it just has no picture to burn into. Extensions are listed as
+ * well as the MIME families because some pickers (and some OSes' file
+ * dialogs) filter by extension and do not map `audio/*` to `.m4a` or
+ * `.opus`.
+ */
+export const VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi", ".ogv"] as const;
+export const AUDIO_EXTENSIONS = [
+  ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga", ".flac", ".opus", ".weba",
+] as const;
+export const MEDIA_ACCEPT = ["video/*", "audio/*", ...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS].join(",");
+
+function extensionOf(name: string): string {
+  const m = /\.[^.]+$/.exec(name);
+  return m ? m[0].toLowerCase() : "";
+}
+
+/**
+ * Whether a file is audio with no picture. By type first, then by name:
+ * a dropped file's `type` is empty more often than one would like
+ * (Windows without a registered handler, some Linux file managers).
+ */
+export function isAudioFile(file: { name: string; type: string }): boolean {
+  if (file.type.startsWith("audio/")) return true;
+  if (file.type.startsWith("video/")) return false;
+  return (AUDIO_EXTENSIONS as readonly string[]).includes(extensionOf(file.name));
+}
+
+/** Whether a file is something the app can open as its source. */
+export function isMediaFile(file: { name: string; type: string }): boolean {
+  if (file.type.startsWith("video/") || file.type.startsWith("audio/")) return true;
+  const ext = extensionOf(file.name);
+  return (
+    (VIDEO_EXTENSIONS as readonly string[]).includes(ext) ||
+    (AUDIO_EXTENSIONS as readonly string[]).includes(ext)
+  );
+}
+
+/**
  * Pick a video, keeping the handle when the browser offers one.
  *
  * Returns `null` if the user cancelled. Throws only for real failures,
@@ -152,9 +193,10 @@ export async function pickVideo(): Promise<{ file: File; handle: FileSystemFileH
       multiple: false,
       types: [
         {
-          description: "Video",
+          description: "Video or audio",
           accept: {
-            "video/*": [".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi", ".ogv"],
+            "video/*": [...VIDEO_EXTENSIONS],
+            "audio/*": [...AUDIO_EXTENSIONS],
           },
         },
       ],

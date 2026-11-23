@@ -58,3 +58,53 @@ export function burnStage(note: string | null | undefined): string {
   if (/^Finishing/.test(note)) return "finish";
   return "prepare";
 }
+
+/**
+ * Where transcription had got to, from the asr progress `stage` (asr.ts):
+ * reading the audio, fetching or loading the speech model, or listening.
+ * Named so a week of transcribe-failed reads the same across runs.
+ */
+export function transcribeStage(stage: string | null | undefined): string {
+  switch (stage) {
+    case "audio":
+      return "read";
+    case "model":
+      return "model";
+    case "transcribing":
+      return "transcribe";
+    default:
+      return "prepare";
+  }
+}
+
+/** A coarse bucket for how long the clip is, never the exact seconds. */
+export function durationBucket(seconds: number | null | undefined): string {
+  const s = Number(seconds) || 0;
+  if (s <= 0) return "unknown";
+  if (s <= 60) return "<=1m";
+  if (s <= 300) return "1-5m";
+  if (s <= 900) return "5-15m";
+  if (s <= 1800) return "15-30m";
+  if (s <= 3600) return "30-60m";
+  return ">60m";
+}
+
+/**
+ * How long a run went before the visitor stopped it, as a coarse bucket, from
+ * milliseconds. The question is how far in people give up -- within seconds
+ * (wrong file, changed their mind) or minutes (a long transcription that was
+ * taking too long) -- so the buckets are fine at the start and coarse later.
+ * A negative figure means the start was not recorded; it reads as "unknown".
+ */
+export function cancelAfterBucket(ms: number | null | undefined): string {
+  const s = Number(ms);
+  if (!Number.isFinite(s) || s < 0) return "unknown";
+  const sec = s / 1000;
+  if (sec <= 5) return "<=5s";
+  if (sec <= 15) return "5-15s";
+  if (sec <= 30) return "15-30s";
+  if (sec <= 60) return "30-60s";
+  if (sec <= 180) return "1-3m";
+  if (sec <= 600) return "3-10m";
+  return ">10m";
+}

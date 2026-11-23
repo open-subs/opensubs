@@ -1,115 +1,99 @@
-# OpenSubs on the Mac App Store: what it would take
+# OpenSubs on the Mac App Store
 
-2026-09-28. Written while publishing the iOS app, from what that
-publication found. **Nothing here is started.** This is the scope, in the
-order the pieces depend on each other, so the work can be costed rather
-than discovered.
+The Mac App Store build is the desktop app (`apps/desktop`) built a second
+way. The direct-download build (`npx tauri build`, the release workflow)
+is untouched by any of it: every difference is behind the Cargo feature
+`appstore` and the page variable `OPENSUBS_STORE=1`, both off by default,
+and the direct-download binary compiles to the same bytes with or without
+the store code in the tree.
 
-`docs/app-store.md` covers iOS, where most of this is already done. The Mac
-is a different app, a different binary, and — as things stand — a different
-purchase.
+```sh
+apps/desktop/scripts/fetch-bundled.sh            # the models (once)
+apps/desktop/scripts/build-appstore.sh test      # sandboxed, runs on this Mac
+apps/desktop/scripts/appstore-smoke.sh speech.mp4 hdr-speech.mp4
+apps/mobile/scripts/asc.py ensure-mac-profile    # the store profile (once a year)
+apps/desktop/scripts/build-appstore.sh store     # the .pkg for App Store Connect
+```
 
----
+`store` stops at a signed `.pkg`. Scanning it (`publish-scan.sh`),
+validating it and uploading it (`xcrun altool --validate-app` /
+`--upload-app -t macos`) are separate steps, and submitting for review is
+never scripted.
 
-## The decision that comes first
+## One app record
 
-**One bundle id across iPhone, iPad and Mac, or two?**
+The Mac app uses the iOS app's bundle id, **`app.opensubs.mobile`**, so it
+is the macOS platform of the same App Store Connect record (`6814209431`)
+and sells the same two credit packs (`opensubs_credits_1000`,
+`opensubs_credits_5000`): one purchase history, one review of the products.
+The App ID is UNIVERSAL and already has In-App Purchase and Sign in with
+Apple. The direct-download app keeps `com.opensubs.desktop`.
 
-| | Today |
-|---|---|
-| iOS | `app.opensubs.mobile` (Capacitor, App Store Connect record `6814209431`) |
-| Mac | `com.opensubs.desktop` (Tauri, no App Store Connect record at all) |
+The macOS platform is added to the record in App Store Connect's website
+(the API cannot add one).
 
-The rule this project follows is one universal id: one purchase and one set
-of credit packs across all three. Two ids means two app records, two product
-sets, two reviews of the same thing.
+## What differs from the direct-download build
 
-Two ids also means **credits bought on the iPhone do not appear on the
-Mac's purchase panel as the same product** — they would still land on the
-same account, because credits are held by the server rather than the device,
-but Apple sees two unrelated consumables and the review of each is
-separate.
+| | Direct download | Mac App Store |
+|---|---|---|
+| Bundle id | `com.opensubs.desktop` | `app.opensubs.mobile` |
+| ffmpeg | prebuilt GPL build (`fetch-bundled.sh`), or an install through Homebrew | LGPL build from source (`scripts/ffmpeg-lgpl.sh`), signed inside the app as a helper in its sandbox; nothing installed or downloaded to run |
+| H.264 encoder | libx264 | VideoToolbox (`h264_videotoolbox`): x264 is GPL |
+| Credits | card checkout in the browser | StoreKit 2 (`src-tauri/appstore/StoreBridge.swift`), redeemed by `apps/web/src/lib/iap.ts`, the iOS app's own code |
+| Sign in with Apple | the web redirect | Apple's sheet (`src/store/account.ts`), against the same `apple_native` challenge as iOS |
+| Account deletion | on the website | in the account panel (guideline 5.1.1(v)) |
+| Where an export goes | beside the video | a folder the person picks, starting at the video's (`src/store/api.ts`); the sandbox grants the picked video, not its folder |
+| Reveal in Finder | `open -R` | `NSWorkspace` |
+| Updates | none compiled in | none compiled in |
+| Architectures | arm64 | arm64 |
 
-Changing the desktop id is cheap *now* and impossible later: the Mac app
-has never been on the store, so nothing is tied to `com.opensubs.desktop`
-except the Developer ID build people may already have installed. Changing
-it after a store release orphans every purchase.
+The sandbox entitlements are only what the app does
+(`src-tauri/appstore/OpenSubs.entitlements`): user-selected read-write
+files, network client (model downloads from Hugging Face, the account and
+cloud translation), Sign in with Apple. ffmpeg and ffprobe carry only
+`app-sandbox` and `inherit` (`helper.entitlements`), so they run in the
+app's sandbox and cannot be started on their own. The privacy manifest is
+`src-tauri/appstore/PrivacyInfo.xcprivacy`; NOTICE, LICENSE, the ffmpeg
+licences, its configure line and the complete source archives of ffmpeg
+and every library in it are copied into `Contents/Resources/licences/`.
 
-**This decision blocks everything below.** Nothing else should start until
-it is made.
+The store build is the page built with `OPENSUBS_STORE=1`: `vite.config.ts`
+swaps `src/lib/account.ts`, `api.ts` and `AccountPanel.svelte` for their
+`src/store/` counterparts. The Rust side is `src-tauri/src/store.rs` and
+`commands::store_cmds`.
 
-## What does not exist yet
+## Testing without the store
 
-- **No Mac app record** in App Store Connect. `asc.py whoami` lists the
-  team's records, and none of them is a Mac app. The record is the one step the API refuses (`POST /v1/apps` → 403), so it
-  is a web-UI step, by hand, once.
-- **No Mac provisioning support in this repo.** `apps/mobile/scripts/asc.py`
-  has `ensure-cert`, `ensure-app-id` and `ensure-profile`, all iOS. A Mac
-  App Store build needs a *Mac App Distribution* certificate, a *Mac
-  Installer Distribution* certificate, and a Mac provisioning profile —
-  three more things, which would be two new commands,
-  `ensure-installer-cert` and `ensure-mac-profile`.
-- **No store build script.** `apps/desktop` has no `scripts/` directory.
-  The shape that works is a `build-appstore.sh` with three modes
-  (`test | store | upload`): `test` builds the sandboxed app ad-hoc so it
-  runs on this Mac, `store` signs it for submission and cannot launch
-  locally at all.
-- **No StoreKit bridge on the Mac.** The page asks `storeKit()` in
-  `apps/web/src/lib/native.ts`; the iOS shell answers through
-  `OpenSubsStore.swift`. Tauri answers nothing, so the Mac store build
-  would show a card checkout — which is the 3.1.1 rejection.
-- **No sandbox entitlements**, and `tauri.conf.json` has an empty
-  `bundle.macOS` block.
+A store-signed app does not launch outside the store, so `build-appstore.sh
+test` builds the same sandboxed app with the Apple Development certificate
+and the sandbox entitlements only, plus a hook (Cargo feature
+`appstore-test`) that runs a script in the real window. `appstore-smoke.sh`
+drives it with no clicks or keystrokes and checks a burn with its `.srt`, an
+HDR burn translated on the Mac, a video opened with the app, that the
+sandbox refuses anything else, and that StoreKit answers through the
+bridge. Sign in with Apple and a purchase need the store profile, so they
+are tested from TestFlight.
 
-## What is already right
+## Traps
 
-- **Nothing shells out to a binary.** `grep -rn "Command::new"` in
-  `apps/desktop/src-tauri/src` finds nothing, so the sandbox rule against
-  running a bundled command-line tool does not bite here. The engine is
-  already WebAssembly in the page.
-- **No updater plugin compiled in** (`plugins: []`), so there is no
-  self-updating app to put behind a Cargo feature. An app that updates
-  itself is refused; this one does not.
-- **The account, the credits and the ledger are the server's**, and already
-  work — the iOS work proved the rail end to end.
-
-## The order
-
-1. **Decide the bundle id.** If universal: change `identifier` in
-   `tauri.conf.json` to `app.opensubs.mobile`, and add the macOS platform
-   to the *existing* App Store Connect record rather than making a second
-   one. If separate: register `com.opensubs.desktop` as its own App ID and
-   accept a second set of consumables.
-2. **Certificates and profile.** Add `ensure-installer-cert` and
-   `ensure-mac-profile` to `apps/mobile/scripts/asc.py` (or a new
-   `apps/desktop/scripts/asc.py`).
-3. **Sandbox the app.** Entitlements: `app-sandbox`,
-   `files.user-selected.read-write`, `files.bookmarks.app-scope` for
-   recents, `network.client` for the account and the paid routes. Then walk
-   every file path in the app: a sandboxed app may read what the person
-   picked, for that session, and needs a security-scoped bookmark for
-   anything it wants to reopen.
-4. **The StoreKit bridge.** A Tauri command backed by StoreKit 2 with the
-   same four calls `OpenSubsStore.swift` exposes — `products`, `purchase`,
-   `outstanding`, `finish` — wired to the same `storeKit()` interface the
-   page already asks for. The purchase *ordering* is already written and
-   tested in `apps/web/src/lib/iap.ts`; only the bridge is new.
-5. **`build-appstore.sh`.** Universal (arm64 + x86_64) — an arm64-only app
-   will not install on an Intel Mac. Read the tail of its log rather than
-   its exit code: a Tauri build with an updater configured can exit non-zero
-   on the updater-signature step, long after a successful build.
-6. **Listing, screenshots (`APP_DESKTOP`), review notes**, and the same
-   review account.
-7. **Submit**, with the IAPs attached in the web UI — the API rejects every
-   documented relationship name for that, which is measured, not assumed.
-
-## Two traps that will cost a day each if met cold
-
-- **Permissive Security blocks every App Store app.** On Apple Silicon,
-  disabling SIP forces the boot policy to Permissive, and macOS then
-  refuses to launch *any* App Store or TestFlight binary — with a dialog
-  that names Security Policy, not signing. Developer ID builds are
-  unaffected, which is the tell. `csrutil status` says `disabled` when this
-  is the problem.
+- **A helper signed with `inherit` traps (exit 133) when started from a
+  terminal.** That is the sandbox working. Read the outputs with the
+  unsigned copy in `src-tauri/bundled/ffmpeg-lgpl/`.
+- **Compiled paths name the builder's home.** Panic locations and C++
+  `__FILE__`s carry the Cargo registry and checkout paths; the store build
+  remaps them (`--remap-path-prefix`, `-ffile-prefix-map`) and builds into
+  `appstore-target/` so the direct-download cache is not invalidated.
+- **`publish-scan.sh` fails on the ffmpeg source the bundle carries.** The
+  upstream archives in `Resources/licences/ffmpeg/source/` are full of
+  their authors' e-mail addresses and version numbers that read as IPs:
+  about 2,500 hits, none of them ours. Check the archives against the
+  SHA-256 pins in `ffmpeg-lgpl.sh`, then scan everything else with
+  `--skip-path 'licences/ffmpeg/source/'`. The one remaining hit is the
+  app's own redaction markers (`"\Users\"`, `"/Users/"`, `"/home/"` in
+  `commands::redact`) running into the next string, `/home/struct`, which
+  the direct-download binary has too: `--allow '/home/struct'`.
+- **Permissive Security blocks every App Store app.** On Apple Silicon with
+  SIP disabled, macOS refuses to launch any App Store or TestFlight binary,
+  with a dialog that names Security Policy, not signing.
 - **An empty review submission cannot be deleted or cancelled.** Create one
   only when there are items ready to go into it, in the same run.

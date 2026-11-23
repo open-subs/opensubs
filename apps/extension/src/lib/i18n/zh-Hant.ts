@@ -25,6 +25,8 @@ const zhHant: Record<string, string> = {
   "Fastest. Fine for clear speech.": "最快。語音清晰時夠用。",
   "A good default. Handles 99 languages.": "不錯的預設選擇。支援 99 種語言。",
   "Most accurate here, and the slowest.": "本機最準確，也最慢。",
+  "needs about {memory} of memory": "大約需要 {memory} 記憶體",
+  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.": "這部裝置回報的記憶體約為 {gb} GB。Small 執行時大約需要 {memory}，建議在這裡改用 Base。",
   "Runs on": "執行裝置",
   "Graphics card (GPU)": "顯示卡 (GPU)",
   "Processor (CPU)": "處理器 (CPU)",

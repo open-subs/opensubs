@@ -42,6 +42,9 @@
     reopenVideo,
     pickVideo,
     handleFromDrop,
+    isAudioFile,
+    isMediaFile,
+    MEDIA_ACCEPT,
   } from "./lib/videohandle";
   import { attachPreview, type Preview } from "./lib/preview";
   import { fontKey, unsupportedCharacters } from "./lib/fonts";
@@ -80,6 +83,7 @@
     REMOTE_MODELS,
     asrSupport,
     hasKnownUploadLimit,
+    modelSource,
     lacksTimestamps,
     loudnessFor,
     remoteUploadSeconds,
@@ -87,7 +91,13 @@
     transcribeRemotely,
     type AsrSupport,
   } from "./lib/asr";
-  import { prefersSmallModel } from "./lib/device";
+  import { formatMemory, prefersSmallModel, reportedMemoryGb, smallIsTightOn } from "./lib/device";
+  import {
+    readModelSourcePref,
+    sourceOrder,
+    writeModelSourcePref,
+    type ModelSourcePref,
+  } from "./lib/modelsource";
   import {
     PROVIDERS,
     deviceAvailability,
@@ -157,6 +167,16 @@
   let videoWidth = $state(0);
   let videoHeight = $state(0);
   let videoDuration = $state(0);
+  /**
+   * The open file has sound and no picture: an mp3, a wav, an m4a.
+   * Everything that reads its speech works unchanged; the
+   * preview and the burned-in export need a picture, so they step aside
+   * and say so instead of waiting for dimensions that never arrive.
+   * Set from the file's type or name on load, and again from the element
+   * once its metadata is in -- an .mp4 holding only an audio track is
+   * audio too.
+   */
+  let audioOnly = $state(false);
   let isDragOver = $state(false);
   /**
    * The video the last visit was working on, if this browser can hand it
@@ -386,6 +406,20 @@
    * for themselves must not have it changed underneath them.
    */
   let modelChosenByUser = $state(false);
+  /**
+   * What Chrome and Edge say this machine has, in GB (navigator.deviceMemory,
+   * coarse and capped at 8); undefined in Firefox and Safari, which then get
+   * no advice either way.
+   */
+  const deviceMemoryGb = reportedMemoryGb();
+  /** Small picked on a machine that reports too little memory for it. */
+  const smallTight = $derived(asrModel.includes("whisper-small") && smallIsTightOn(deviceMemoryGb));
+  /**
+   * Where the speech model downloads from: automatic (mainland China by its
+   * time zone gets ModelScope, everyone else Hugging Face), or one of the two
+   * named. Kept on this device; see ./lib/modelsource.
+   */
+  let modelSourcePref = $state<ModelSourcePref>(readModelSourcePref());
 
   /**
    * Small where the GPU can carry it, Base everywhere else.
@@ -419,7 +453,9 @@
     if (modelChosenByUser || !asr) return;
     const small = ASR_MODELS.find((m) => m.id.includes("whisper-small"));
     const base = ASR_MODELS.find((m) => m.id.includes("whisper-base"));
-    const pick = prefersSmallModel({ device: asrDevice, integrated: asr.integrated }) ? small : base;
+    const pick = prefersSmallModel({ device: asrDevice, integrated: asr.integrated, memoryGb: deviceMemoryGb })
+      ? small
+      : base;
     if (pick) asrModel = pick.id;
   }
 
@@ -460,6 +496,14 @@
     spokenFound.map((code) => languages.find((l) => l.code.split("-")[0] === code)?.name ?? code),
   );
   let transcribing = $state(false);
+  /**
+   * The cues the last transcription made, while they are still the ones on
+   * screen: what shows the "Enjoying OpenSubs?" line once under a fresh
+   * result. Anything that replaces the cues (a translation, an imported
+   * file, a new run) makes them different cues, and the line goes.
+   */
+  let freshCues = $state.raw<Cue[] | null>(null);
+  const subtitlesJustMade = $derived(freshCues !== null && freshCues === cues && cues.length > 0);
   let asrNote = $state("");
   let asrPercent = $state<number | null>(null);
   /**
@@ -768,6 +812,9 @@
 
   /** The dimensions an export would encode at, which the ASS is bound to. */
   const outputSize = $derived.by<[number, number]>(() => {
+    // Audio has no frame, so its .ass is laid out on the usual 1080p
+    // canvas; a player scales PlayRes to whatever it is shown over.
+    if (engineReady && hasVideo && audioOnly) return [1920, 1080];
     if (!engineReady || !hasDimensions) return [0, 0];
     return exportSize(videoWidth, videoHeight, exportHeight === "" ? 0 : Number(exportHeight));
   });
@@ -951,6 +998,10 @@
     // has no `window` to read a preference from.
     initLocale();
     primeExportGate();
+    // A transcription whose page the browser ended mid-run (a memory kill on
+    // a phone, a reload, the tab closed) left a marker behind: report it once,
+    // as transcribe-failed error=interrupted, so those are not a silent gap.
+    funnel.reportTranscribeInterrupted();
     void exportGateOn().then((on) => {
       exportGateCopy = on;
       // Once per page load, with a connection: is the session here still
@@ -1069,7 +1120,8 @@
   $effect(() => {
     const ass = assDocument;
     const el = videoEl;
-    if (!el || !ass) {
+    // No picture, so nothing for libass to draw over.
+    if (!el || !ass || audioOnly) {
       preview?.destroy();
       preview = null;
       previewFontKey = "";
@@ -1159,6 +1211,7 @@
     videoWidth = 0;
     videoHeight = 0;
     videoDuration = 0;
+    audioOnly = isAudioFile(file);
     trimStart = null;
     trimEnd = null;
     // Nothing waits on this: whether the video can be offered back after a
@@ -1264,6 +1317,11 @@
     videoWidth = videoEl.videoWidth;
     videoHeight = videoEl.videoHeight;
     videoDuration = videoEl.duration;
+    if (videoWidth === 0 || videoHeight === 0) audioOnly = true;
+    if (audioOnly) {
+      void tick().then(showNextStep);
+      return;
+    }
     // Here rather than at the end of `loadVideo`: the player has no height
     // until its metadata arrives, so a scroll computed before this point
     // aims at a document that is about to grow by the height of a video.
@@ -1619,7 +1677,9 @@
     );
     const files = Array.from(event.dataTransfer?.files ?? []);
     for (const [i, file] of files.entries()) {
-      if (file.type.startsWith("video/")) {
+      // Audio as well as video, and by extension too: a dropped
+      // file's type is sometimes empty.
+      if (isMediaFile(file) && !/\.(srt|vtt)$/i.test(file.name)) {
         await loadVideo(file, handles[i] ?? null);
       } else if (/\.(srt|vtt)$/i.test(file.name)) {
         await useSubtitleFile(file);
@@ -1757,6 +1817,7 @@
   async function doTranscribe() {
     if (!videoFile || transcribing) return;
     transcribing = true;
+    freshCues = null;
     asrError = null;
     noSpeechOffer = false;
     asrPercent = null;
@@ -1765,6 +1826,23 @@
     asrPhase = "";
     asrPhaseStarted = performance.now();
     asrAbort = new AbortController();
+    // The funnel's view of this run: the spoken language asked for, where it
+    // ran, and a coarse clip-length bucket. `atStage` follows the engine's
+    // own stage, so a failure (or an interruption) names where it died.
+    const runInfo: { lang: string; engine: string; dur: string; src?: string } = {
+      lang: spokenLanguage || "auto",
+      engine: asrEngine,
+      dur: funnel.durationBucket(clipLength(trim.start, trim.end, videoDuration)),
+    };
+    // On this device, where the model is meant to come from: the host tried
+    // first, replaced by the one that actually served it once it has loaded.
+    // Mainland China's completions are read off this.
+    if (asrEngine === "local") runInfo.src = sourceOrder(modelSourcePref)[0];
+    const settleSource = () => {
+      if (asrEngine === "local") runInfo.src = modelSource() ?? runInfo.src;
+    };
+    let atStage: string | null = null;
+    funnel.transcribeStart(runInfo);
     try {
       const shared = {
         file: videoFile,
@@ -1775,8 +1853,10 @@
         start: trim.start,
         end: trimEnd,
         signal: asrAbort.signal,
-        onProgress: (p: { note: string; fraction: number | null }) => {
+        onProgress: (p: { note: string; fraction: number | null; stage?: string }) => {
           asrPercent = p.fraction === null ? null : Math.round(p.fraction * 100);
+          atStage = p.stage ?? atStage;
+          funnel.transcribeProgress(p.stage);
           // The clock is keyed on the note, which is the engine saying what
           // it is doing right now: reading the audio, fetching one file of
           // the model, listening. Each runs at its own rate and each starts
@@ -1822,6 +1902,11 @@
       if (result.noSpeech) {
         noSpeechOffer = true;
         transcribing = false;
+        // The run finished but found nothing to transcribe, so no subtitles
+        // came of it: counted as its own outcome, not a success and not a
+        // crash. A retry with "subtitle it anyway" is a fresh start/complete.
+        settleSource();
+        funnel.transcribeFailed(atStage, { category: "no-speech" }, runInfo);
         return;
       }
 
@@ -1874,9 +1959,14 @@
       loudness = loudnessFor(cues, audio, audioOffset);
       selectedCue = null;
       forgetEdits();
+      settleSource();
+      funnel.transcribeComplete(runInfo);
+      freshCues = cues;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       asrError = message.includes("Cancelled") ? null : message;
+      settleSource();
+      funnel.transcribeFailed(atStage, e, runInfo);
     } finally {
       transcribing = false;
       asrAbort = null;
@@ -2485,8 +2575,38 @@
               onchange={() => (modelChosenByUser = true)}
             >
               {#each ASR_MODELS as m (m.id)}
-                <option value={m.id}>{t(m.label)} &middot; {m.size}</option>
+                <option value={m.id}
+                  >{t(m.label)} &middot; {m.size} &middot; {t("needs about {memory} of memory", {
+                    memory: formatMemory(m.memory[asrDevice]),
+                  })}</option
+                >
               {/each}
+            </select>
+            {#if smallTight}
+              <!-- Advice, not a block: the figure is a measured peak and the
+                   reported memory is rounded down, so it may well run. -->
+              <span class="oa-caption model-memory-hint">
+                {t(
+                  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.",
+                  {
+                    gb: deviceMemoryGb ?? 0,
+                    memory: formatMemory(ASR_MODELS.find((m) => m.id === asrModel)?.memory[asrDevice] ?? 0),
+                  },
+                )}
+              </span>
+            {/if}
+          </label>
+          <label class="field">
+            <span class="field-label">{t("Download from")}</span>
+            <select
+              class="input"
+              bind:value={modelSourcePref}
+              disabled={transcribing}
+              onchange={() => writeModelSourcePref(modelSourcePref)}
+            >
+              <option value="auto">{t("Automatic")}</option>
+              <option value="cn">{t("Mainland China")}</option>
+              <option value="us">{t("International")}</option>
             </select>
           </label>
           {#if asr?.device === "webgpu"}
@@ -2780,7 +2900,7 @@
         asking for a particular rectangle.
       -->
       <div class="start">
-        <h3 class="start-title">{t("Start with a video")}</h3>
+        <h3 class="start-title">{t("Start with a video or audio file")}</h3>
         <p class="start-sub">
           {t("Its speech becomes subtitles here, on this machine. Nothing is uploaded.")}
         </p>
@@ -2794,14 +2914,14 @@
           <label class="btn btn-primary start-primary">
             <input
               type="file"
-              accept="video/*"
-              aria-label={t("Choose a video")}
+              accept={MEDIA_ACCEPT}
+              aria-label={t("Choose a file")}
               onclick={chooseVideo}
               onchange={onVideoInput}
               hidden
             />
             <Icon name="film" size={20} />
-            {t("Choose a video")}
+            {t("Choose a file")}
           </label>
           <button
             type="button"
@@ -2833,8 +2953,8 @@
         </div>
         <p class="start-fine">
           {exportGateCopy
-            ? t("MP4, MOV, WebM and MKV. Free, no account to try; burning into a video takes a free sign-in. The speech model downloads once, when you generate.")
-            : t("MP4, MOV, WebM and MKV. Free, no account. The speech model downloads once, when you generate.")}
+            ? t("MP4, MOV, WebM and MKV, or MP3, WAV and M4A audio. Free, no account to try; burning into a video takes a free sign-in. The speech model downloads once, when you generate.")
+            : t("MP4, MOV, WebM and MKV, or MP3, WAV and M4A audio. Free, no account. The speech model downloads once, when you generate.")}
         </p>
       </div>
       {#if videoError}
@@ -2857,7 +2977,19 @@
     -->
     <div class="workspace">
       <div class="workspace-output">
-            <div class="stage" class:stage-empty={!hasVideo}>
+            <div class="stage" class:stage-empty={!hasVideo} class:stage-audio={hasVideo && audioOnly}>
+              {#if hasVideo && audioOnly}
+                <!--
+                  An audio file. The element below still plays it, but as a
+                  video it would be a black box with controls under it, which
+                  reads as footage that failed to load. Said plainly instead.
+                -->
+                <div class="no-video" data-audio-only>
+                  <Icon name="music" size={22} />
+                  <p class="no-video-title">{t("Audio only, so there is no picture to preview.")}</p>
+                  <p class="oa-caption">{t("It plays here, and the subtitles are in the list below.")}</p>
+                </div>
+              {/if}
               <!-- svelte-ignore a11y_media_has_caption -->
               <video
                 bind:this={videoEl}
@@ -2901,7 +3033,7 @@
                     <label class="btn btn-sm" class:btn-primary={!rememberedVideoHandle} class:btn-secondary={!!rememberedVideoHandle}>
                       <input
                         type="file"
-                        accept="video/*"
+                        accept={MEDIA_ACCEPT}
                         onclick={chooseVideo}
                         onchange={onVideoInput}
                         hidden
@@ -2915,6 +3047,11 @@
             <div class="file-row">
               {#if !hasVideo}
                 <p class="oa-caption file-meta">{t("No video loaded")}</p>
+              {:else if audioOnly}
+                <p class="oa-caption file-meta" title={videoName}>
+                  <span class="oa-mono file-name">{videoName}</span>
+                  <span class="file-facts">&middot; {t("audio")}{videoDuration > 0 ? ` · ${formatDuration(videoDuration)}` : ""}</span>
+                </p>
               {:else if hasDimensions}
                 <p class="oa-caption file-meta" title={videoName}>
                   <span class="oa-mono file-name">{videoName}</span>
@@ -2929,13 +3066,13 @@
               <label class="btn btn-ghost btn-sm" class:disabled={burning || transcribing}>
                 <input
                   type="file"
-                  accept="video/*"
+                  accept={MEDIA_ACCEPT}
                   onclick={chooseVideo}
                   onchange={onVideoInput}
                   disabled={burning || transcribing}
                   hidden
                 />
-                {hasVideo ? t("Replace video") : t("Load video")}
+                {hasVideo ? (audioOnly ? t("Replace audio") : t("Replace video")) : t("Load video")}
               </label>
             </div>
         {#if videoError}
@@ -2976,6 +3113,12 @@
                 {t("Replace")}
               </label>
             </div>
+            {#if subtitlesJustMade && !burnedUrl}
+              <!-- Once, under subtitles a run has just made: the Telegram
+                   and X pair with one line. Browser tab only (lib/support.ts);
+                   gone once the cues change or a burned video takes over. -->
+              <openapps-community variant="success" class="result-community"></openapps-community>
+            {/if}
             <CueList
               {cues}
               source={sourceCues}
@@ -3540,10 +3683,14 @@
           </p>
           <div class="checkbox-row">
             <label class="btn btn-primary btn-sm" data-load-for-burn>
-              <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
+              <input type="file" accept={MEDIA_ACCEPT} onclick={chooseVideo} onchange={onVideoInput} hidden />
               {t("Load the video first")}
             </label>
           </div>
+        {:else if audioOnly}
+          <p class="oa-caption card-intro" data-burn-needs-video>
+            {t("Burning in needs a video file. This one is audio, so save a subtitle file below.")}
+          </p>
         {:else if !hasDimensions}
           <p class="oa-caption card-intro">{t("reading…")}</p>
         {/if}
@@ -3583,6 +3730,9 @@
                 </button>
               </div>
             </div>
+            <!-- The burned video is the finished result: the Telegram and X
+                 pair with one line, once, under it (browser tab only). -->
+            <openapps-community variant="success" class="result-community"></openapps-community>
           {:else if burning}
             <div class="burn-progress">
               <div
@@ -3629,7 +3779,7 @@
             {#if burnReselect}
               <div class="checkbox-row">
                 <label class="btn btn-primary btn-sm" data-burn-reselect>
-                  <input type="file" accept="video/*" onclick={chooseVideo} onchange={onVideoInput} hidden />
+                  <input type="file" accept={MEDIA_ACCEPT} onclick={chooseVideo} onchange={onVideoInput} hidden />
                   {t("Choose the video again")}
                 </label>
               </div>
@@ -3750,7 +3900,9 @@
     <p class="oa-caption">
       {t("Engine {version} running in WebAssembly — the same Rust the desktop app and CLI use.", { version })}
     </p>
-    <!-- The quiet way to reach us, always there. -->
+    <!-- The way to reach us, always there: the box draws Telegram (which
+         opens its panel pointing at the OpenSubs topic, lib/support.ts) and
+         "Follow @OpenSubsApp on X" as a pair of outlined buttons. -->
     <openapps-support variant="link"></openapps-support>
   </footer>
 </main>

@@ -494,7 +494,7 @@ console.log("the sample");
 // "generate subtitles from the audio" possible at all.
 if (FIXTURE) {
   console.log("video");
-  await page.setInputFiles('input[accept="video/*"]', FIXTURE);
+  await page.setInputFiles('input[accept^="video/*"]', FIXTURE);
   await page.waitForFunction(
     () => {
       const v = document.querySelector("video");
@@ -1413,7 +1413,7 @@ if (FIXTURE) {
     // which is the point of the test -- and every later check needs it, so
     // this test must restore the world it disturbed rather than leaving the
     // rest of the suite to fail on a null <video>.
-    await page.setInputFiles('input[accept="video/*"]', FIXTURE);
+    await page.setInputFiles('input[accept^="video/*"]', FIXTURE);
     await page.waitForFunction(
       () => {
         const v = document.querySelector("video");
@@ -1460,7 +1460,7 @@ if (FIXTURE) {
         await writable.close();
         window.showOpenFilePicker = async () => [handle];
       }, `${base}/clip.webm`);
-      await page.$eval('input[accept="video/*"]', (el) => el.click());
+      await page.$eval('input[accept^="video/*"]', (el) => el.click());
       const picked = await page
         .waitForFunction(() => {
           const v = document.querySelector("video");
@@ -1572,7 +1572,7 @@ if (FIXTURE) {
       });
       await page.goto(base, { waitUntil: "networkidle" });
       await page.waitForSelector(".features-card", { timeout: 15000 });
-      await page.setInputFiles('input[accept="video/*"]', FIXTURE);
+      await page.setInputFiles('input[accept^="video/*"]', FIXTURE);
       await page.waitForFunction(
         () => {
           const v = document.querySelector("video");
@@ -1813,6 +1813,23 @@ check(
     return "";
   };
 
+  // The model picker is on the Subtitles card, which only shows once there
+  // is a video; a fresh page gets the same fixture the main one did.
+  const withVideo = async (pg) => {
+    if (FIXTURE) {
+      await pg.setInputFiles('input[accept^="video/*"]', FIXTURE);
+      await pg.waitForFunction(() => (document.querySelector("video")?.videoWidth ?? 0) > 0, null, { timeout: 20000 });
+    }
+    await pg.waitForTimeout(1200);
+  };
+  // The picker sits in a folded section, so it is chosen the way the page
+  // hears a choice -- a change event -- rather than clicked.
+  const pick = (select, label) => select.evaluate((el, label) => {
+    const o = [...el.options].find((x) => x.textContent.replace(/\s+/g, " ").trim() === label);
+    if (o) el.value = o.value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, label);
+
   // This harness has no WebGPU at all -- checked, not assumed -- so the
   // page must start on Base. Small on the WASM backend cannot load the
   // quantised weights and would pull about a gigabyte of fp32 instead.
@@ -1833,7 +1850,7 @@ check(
   });
   const gpuPage = await gpuCtx.newPage();
   await gpuPage.goto(base, { waitUntil: "networkidle" });
-  await gpuPage.waitForTimeout(1200);
+  await withVideo(gpuPage);
   check(
     "with WebGPU it starts on Small",
     /Small/.test(await chosen(gpuPage)),
@@ -1846,13 +1863,65 @@ check(
     const options = await sels.nth(i).locator("option").allTextContents();
     if (options.some((o) => /MB/.test(o))) {
       const base = options.find((o) => /Base/.test(o));
-      if (base) await sels.nth(i).selectOption({ label: base });
+      if (base) await pick(sels.nth(i), base.replace(/\s+/g, " ").trim());
       break;
     }
   }
   await gpuPage.waitForTimeout(600);
   check("a model the user picked is left alone", /Base/.test(await chosen(gpuPage)), await chosen(gpuPage));
   await gpuCtx.close();
+
+  // Each model says about how much memory it needs, beside its download,
+  // and the figure follows the backend: q8 on WebGPU, fp32 on the CPU.
+  const modelOptions = async (pg) => {
+    const sels = pg.locator(modelSelect);
+    for (let i = 0; i < (await sels.count()); i += 1) {
+      const options = await sels.nth(i).locator("option").allTextContents();
+      if (options.some((o) => /MB/.test(o))) return { select: sels.nth(i), options: options.map((o) => o.replace(/\s+/g, " ").trim()) };
+    }
+    return { select: null, options: [] };
+  };
+  const cpuOptions = (await modelOptions(page)).options;
+  check("every model says about how much memory it needs",
+    cpuOptions.length === 3 && cpuOptions.every((o) => /needs about \d+(\.\d)? [MG]B of memory/.test(o)), cpuOptions.join(" | "));
+  check("the CPU figures are the measured fp32 ones",
+    /Small.*~250 MB.*4\.1 GB/.test(cpuOptions[2]) && /Base.*2\.0 GB/.test(cpuOptions[1]), cpuOptions.join(" | "));
+
+  // Low memory as Chrome reports it (navigator.deviceMemory, here 4 -- "4
+  // to 8 GB"), on a machine whose GPU would otherwise be given Small.
+  const lowCtx = await browser.newContext();
+  await lowCtx.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", { configurable: true, value: { requestAdapter: async () => ({ name: "stub" }) } });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 4 });
+  });
+  const lowPage = await lowCtx.newPage();
+  await lowPage.goto(base, { waitUntil: "networkidle" });
+  await withVideo(lowPage);
+  check("with WebGPU but 4 GB reported it starts on Base", /Base/.test(await chosen(lowPage)), await chosen(lowPage));
+  const low = await modelOptions(lowPage);
+  check("on WebGPU the figures are the q8 ones", /Small.*3\.4 GB/.test(low.options[2] ?? ""), low.options.join(" | "));
+  const hint = lowPage.locator(".model-memory-hint");
+  check("no advice while Base is chosen", (await hint.count()) === 0);
+  const smallLabel = low.options.find((o) => /Small/.test(o));
+  if (low.select && smallLabel) await pick(low.select, smallLabel);
+  await lowPage.waitForTimeout(300);
+  const said = (await hint.count()) ? (await hint.textContent()).replace(/\s+/g, " ").trim() : "";
+  check("choosing Small there suggests Base, and says it is approximate",
+    /reports about 4 GB/.test(said) && /about 3\.4 GB/.test(said) && /Base is the safer choice/.test(said), said);
+  await lowCtx.close();
+
+  // 8 is Chrome's cap ("8 GB or more"): no advice.
+  const bigCtx = await browser.newContext();
+  await bigCtx.addInitScript(() => {
+    Object.defineProperty(navigator, "gpu", { configurable: true, value: { requestAdapter: async () => ({ name: "stub" }) } });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 8 });
+  });
+  const bigPage = await bigCtx.newPage();
+  await bigPage.goto(base, { waitUntil: "networkidle" });
+  await withVideo(bigPage);
+  check("with 8 GB reported Small stays the default, with no advice",
+    /Small/.test(await chosen(bigPage)) && (await bigPage.locator(".model-memory-hint").count()) === 0, await chosen(bigPage));
+  await bigCtx.close();
 }
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.join(" | "));

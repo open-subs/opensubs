@@ -1,19 +1,19 @@
-import{a as p,b as r,d as o,e as h,f as l,g as n,m as d}from"./chunk-D7VGXHRZ.js";import{a as i}from"./chunk-LCQWCHVU.js";function u(c){return new Date(c*1e3).toLocaleDateString(void 0,{day:"numeric",month:"short"})}var a=class extends d{constructor(){super(...arguments);this.appId="";this.info=null;this.earnings=null;this.referees=null;this.tab="link";this.copied=!1}connectedCallback(){super.connectedCallback(),this.load()}onSessionChange(){this.load()}async load(){let t=this.sdkOrNull;if(!t?.isLoggedIn){this.info=null,this.earnings=null,this.referees=null;return}this.info=await this.run(()=>t.referral.code(this.appId||void 0))??null,this.earnings=await this.run(()=>t.referral.earnings())??null,this.referees=await this.run(()=>t.referral.referees())??null}updated(t){t.has("appId")&&this.load()}get link(){if(this.info?.invite_url)return this.info.invite_url;let t=this.inviteUrl??(typeof location>"u"?"":`${location.origin}${location.pathname}`);if(!this.info)return t;let e=t.includes("?")?"&":"?";return`${t}${e}ref=${encodeURIComponent(this.info.code)}`}async copy(){try{await navigator.clipboard.writeText(this.link),this.copied=!0,setTimeout(()=>this.copied=!1,2e3)}catch{this.error="Could not copy. Select the link and copy it manually."}}render(){if(!this.sdkOrNull)return r`<p class="muted">Loading…</p>`;if(!this.sdk.isLoggedIn)return r`<p class="muted">Sign in to get your invite link.</p>`;if(!this.info)return r`<p class="muted">${this.error??"Loading\u2026"}</p>`;let t=this.referees?.referees??[],e=this.earnings?.entries??[],g=[["link","Your link"],["referees",`Referees${t.length?` (${t.length})`:""}`],["earnings",`Earnings${e.length?` (${e.length})`:""}`]];return r`
+import{a as h,c as r,e as l,f as u,g as d,h as s,n as g,o as n,q as c}from"./chunk-HLRRPXU7.js";import{a as i}from"./chunk-LCQWCHVU.js";function v(p){return new Date(p*1e3).toLocaleDateString(g(),{day:"numeric",month:"short"})}var a=class extends c{constructor(){super(...arguments);this.appId="";this.info=null;this.earnings=null;this.referees=null;this.tab="link";this.copied=!1}connectedCallback(){super.connectedCallback(),this.load()}onSessionChange(){this.load()}async load(){let t=this.sdkOrNull;if(!t?.isLoggedIn){this.info=null,this.earnings=null,this.referees=null;return}this.info=await this.run(()=>t.referral.code(this.appId||void 0))??null,this.earnings=await this.run(()=>t.referral.earnings())??null,this.referees=await this.run(()=>t.referral.referees())??null}updated(t){t.has("appId")&&this.load()}get link(){if(this.info?.invite_url)return this.info.invite_url;let t=this.inviteUrl??(typeof location>"u"?"":`${location.origin}${location.pathname}`);if(!this.info)return t;let e=t.includes("?")?"&":"?";return`${t}${e}ref=${encodeURIComponent(this.info.code)}`}async copy(){try{await navigator.clipboard.writeText(this.link),this.copied=!0,setTimeout(()=>this.copied=!1,2e3)}catch{this.error="Could not copy. Select the link and copy it manually."}}render(){if(!this.sdkOrNull)return r`<p class="muted">Loading…</p>`;if(!this.sdk.isLoggedIn)return r`<p class="muted">Sign in to get your invite link.</p>`;if(!this.info)return r`<p class="muted">${this.error??"Loading\u2026"}</p>`;let t=this.referees?.referees??[],e=this.earnings?.entries??[],b=[["link","Your link"],["referees",`Referees${t.length?` (${t.length})`:""}`],["earnings",`Earnings${e.length?` (${e.length})`:""}`]];return r`
       <div class="stack">
         <div class="tabs" role="tablist">
-          ${g.map(([s,v])=>r`
+          ${b.map(([o,f])=>r`
               <button
                 role="tab"
-                aria-selected=${this.tab===s}
-                class="tab ${this.tab===s?"on":""}"
-                @click=${()=>this.tab=s}
+                aria-selected=${this.tab===o}
+                class="tab ${this.tab===o?"on":""}"
+                @click=${()=>this.tab=o}
               >
-                ${v}
+                ${f}
               </button>
             `)}
         </div>
         ${this.tab==="link"?this.renderLink():this.tab==="referees"?this.renderReferees(t):this.renderEarnings(e)}
-        ${this.error?r`<p class="error" role="alert">${this.error}</p>`:o}
+        ${this.error?r`<p class="error" role="alert">${this.error}</p>`:l}
       </div>
     `}renderLink(){let t=this.earnings?.total??0,e=this.earnings?.entries.length??0;return r`
       <p class="desc">
@@ -28,7 +28,7 @@ import{a as p,b as r,d as o,e as h,f as l,g as n,m as d}from"./chunk-D7VGXHRZ.js
       </div>
       <div class="earned">
         <span class="eyebrow">Earned</span>
-        <span class="total mono">${t.toLocaleString()}</span>
+        <span class="total mono">${n(t)}</span>
         <span class="caption">
           ${e===0?"No referred purchases yet.":`credits from ${e} purchase${e===1?"":"s"}`}
         </span>
@@ -45,11 +45,11 @@ import{a as p,b as r,d as o,e as h,f as l,g as n,m as d}from"./chunk-D7VGXHRZ.js
             <div class="item">
               <span class="mono handle">${e.handle}</span>
               <span class="grow caption">
-                joined ${u(e.joined_at)} ·
+                joined ${v(e.joined_at)} ·
                 ${e.purchases===0?"no purchases yet":`${e.purchases} purchase${e.purchases===1?"":"s"}`}
               </span>
               <span class="mono amount ${e.earned>0?"good":""}">
-                ${e.earned>0?`+${e.earned.toLocaleString()}`:"\u2014"}
+                ${e.earned>0?`+${n(e.earned)}`:"\u2014"}
               </span>
             </div>
           `)}
@@ -65,16 +65,16 @@ import{a as p,b as r,d as o,e as h,f as l,g as n,m as d}from"./chunk-D7VGXHRZ.js
       <div class="list">
         ${t.map(e=>r`
             <div class="item">
-              <span class="mono date">${u(e.created_at)}</span>
+              <span class="mono date">${v(e.created_at)}</span>
               <span class="grow caption">
                 ${e.referee??"unknown"}
-                ${e.referee_credits?r` bought ${e.referee_credits.toLocaleString()} credits`:o}
+                ${e.referee_credits?r` bought ${n(e.referee_credits)} credits`:l}
               </span>
-              <span class="mono amount good">+${e.amount.toLocaleString()}</span>
+              <span class="mono amount good">+${n(e.amount)}</span>
             </div>
           `)}
       </div>
-    `}};a.styles=[d.baseStyles,p`
+    `}};a.styles=[c.baseStyles,h`
       .stack {
         display: grid;
         gap: 12px;
@@ -163,5 +163,5 @@ import{a as p,b as r,d as o,e as h,f as l,g as n,m as d}from"./chunk-D7VGXHRZ.js
         letter-spacing: var(--tracking-display, -0.035em);
         color: var(--text-strong, var(--fb-strong));
       }
-    `],i([l({type:String,attribute:"app-id"})],a.prototype,"appId",2),i([l({type:String,attribute:"invite-url"})],a.prototype,"inviteUrl",2),i([n()],a.prototype,"info",2),i([n()],a.prototype,"earnings",2),i([n()],a.prototype,"referees",2),i([n()],a.prototype,"tab",2),i([n()],a.prototype,"copied",2),a=i([h("openapps-referral")],a);export{a as OpenAppsReferral};
+    `],i([d({type:String,attribute:"app-id"})],a.prototype,"appId",2),i([d({type:String,attribute:"invite-url"})],a.prototype,"inviteUrl",2),i([s()],a.prototype,"info",2),i([s()],a.prototype,"earnings",2),i([s()],a.prototype,"referees",2),i([s()],a.prototype,"tab",2),i([s()],a.prototype,"copied",2),a=i([u("openapps-referral")],a);export{a as OpenAppsReferral};
 //# sourceMappingURL=openapps-referral.js.map

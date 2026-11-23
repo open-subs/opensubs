@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "app.opensubs.mobile",
+  "build": {
+    "beforeBuildCommand": "OPENSUBS_STORE=1 npm run build"
+  },
+  "app": {
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "appstore",
+          "description": "The Mac App Store build: the main window and the sign-in window it opens. No checkout page is ever opened.",
+          "windows": [
+            "main",
+            "signin"
+          ],
+          "permissions": [
+            "core:default",
+            "core:event:default",
+            "core:webview:allow-create-webview-window",
+            "dialog:default"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "targets": [
+      "app"
+    ],
+    "category": "Video",
+    "copyright": "AGPL-3.0-or-later. Source: github.com/open-subs/opensubs",
+    "resources": {
+      "bundled/vendor/ffmpeg": null,
+      "bundled/vendor/ffprobe": null,
+      "bundled/ffmpeg-lgpl/ffmpeg": "vendor/ffmpeg",
+      "bundled/ffmpeg-lgpl/ffprobe": "vendor/ffprobe",
+      "../../../NOTICE": null,
+      "../../../LICENSE": null,
+      "../licences/GPL-3.0.txt": null,
+      "bundled/vendor/ffmpeg-build.txt": null
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}

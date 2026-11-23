@@ -8,6 +8,47 @@
 export type ErrorCode = "bad_request" | "unauthorized" | "insufficient_balance" | "not_found" | "conflict" | "rate_limited" | "internal"
 /** The identity you tried to link is already on a different account. */
  | "identity_belongs_to_another_account"
+/**
+ * The two accounts both use some sign-in method and cannot be combined.
+ * `detail.blocking` says which, and which identity on each side.
+ */
+ | "merge_blocked_by_duplicate_namespace"
+/** The account already has a sign-in of that kind; `detail.linked` is it. */
+ | "namespace_already_linked"
+/** It is the account's only sign-in method. */
+ | "last_sign_in_method"
+/**
+ * A method was connected too recently for the older ones to be removed.
+ * `detail.removable_at` is when they can be; the new one can go now.
+ */
+ | "recently_connected_method"
+/**
+ * A link named the identity it expected (`expect`) and the proof came
+ * from another: a different signer answered. Nothing was linked.
+ * `detail.expected` and `detail.signed` name the two.
+ */
+ | "signed_by_a_different_key"
+/**
+ * The sign-in method proven was connected to its account too recently to
+ * combine accounts with. `detail.retry_at` is when it no longer is.
+ */
+ | "merge_via_new_method"
+/** The credentials are good and are not allowed to do this. */
+ | "forbidden"
+/**
+ * OnWallet cannot be connected from this sign-in: it began with a
+ * redirect code that was not bound to its page. `detail.sign_in_url` is
+ * the server's Account page, which signs in afresh and then connects.
+ */
+ | "sign_in_on_account_page"
+/**
+ * The change asked for (link, unlink, merge, delete, ending sessions)
+ * needs a recent sign-in. Have the user sign in again — with any method
+ * already on the account — and retry.
+ */
+ | "reauth_required"
+/** The account is suspended. */
+ | "account_suspended"
 /** The request never reached the server (offline, DNS, CORS, abort). */
  | "network"
 /** A poll helper gave up before the top-up reached a terminal state. */

@@ -6,7 +6,7 @@ mod commands;
 mod models;
 mod settings;
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[cfg(not(feature = "appstore"))] #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -37,3 +37,9 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+// The Mac App Store build's own entry point; see `store`.
+#[cfg(feature = "appstore")]
+mod store;
+#[cfg(feature = "appstore")]
+pub use store::run;

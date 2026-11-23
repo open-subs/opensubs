@@ -25,6 +25,8 @@ const ko: Record<string, string> = {
   "Fastest. Fine for clear speech.": "가장 빠릅니다. 또렷한 음성이면 충분합니다.",
   "A good default. Handles 99 languages.": "무난한 기본값입니다. 99개 언어를 지원합니다.",
   "Most accurate here, and the slowest.": "여기서 가장 정확하지만 가장 느립니다.",
+  "needs about {memory} of memory": "메모리 약 {memory} 필요",
+  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.": "이 기기의 메모리는 약 {gb}GB로 보고됩니다. Small은 실행 중 약 {memory}를 사용하므로 여기서는 Base를 권장합니다.",
   "Runs on": "실행 장치",
   "Graphics card (GPU)": "그래픽 카드 (GPU)",
   "Processor (CPU)": "프로세서 (CPU)",

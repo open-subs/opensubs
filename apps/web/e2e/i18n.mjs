@@ -15,8 +15,9 @@ import ko from "../src/lib/i18n/ko.ts";
 import de from "../src/lib/i18n/de.ts";
 import es from "../src/lib/i18n/es.ts";
 import pt from "../src/lib/i18n/pt.ts";
+import ru from "../src/lib/i18n/ru.ts";
 
-const CATALOGUES = { "zh-Hans": zhHans, "zh-Hant": zhHant, ja, ko, de, es, pt };
+const CATALOGUES = { "zh-Hans": zhHans, "zh-Hant": zhHant, ja, ko, de, es, pt, ru };
 
 /**
  * Values that are legitimately the same as their English source.
@@ -78,13 +79,16 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
 }
 
 // 4. Placeholders survive translation. A dropped {name} renders the brace
-//    to the user; an invented one renders nothing at all.
+//    to the user; an invented one renders nothing at all. A value with
+//    plural forms ("a|b|c") is checked form by form: each is shown alone.
 for (const [code, table] of Object.entries(CATALOGUES)) {
   const broken = [];
   for (const [k, v] of Object.entries(table)) {
     const want = [...k.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
-    const got = [...v.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
-    if (want !== got) broken.push(`${k} (${want || "none"} -> ${got || "none"})`);
+    for (const form of v.split("|")) {
+      const got = [...form.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
+      if (want !== got) broken.push(`${k} (${want || "none"} -> ${got || "none"})`);
+    }
   }
   ok(`${code} keeps every placeholder`, broken.length === 0, broken.slice(0, 3).join(" | "));
 }
@@ -181,6 +185,34 @@ for (const [code, table] of Object.entries(CATALOGUES)) {
       .map(([k, v]) => `${k} = ${v}`);
     ok(`${code} says "save" as storing a file, not saving money`, wrong.length === 0, wrong.slice(0, 3).join(" | "));
   }
+}
+
+// 8. Plural forms. Russian has three ("1 кредит", "3 кредита", "5 кредитов",
+//    and 21 goes with 1); a "|" value must hold exactly that many, and only
+//    a catalogue whose language needs them may use one. Then the forms are
+//    picked the way t() picks them (plural.ts).
+{
+  const FORMS = { ru: 3 };
+  for (const [code, table] of Object.entries(CATALOGUES)) {
+    const wrong = Object.entries(table)
+      .filter(([, v]) => v.includes("|") && v.split("|").length !== (FORMS[code] ?? 1))
+      .map(([k]) => k);
+    ok(`${code} uses plural forms only as its language needs`, wrong.length === 0, wrong.slice(0, 3).join(" | "));
+  }
+  // Every English key that comes in a singular/plural pair is a count, so
+  // Russian must decline it (or be phrased to need no declension).
+  const counted = reference.filter((k) => /\{n\}/.test(k) || k === "credit" || k === "credits");
+  const flat = counted.filter((k) => !ru[k].includes("|"));
+  ok("ru declines every {n} count", flat.length === 0, flat.slice(0, 3).join(" | "));
+
+  const { pluralForm } = await import("../src/lib/i18n/plural.ts");
+  const credits = (n) => pluralForm(ru[n === 1 ? "{n} credit" : "{n} credits"], "ru", { n }).replaceAll("{n}", String(n));
+  const said = [1, 2, 5, 11, 21, 22, 25, 1000].map(credits);
+  ok("ru picks one / few / many by the count", JSON.stringify(said) === JSON.stringify([
+    "1 кредит", "2 кредита", "5 кредитов", "11 кредитов", "21 кредит", "22 кредита", "25 кредитов", "1000 кредитов",
+  ]), said.join(", "));
+  ok("ru declines a bare noun by n", pluralForm(ru["credits"], "ru", { n: 3 }) === "кредита", pluralForm(ru["credits"], "ru", { n: 3 }));
+  ok("ru takes a fraction's form from few", pluralForm(ru["credits"], "ru", { n: 1.5 }) === "кредита");
 }
 
 console.log(`${pass} passed, ${fails.length} failed`);

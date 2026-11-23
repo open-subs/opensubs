@@ -613,7 +613,8 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   const { join, dirname } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const i18n = await import("../src/lib/i18n.ts");
-  const { resolveLocale, LOCALES } = await import("../../web/src/lib/i18n/locales.ts");
+  const { resolveLocale } = await import("../../web/src/lib/i18n/locales.ts");
+  const { LOCALES } = i18n;
   const src = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
   const files = (dir) => readdirSync(dir).flatMap((f) => {
     const p = join(dir, f);
@@ -654,7 +655,7 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   // entry, asr.ts's progress and failures, and the store-page message.
   const viaVariable = [
     "Tiny (English)", "Fastest. Fine for clear speech.", "A good default. Handles 99 languages.",
-    "Most accurate here, and the slowest.",
+    "Most accurate here, and the slowest.", "needs about {memory} of memory",
     "Uses the processor on Firefox and on Intel built-in graphics, where it was measured faster; the graphics card elsewhere.",
     "Fastest on a dedicated graphics card or Apple silicon. Can fall behind on built-in graphics.",
     "Works everywhere. The first run downloads a model about four times larger.",
@@ -690,6 +691,8 @@ const { toWire, fromWire, blobToWire } = await import("../src/lib/protocol.ts");
   eq("zh-TW and zh-HK read Traditional", [resolveLocale(["zh-TW"]), resolveLocale(["zh-HK"])], ["zh-Hant", "zh-Hant"]);
   eq("pt-PT and pt-BR read Portuguese", [resolveLocale(["pt-PT"]), resolveLocale(["pt-BR"])], ["pt", "pt"]);
   eq("a language not shipped reads English", resolveLocale(["fr-FR"]), "en");
+  eq("the panel skips a web-only language for the next one asked for",
+    resolveLocale(["ru-RU", "de"], LOCALES.map((l) => l.code)), "de");
 
   i18n.setLocale("zh-Hans");
   eq("a word on screen comes out in Chinese", i18n.t("Save .srt"), "保存字幕");

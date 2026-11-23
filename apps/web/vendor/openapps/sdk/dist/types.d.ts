@@ -5,7 +5,7 @@ export type Namespace = "eip155" | "nostr";
  * one-time code, rather than being signed in the page.
  */
 /** Sign-ins that leave the page for the provider and come back. */
-export type RedirectProvider = "google" | "github" | "apple";
+export type RedirectProvider = "google" | "github" | "apple" | "openwallet";
 /** Login methods a given deployment has configured. */
 export interface AuthMethods {
     google: boolean;
@@ -23,6 +23,12 @@ export interface AuthMethods {
      * where a code can really be sent.
      */
     email?: boolean;
+    /**
+     * Sign in with OnWallet: OnWallet ID's OpenID Connect provider. The
+     * person approves in the OnWallet browser extension. Absent on servers
+     * from before it existed.
+     */
+    openwallet?: boolean;
     eip155: boolean;
     nostr: boolean;
 }
@@ -52,6 +58,19 @@ export interface EmailStart {
     /** Seconds before another code may be asked for. */
     resend_after: number;
     code_length: number;
+}
+/**
+ * What `GET /v1/auth/methods` says about the deployment, beyond which
+ * buttons to show.
+ */
+export interface AuthServerInfo {
+    methods: AuthMethods;
+    /**
+     * Where to send someone who has no OnWallet extension. Configured on
+     * the server, so every product links to the same place; `null` until the
+     * operator sets it, and always `null` unless it is an `https:` URL.
+     */
+    openwallet_install_url: string | null;
 }
 export interface Challenge {
     challenge_id: string;
@@ -87,9 +106,131 @@ export interface LinkedAccount {
      * something anyone recognises.
      */
     label?: string;
+    /**
+     * When it came onto this account (unix seconds): at sign-up, at a link,
+     * or at the merge that brought it over. A method connected within
+     * `Me.new_method_cooldown_secs` cannot yet be used to remove older ones.
+     */
+    connected_at?: number;
+}
+/**
+ * Genesis membership, as the account holds it.
+ *
+ * It belongs to the account's linked OnWallet ID and is decided only by
+ * what OnWallet ID says at sign-in — never by an address, an email or a
+ * key. It holds however the person signs in afterwards.
+ */
+export interface Membership {
+    genesis: true;
+    /** The OnWallet identity that carries it, `openwallet:…`. */
+    identity: string;
+    /** When this account first held it (unix seconds). */
+    since: number;
+    /** The last OnWallet sign-in or link that confirmed it. */
+    confirmed_at: number;
+    /** What membership earns applies from this time. */
+    benefits_from: number;
+    /**
+     * What to act on. False while an OnWallet ID that moved here from
+     * another account serves its wait, or when the confirmation is too old.
+     */
+    benefits_active: boolean;
+    /** The person should sign in with OnWallet again to keep the perks. */
+    needs_confirmation: boolean;
+}
+/**
+ * The Nostr keys an account has in view.
+ *
+ * Products use `linked` and nothing else: it is the key the person proved
+ * by signing. `openwallet_claim` is the npub their OnWallet ID says it
+ * has — for display, and never to sign in, to find an account, or to keep
+ * data under.
+ */
+export interface NostrKeys {
+    /** The account's Nostr sign-in, `npub1…`, or null. */
+    linked: string | null;
+    /** The npub the linked OnWallet ID shares, or null. */
+    openwallet_claim: string | null;
+    /** `"linked"` when the account has a Nostr sign-in; otherwise null. */
+    in_use: "linked" | null;
+    /** Both are present and they are different keys. */
+    differs: boolean;
+}
+/**
+ * What the server hands back to start a redirect link.
+ *
+ * `go` is a form to submit as a top-level navigation; the server binds the
+ * link to the browser that posts it from one of its own pages. `auth_url`
+ * is the older plain URL, which a server may refuse.
+ */
+export interface LinkStart {
+    auth_url: string;
+    go?: {
+        url: string;
+        method: "POST";
+        fields: Record<string, string>;
+    };
+    /**
+     * For OnWallet, where the server says in the request that this is a
+     * connect: the six characters OnWallet will show for it. The same as
+     * `Me.openwallet_connect_tag`.
+     */
+    account_tag?: string | null;
+}
+/** One sign-in method, as a refusal names it. */
+export interface IdentitySummary {
+    caip10: string;
+    label: string;
+}
+/**
+ * One entry of `detail.blocking` on a
+ * `merge_blocked_by_duplicate_namespace` error: a kind of sign-in both
+ * accounts hold, and which identity it is on each side.
+ */
+export interface BlockingSignIn {
+    namespace: string;
+    /** `Nostr`, `Google`, … */
+    name: string;
+    this_account: IdentitySummary | null;
+    other_account: IdentitySummary | null;
+    /** Products keep data under this kind of key; giving it up costs more
+     *  than a way in. True for Nostr. */
+    data_depends_on_it: boolean;
+}
+/**
+ * A merge that has been asked for and is waiting. Nothing has moved; either
+ * account can cancel until `effective_at`.
+ */
+export interface PendingMergeInfo {
+    id: string;
+    /**
+     * `"absorbed"`: this account would be folded into another one.
+     * `"survivor"`: this account asked, and would remain.
+     */
+    role: "absorbed" | "survivor";
+    requested_at: number;
+    /** When it happens unless cancelled (unix seconds). */
+    effective_at: number;
+    /** The sign-in method it was asked with, on the absorbed account only. */
+    via: {
+        caip10: string;
+        namespace: string;
+        name: string;
+        label: string;
+    } | null;
 }
 export interface LinkResult {
     ok: boolean;
+    /**
+     * The identity is on another, established account: combining the two was
+     * recorded and will happen at `pending_merge.effective_at` unless either
+     * account cancels. Nothing has moved, and `merged` is false.
+     */
+    merge_pending?: boolean;
+    pending_merge?: {
+        id: string;
+        effective_at: number;
+    };
     caip10: string;
     /** True when another account was absorbed to make this link. */
     merged: boolean;
@@ -102,7 +243,17 @@ export interface OtherAccount {
     balance: number;
 }
 /** What a Google or GitHub link redirect came back with. */
-export type LinkRedirect = {
+export type LinkRedirect = 
+/**
+ * The provider proved the identity; nothing is linked until this page
+ * confirms it with `auth.confirmLink(code)`. Current servers answer only
+ * with this; the other shapes are what older servers sent.
+ */
+{
+    status: "pending";
+    namespace: string;
+    code: string;
+} | {
     status: "linked";
     namespace: string;
     merged: boolean;
@@ -129,6 +280,68 @@ export interface Me {
     referral_code: string;
     balance: number;
     linked_accounts: LinkedAccount[];
+    /** Merges waiting that name this account. Absent when there are none. */
+    pending_merges?: PendingMergeInfo[];
+    /** Genesis membership, or null. Absent on servers from before it. */
+    membership?: Membership | null;
+    /** Which Nostr key is in use. Absent on servers from before it. */
+    nostr?: NostrKeys;
+    /**
+     * How long after a method is connected the older ones cannot be removed
+     * (seconds). The new one can always be disconnected.
+     */
+    new_method_cooldown_secs?: number;
+    /**
+     * When this session's sign-in happened (unix seconds). Linking,
+     * unlinking and deleting need a recent one; older sessions get
+     * `reauth_required` and must sign in again first.
+     */
+    auth_time?: number;
+    /**
+     * The code OnWallet shows when this account connects an OnWallet ID:
+     * six characters, upper case, digits and letters without I, L, O and U.
+     * Show it beside "Connect OnWallet" so the person can compare the two
+     * before approving. Present only on a server where OnWallet is
+     * configured and a connect says what it is; absent otherwise.
+     */
+    openwallet_connect_tag?: string | null;
+    /**
+     * An OnWallet ID is connected and the account has no Genesis
+     * membership. Which of two things the latest approval said:
+     *
+     * - `"not_shared"`: nothing. The person left the membership switch off
+     *   in the wallet, so nobody knows whether they are a member. Say that
+     *   nothing was shared and that connecting again with the switch on turns
+     *   member perks on; do not say they are a member.
+     * - `"not_member"`: OnWallet ID answered that this ID is not a member
+     *   now. Say that, and nothing more: the same answer comes from someone
+     *   who never was a member and someone who no longer is, so never word it
+     *   as a membership that ended.
+     *
+     * Absent in every other case. Treat a value you do not know as absent.
+     */
+    membership_hint?: "not_shared" | "not_member";
+}
+/** One live session of the account, as `auth.sessions()` lists it. */
+export interface SessionInfo {
+    id: string;
+    current: boolean;
+    created_at: number;
+    last_used_at: number;
+    expires_at: number;
+    auth_time: number;
+    amr: string[];
+    client: {
+        user_agent?: string | null;
+        origin?: string | null;
+    } | null;
+}
+/** A security-relevant change to the account, from `auth.events()`. */
+export interface AccountEvent {
+    id: number;
+    kind: string;
+    detail: Record<string, unknown>;
+    created_at: number;
 }
 export interface CreditPackage {
     id: string;
@@ -142,7 +355,33 @@ export interface Packages {
         stripe: boolean;
         ethereum: boolean;
         lightning: boolean;
+        /** Present, and true, only on a server with USD₮0 enabled. */
+        usdt0?: boolean;
     };
+    /** The USD₮0 networks on offer. Absent unless the rail is enabled. */
+    usdt0?: Usdt0Offer;
+}
+/**
+ * USD₮0 (Tether's omnichain USD₮) as a server offers it.
+ *
+ * Issuer-freezable: Tether can freeze any address holding it, and the
+ * server screens every deposit against Tether's blocklist before crediting.
+ * Anything that offers this rail should show `notice`.
+ */
+export interface Usdt0Offer {
+    /** "USD₮0". */
+    token: string;
+    issuer_freezable: true;
+    notice: string;
+    networks: Usdt0Network[];
+}
+export interface Usdt0Network {
+    /** `arbitrum` | `plasma` | `stable` — what `usdt0DepositAddress` takes. */
+    id: string;
+    /** What the payer selects in their wallet, e.g. "Arbitrum One". */
+    name: string;
+    /** CAIP-2, e.g. `eip155:42161`. */
+    chain: string;
 }
 export type TopupStatus = "pending" | "confirmed" | "failed" | "expired";
 export interface Topup {
@@ -184,6 +423,25 @@ export interface EthDeposit {
         usdt: string;
     };
 }
+export interface Usdt0Deposit {
+    topup_id: string;
+    network: string;
+    network_name: string;
+    /** CAIP-2, e.g. `eip155:42161`. */
+    chain: string;
+    address: string;
+    /** Token minor units (6 decimals). */
+    expected_amount: number;
+    token: {
+        symbol: string;
+        contract: string;
+        decimals: number;
+    };
+    issuer_freezable: true;
+    notice: string;
+    /** Null where the wait is for finality rather than a block count. */
+    confirmations_required: number | null;
+}
 export interface LightningInvoice {
     topup_id: string;
     bolt11: string;
@@ -210,6 +468,57 @@ export interface LedgerEntry {
     app_name: string | null;
     balance_after: number;
     created_at: number;
+}
+/**
+ * Why an account has no member credits this month. Each is about the
+ * caller's own account and the OnWallet ID it holds, never another one.
+ */
+export type NoGrantReason = "not_member" | "disabled" | "waiting_after_move" | "budget_exhausted" | "month_not_run" | "inactive";
+/** This month's member credits, when they are on this account. */
+export interface MemberGrant {
+    /** The UTC calendar month, `"2026-11"`. */
+    month: string;
+    /** The level's name, as the operator configured it. */
+    level: string;
+    /** What the level is due, in credits. */
+    nominal: number;
+    /** What was granted, in credits. Less than `nominal` when scaled. */
+    granted: number;
+    /** The month's budget scaled this grant down. */
+    scaled: boolean;
+    /** The scale, in parts per million of `nominal`. */
+    scale_ppm: number;
+    /** What is left of it. */
+    remaining: number;
+    granted_at: number;
+    /** When what is left lapses (unix seconds; 00:00 UTC on the 1st). */
+    expires_at: number;
+}
+/**
+ * What a balance is made of.
+ *
+ * A server with member credits off answers `{ balance }` and nothing else,
+ * so every field but `balance` is optional: its absence means "this server
+ * does not say", and a UI then shows the number alone.
+ */
+export interface CreditsBreakdown {
+    /** Everything spendable now. */
+    balance: number;
+    /** Credits that never lapse: bought, a referral bonus, an adjustment. */
+    purchased?: number;
+    /** Member credits; they lapse at the end of their month. */
+    granted?: number;
+    /** When the soonest of them lapse, or null when there are none. */
+    granted_expires_at?: number | null;
+    /** Every lapse ahead, soonest first. */
+    expiring?: {
+        amount: number;
+        expires_at: number;
+    }[];
+    /** This month's grant, or null. */
+    member_grant?: MemberGrant | null;
+    /** Null when there is a grant; otherwise why there is none. */
+    no_grant_reason?: NoGrantReason | null;
 }
 export interface History {
     entries: LedgerEntry[];
@@ -264,5 +573,33 @@ export interface Referees {
         purchases: number;
         earned: number;
     }[];
+}
+/**
+ * What agents a person approves in OnWallet may spend from this account's
+ * credits through the /connect gateway (`GET /v1/me/delegation`).
+ */
+export interface Delegation {
+    per_day_credits: number;
+    per_run_credits: number;
+    /** Delegated spending today (UTC): captured, plus holds still running. */
+    used_today: number;
+    /** Unix seconds when it was turned off, or null while it is on. */
+    revoked_at: number | null;
+}
+export interface DelegationView {
+    /** Whether the account has an OnWallet ID; without one nothing applies. */
+    onwallet_linked: boolean;
+    /** Null until it is set (connecting OnWallet sets the defaults). */
+    delegation: Delegation | null;
+    used_today: number;
+    /** Spendable now: the balance less credits held for work under way. */
+    balance: number;
+    /** What a new delegation starts at: 200 a day, 50 a run. */
+    defaults: {
+        per_day_credits: number;
+        per_run_credits: number;
+    };
+    /** 0.005: 200 credits is $1. */
+    usd_per_credit: number;
 }
 //# sourceMappingURL=types.d.ts.map

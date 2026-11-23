@@ -70,8 +70,8 @@ for (const name of ["zh", "ja", "en"]) {
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage({ viewport: { width: 1180, height: 1000 } });
   await page.goto(base);
-  await page.waitForSelector('input[accept="video/*"]', { state: "attached", timeout: 30000 });
-  await page.setInputFiles('input[accept="video/*"]', video);
+  await page.waitForSelector('input[accept^="video/*"]', { state: "attached", timeout: 30000 });
+  await page.setInputFiles('input[accept^="video/*"]', video);
   await page.waitForFunction(
     () => document.querySelector(".file-meta")?.textContent?.includes("×"),
     { timeout: 120000 },

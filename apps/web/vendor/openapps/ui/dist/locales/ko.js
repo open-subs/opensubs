@@ -7,6 +7,7 @@ const catalogue = {
     "Continue with a wallet": "지갑으로 계속하기",
     "Continue with {name}": "{name}(으)로 계속하기",
     "Continue with Nostr": "Nostr로 계속하기",
+    "Coming soon": "곧 출시",
     "No extension? Use a remote signer": "확장 프로그램이 없나요? 원격 서명기 사용",
     "Email address": "이메일 주소",
     "Send code": "코드 보내기",
@@ -31,7 +32,13 @@ const catalogue = {
     "Email sign-in is not available here.": "여기서는 이메일 로그인을 사용할 수 없습니다.",
     "Could not reach the server. Check your connection and try again.": "서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
     "Sign out": "로그아웃",
-    "This server has no login methods configured.": "이 서버에는 로그인 방법이 설정되어 있지 않습니다."
+    "This server has no login methods configured.": "이 서버에는 로그인 방법이 설정되어 있지 않습니다.",
+    // OnWallet: the button reads these words, then the wordmark.
+    "Sign in with": "로그인:",
+    "Continue in OnWallet…": "OnWallet에서 계속…",
+    "Approve in your OnWallet browser extension": "OnWallet 브라우저 확장 프로그램에서 승인하세요",
+    "Sign-in was declined in OnWallet.": "OnWallet에서 로그인이 거부되었습니다.",
+    "The OnWallet request timed out. Try again.": "OnWallet 요청 시간이 초과되었습니다. 다시 시도하세요."
 };
 export default catalogue;
 //# sourceMappingURL=ko.js.map

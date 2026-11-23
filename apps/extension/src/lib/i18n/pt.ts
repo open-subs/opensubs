@@ -25,6 +25,8 @@ const pt: Record<string, string> = {
   "Fastest. Fine for clear speech.": "O mais rápido. Suficiente para fala clara.",
   "A good default. Handles 99 languages.": "Um bom padrão. Lida com 99 idiomas.",
   "Most accurate here, and the slowest.": "O mais preciso aqui, e o mais lento.",
+  "needs about {memory} of memory": "precisa de cerca de {memory} de memória",
+  "This device reports about {gb} GB of memory. Small needs about {memory} while it works, so Base is the safer choice here.": "Este dispositivo indica cerca de {gb} GB de memória. O Small precisa de cerca de {memory} enquanto trabalha, por isso o Base é a escolha mais segura aqui.",
   "Runs on": "Executar em",
   "Graphics card (GPU)": "Placa de vídeo (GPU)",
   "Processor (CPU)": "Processador (CPU)",

@@ -613,6 +613,23 @@ html {
   border: 1px dashed var(--border-strong);
 }
 
+/* Audio with no picture: the same quiet surface, with the player's own
+   controls kept at their natural height under the note instead of a
+   black 16:9 box. */
+.stage.stage-audio {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+}
+
+.stage.stage-audio .no-video {
+  padding-bottom: var(--space-3);
+}
+
+.stage.stage-audio video {
+  height: 54px;
+  background: transparent;
+}
+
 .no-video {
   display: flex;
   flex-direction: column;
@@ -906,6 +923,13 @@ html {
 .burn-done-body {
   flex: 1;
   min-width: 0;
+}
+
+/* "Enjoying OpenSubs?" and the Telegram and X pair, once under a finished
+   result (App.svelte). */
+.result-community {
+  display: block;
+  margin-top: var(--space-3);
 }
 
 /* An indeterminate stage: model download and inference report no fraction. */
@@ -1643,7 +1667,8 @@ html {
 
 /* The "having trouble?" box (lib/support.ts). Nothing until it is defined,
    which in the phone shells is never. */
-openapps-support:not(:defined) {
+openapps-support:not(:defined),
+openapps-community:not(:defined) {
   display: none;
 }
 .banner.signin-failed p {
