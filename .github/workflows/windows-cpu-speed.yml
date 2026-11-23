@@ -67,7 +67,11 @@ jobs:
           "CMAKE_GENERATOR=Ninja" | Out-File -Append $env:GITHUB_ENV
           # The Visual Studio generator turns C++ exceptions on by itself;
           # with Ninja they have to be asked for, and ggml uses them.
-          "CXXFLAGS=/EHsc" | Out-File -Append $env:GITHUB_ENV
+          "CXXFLAGS=/EHsc /MT" | Out-File -Append $env:GITHUB_ENV
+          # The static C runtime, as the Rust side links (+crt-static).
+          "CFLAGS=/MT" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_POLICY_DEFAULT_CMP0091=NEW" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" | Out-File -Append $env:GITHUB_ENV
       - name: Windows settings
         if: runner.os == 'Windows'
         shell: bash
