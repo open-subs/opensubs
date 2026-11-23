@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [release, openmp, native]
+        variant: [release, openmp]
     env:
       CARGO_TARGET_DIR: D:\t
       RUSTFLAGS: -C target-feature=+crt-static
@@ -51,7 +51,7 @@ jobs:
         run: |
           features=""
           [ "${{ matrix.variant }}" = openmp ] && features="--features openmp"
-          cargo build --release -p subs-whisper --example transcribe $features
+          cargo build --release -p subs-whisper --example transcribe --example stages $features
       - name: Model and sample
         shell: pwsh
         run: |
@@ -68,3 +68,7 @@ jobs:
             Get-Content "$env:RUNNER_TEMP\w.log" | Select-String -Pattern "^[0-9.]+s, language|system_info|n_threads" | ForEach-Object { "${{ matrix.variant }} run ${i}: $_" }
           }
           $out
+      - name: Each stage
+        shell: pwsh
+        run: |
+          & "$env:CARGO_TARGET_DIR\release\examples\stages.exe" "$env:RUNNER_TEMP\ggml-base.bin" "$env:RUNNER_TEMP\jfk.wav" 2>&1 | Select-String -Pattern "^stage|system_info" | ForEach-Object { "${{ matrix.variant }} $_" }
