@@ -65,6 +65,9 @@ jobs:
           "CC=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
           "CXX=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
           "CMAKE_GENERATOR=Ninja" | Out-File -Append $env:GITHUB_ENV
+          # The Visual Studio generator turns C++ exceptions on by itself;
+          # with Ninja they have to be asked for, and ggml uses them.
+          "CXXFLAGS=/EHsc" | Out-File -Append $env:GITHUB_ENV
       - name: Windows settings
         if: runner.os == 'Windows'
         shell: bash
