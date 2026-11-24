@@ -82,7 +82,7 @@ jobs:
         # a release build, nor the other way round.
         # "clang": whisper-rs-sys does not rebuild when the compiler changes,
         # so a cache from the MSVC build must never be restored into this one.
-        with: { key: "ggml-vulkan-clang-${{ env.VULKAN_VERSION }}" }
+        with: { key: "ggml-vulkan-clang2-${{ env.VULKAN_VERSION }}" }
 
       # whisper.cpp compiled by clang-cl, not MSVC. Measured on the same
       # 4-core build machine, the 11 s sample with the base model took 20.8 s
@@ -102,11 +102,16 @@ jobs:
           $clang = Get-ChildItem "$env:VCINSTALLDIR\Tools\Llvm\x64\bin\clang-cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $clang) { throw "Visual Studio has no clang-cl here: $env:VCINSTALLDIR" }
           & $clang.FullName --version
-          "CC=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
-          "CXX=$($clang.FullName)" | Out-File -Append $env:GITHUB_ENV
+          # Only whisper.cpp: whisper-rs-sys hands every CMAKE_* variable to
+          # its own cmake and to nothing else. A plain CC/CXX reaches every C
+          # dependency, and CTranslate2's cpuinfo does not compile under
+          # clang-cl. (CMAKE_GENERATOR is read by every cmake build; the
+          # others build with MSVC under Ninja as they did under Visual Studio.)
+          $cl = $clang.FullName -replace '\\','/'
+          "CMAKE_C_COMPILER=$cl" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_CXX_COMPILER=$cl" | Out-File -Append $env:GITHUB_ENV
+          "CMAKE_CXX_FLAGS=/EHsc" | Out-File -Append $env:GITHUB_ENV
           "CMAKE_GENERATOR=Ninja" | Out-File -Append $env:GITHUB_ENV
-          "CXXFLAGS=/EHsc /MT" | Out-File -Append $env:GITHUB_ENV
-          "CFLAGS=/MT" | Out-File -Append $env:GITHUB_ENV
           "CMAKE_POLICY_DEFAULT_CMP0091=NEW" | Out-File -Append $env:GITHUB_ENV
           "CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" | Out-File -Append $env:GITHUB_ENV
 
